@@ -96,11 +96,46 @@ with `--threads`), each with its own key deriver and CSPRNG-filled entropy
 buffer, so the hot loop has no shared mutable state beyond a lock-free match
 counter.
 
-**Planned: GPU backend.** The address-derivation and pattern-matching core
-(`XrplVanity.Core`) is deliberately kept free of CLI and threading concerns so
-its semantics — `entropy -> address` and `address -> match?` — can be
-reproduced bit-for-bit by a future GPU (CUDA) kernel for much higher
-throughput. That kernel is not implemented yet.
+The address-derivation core (`XrplVanity.Core`) is deliberately kept free of
+CLI and threading concerns so its semantics — `entropy -> address` — can be
+reproduced bit-for-bit by a GPU backend for much higher throughput. The
+`--gpu` flag and the GPU-side pattern search are not implemented yet; that is
+planned future work. What exists today is the verified derivation pipeline
+described below.
+
+## GPU backend (CUDA)
+
+The CUDA kernel source lives at `gpu/kernels/xrpl_vanity.cu` (device-only —
+it is not built by `dotnet build` or any `.csproj`). It implements the same
+`entropy -> address` derivation as `XrplVanity.Core`, verified kernel by
+kernel against the .NET/BouncyCastle reference and against RFC 8032 test
+vectors.
+
+At development time, the kernel is compiled to PTX (target `compute_75`,
+i.e. NVIDIA Turing / 2018 or newer — the driver JIT-compiles the PTX for the
+actual GPU at load time) with:
+
+```bash
+python gpu/build-ptx.py
+```
+
+This needs the `nvidia-cuda-nvrtc` pip wheel:
+
+```bash
+pip install --user nvidia-cuda-nvrtc
+```
+
+Set `NVRTC_DIR` to override where the script looks for the NVRTC library.
+
+The generated `gpu/kernels/xrpl_vanity.ptx` is committed to the repository
+and embedded into the `XrplVanity.Gpu` assembly as a resource, so a plain
+`dotnet build` never requires CUDA or NVRTC — only the NVIDIA driver is
+needed at run time, to load and execute the embedded PTX. Whenever the `.cu`
+kernel changes, regenerate the PTX and commit the `.cu` and `.ptx` files
+together.
+
+GPU tests (`tests/XrplVanity.Tests/Gpu`) skip automatically when no CUDA
+device is present, or when the available device is older than compute_75.
 
 ## Acknowledgements
 
