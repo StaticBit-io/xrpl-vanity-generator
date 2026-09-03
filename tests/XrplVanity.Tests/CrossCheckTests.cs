@@ -11,12 +11,12 @@ public class CrossCheckTests
     public void Derived_Address_Matches_Sdk_For_Random_Seeds()
     {
         IAddressDeriver deriver = new BouncyCastleDeriver();
+        Span<char> buffer = stackalloc char[48];
 
         for (int i = 0; i < 500; i++)
         {
             byte[] entropy = RandomNumberGenerator.GetBytes(16);
 
-            Span<char> buffer = stackalloc char[48];
             int len = deriver.DeriveAddress(entropy, buffer);
             string ours = new string(buffer[..len]);
 
