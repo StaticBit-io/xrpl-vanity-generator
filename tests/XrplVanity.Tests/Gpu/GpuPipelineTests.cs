@@ -10,6 +10,12 @@ namespace XrplVanity.Tests.Gpu;
 
 public class GpuPipelineTests
 {
+    // Launching all n candidates in one cuLaunchKernel makes one very long kernel for large
+    // n, which a display GPU under the default Windows WDDM TDR (2 seconds) can kill with
+    // CUDA_ERROR_LAUNCH_TIMEOUT. Process in batches instead, reusing the same device buffers
+    // via pointer offsets so the wall-clock cost stays the same.
+    private const int BatchSize = 65_536;
+
     private static byte[] RunDerive(byte[] entropies, int n)
     {
         using CudaContext context = GpuTestHelper.RequireContext();
@@ -19,8 +25,15 @@ public class GpuPipelineTests
         using DeviceBuffer din = context.Alloc(entropies.Length);
         using DeviceBuffer dout = context.Alloc((long)n * 36);
         din.CopyFrom(entropies);
-        context.Launch(fn, (n + 127) / 128, 128, din, dout, n);
-        context.Synchronize();
+
+        for (int batchStart = 0; batchStart < n; batchStart += BatchSize)
+        {
+            int batchLength = Math.Min(BatchSize, n - batchStart);
+            ulong inPointer = din.Pointer + (ulong)batchStart * 16;
+            ulong outPointer = dout.Pointer + (ulong)batchStart * 36;
+            context.Launch(fn, (batchLength + 127) / 128, 128, inPointer, outPointer, batchLength);
+            context.Synchronize();
+        }
 
         byte[] output = new byte[n * 36];
         dout.CopyTo(output);
