@@ -596,18 +596,22 @@ extern "C" __global__ void k_derive_address(const u8* entropy, u8* out, int n)
     derive_address(entropy + i * 16, out + i * 36);
 }
 
-// Per-launch entropy PRF: out[i] = SHA-512(key32 || LE64(start + i))[0..16].
+// Per-launch entropy PRF: out16 = SHA-512(key32 || LE64(counter))[0..16].
+__device__ void prf_entropy(const u8* key32, u64 counter, u8* out16)
+{
+    u8 m[40];
+    for (int j = 0; j < 32; j++) m[j] = key32[j];
+    for (int j = 0; j < 8; j++) m[32 + j] = (u8)(counter >> (8 * j));
+    u8 h[64];
+    sha512(m, 40, h);
+    for (int j = 0; j < 16; j++) out16[j] = h[j];
+}
+
 extern "C" __global__ void k_prf_entropy(const u8* key32, u64 start, u8* out, int n)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    u8 m[40];
-    for (int j = 0; j < 32; j++) m[j] = key32[j];
-    u64 c = start + (u64)i;
-    for (int j = 0; j < 8; j++) m[32 + j] = (u8)(c >> (8 * j));
-    u8 h[64];
-    sha512(m, 40, h);
-    for (int j = 0; j < 16; j++) out[i * 16 + j] = h[j];
+    prf_entropy(key32, start + (u64)i, out + i * 16);
 }
 
 // ---------------------------------------------------------------------------
@@ -669,4 +673,31 @@ extern "C" __global__ void k_match_records(const u8* records, int n, const u32* 
     const u8* rec = records + i * 36;
     int len = rec[0];
     flags[i] = (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars)) ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// M5: search kernel. Each thread derives one candidate from the launch key and
+// its counter, matches it on the device, and appends a 52-byte hit record
+// (entropy16 || address record36) behind an atomic counter. Slots beyond
+// hitCapacity are dropped; the host reads hitCount to detect the overflow.
+// ---------------------------------------------------------------------------
+extern "C" __global__ void k_search(const u8* key32, u64 start, int n,
+                                    const u32* groups, int groupCount, const u8* chars,
+                                    u8* hits, u32* hitCount, int hitCapacity)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    u8 e[16];
+    prf_entropy(key32, start + (u64)i, e);
+    u8 rec[36];
+    derive_address(e, rec);
+    int len = rec[0];
+    if (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars)) {
+        u32 slot = atomicAdd(hitCount, 1u);
+        if ((int)slot < hitCapacity) {
+            u8* h = hits + (u32)slot * 52u;
+            for (int j = 0; j < 16; j++) h[j] = e[j];
+            for (int j = 0; j < 36; j++) h[16 + j] = rec[j];
+        }
+    }
 }
