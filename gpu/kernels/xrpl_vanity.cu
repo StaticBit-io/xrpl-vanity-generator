@@ -701,3 +701,128 @@ extern "C" __global__ void k_search(const u8* key32, u64 start, int n,
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// M6: windowed fixed-base scalar multiplication (libsodium ge25519_scalarmult_base
+// layout). A 256-entry table of precomputed multiples of B is built ON THE DEVICE by
+// the verified naive scalarmult_base, so no new host arithmetic is trusted.
+//   table[k*8 + j] = precomp((j+1) * 2^(8k) * B), k in 0..31, j in 0..7, 96 bytes each
+//   precomp(P) = (y+x, y-x, 2d*x*y) of the affine point.
+// Requires a clamped scalar (bit 255 clear) so the recoded top digit fits the table.
+// ---------------------------------------------------------------------------
+struct Precomp { Fe ypx, ymx, xy2d; };
+
+__device__ void precomp_from_pt(Precomp& o, const Pt& p)
+{
+    Fe zi, x, y, t, d2;
+    fe_inv(zi, p.Z);
+    fe_mul(x, p.X, zi);
+    fe_mul(y, p.Y, zi);
+    fe_add(o.ypx, y, x);
+    fe_sub(o.ymx, y, x);
+    fe_load_const(d2, D2_LIMBS);
+    fe_mul(t, x, y);
+    fe_mul(o.xy2d, t, d2);
+}
+
+extern "C" __global__ void k_build_base_table(u8* table)
+{
+    int t = blockIdx.x * blockDim.x + threadIdx.x;
+    if (t >= 256) return;
+    int k = t / 8;
+    int j = t % 8;
+    u8 s[32];
+    for (int i = 0; i < 32; i++) s[i] = 0;
+    s[k] = (u8)(j + 1);                       // (j+1) * 256^k = (j+1) * 2^(8k)
+    Pt P;
+    scalarmult_base(P, s);
+    Precomp pc;
+    precomp_from_pt(pc, P);
+    u8* o = table + t * 96;
+    fe_to_bytes(o, pc.ypx);
+    fe_to_bytes(o + 32, pc.ymx);
+    fe_to_bytes(o + 64, pc.xy2d);
+}
+
+__device__ __forceinline__ void precomp_identity(Precomp& o) { fe_one(o.ypx); fe_one(o.ymx); fe_zero(o.xy2d); }
+
+__device__ __forceinline__ void precomp_load(Precomp& o, const u8* table, int index)
+{
+    const u8* e = table + index * 96;
+    fe_from_bytes(o.ypx, e);
+    fe_from_bytes(o.ymx, e + 32);
+    fe_from_bytes(o.xy2d, e + 64);
+}
+
+// -P: (y+x, y-x, 2dxy) -> (y-x, y+x, -2dxy)
+__device__ __forceinline__ void precomp_neg(Precomp& o)
+{
+    Fe t;
+    fe_copy(t, o.ypx);
+    fe_copy(o.ypx, o.ymx);
+    fe_copy(o.ymx, t);
+    Fe z;
+    fe_zero(z);
+    fe_sub(o.xy2d, z, o.xy2d);
+}
+
+// r = p + q with q in precomputed affine form (add-2008-hwcd-3, Z2 = 1). r may alias p.
+__device__ void pt_madd(Pt& r, const Pt& p, const Precomp& q)
+{
+    Fe A, B, C, D, E, F, G, H, t1;
+    fe_sub(t1, p.Y, p.X); fe_mul(A, t1, q.ymx);
+    fe_add(t1, p.Y, p.X); fe_mul(B, t1, q.ypx);
+    fe_mul(C, p.T, q.xy2d);
+    fe_add(D, p.Z, p.Z);
+    fe_sub(E, B, A); fe_sub(F, D, C); fe_add(G, D, C); fe_add(H, B, A);
+    fe_mul(r.X, E, F); fe_mul(r.Y, G, H); fe_mul(r.Z, F, G); fe_mul(r.T, E, H);
+}
+
+__device__ __forceinline__ void select_precomp(Precomp& o, const u8* table, int k, int e)
+{
+    if (e == 0) { precomp_identity(o); return; }
+    int a = e < 0 ? -e : e;
+    precomp_load(o, table, k * 8 + (a - 1));
+    if (e < 0) precomp_neg(o);
+}
+
+// r = scalar * B via 64 signed 4-bit digits: odd digits first, x16, then even digits.
+__device__ void scalarmult_base_windowed(Pt& r, const u8* a, const u8* table)
+{
+    signed char e[64];
+    for (int i = 0; i < 32; i++) {
+        e[2 * i]     = (signed char)(a[i] & 15);
+        e[2 * i + 1] = (signed char)((a[i] >> 4) & 15);
+    }
+    signed char carry = 0;
+    for (int i = 0; i < 63; i++) {
+        e[i] = (signed char)(e[i] + carry);
+        carry = (signed char)((e[i] + 8) >> 4);
+        e[i] = (signed char)(e[i] - carry * 16);
+    }
+    e[63] = (signed char)(e[63] + carry);
+
+    Pt h;
+    pt_identity(h);
+    Precomp t;
+    for (int i = 1; i < 64; i += 2) {
+        select_precomp(t, table, i / 2, e[i]);
+        pt_madd(h, h, t);
+    }
+    pt_dbl(h, h); pt_dbl(h, h); pt_dbl(h, h); pt_dbl(h, h);
+    for (int i = 0; i < 64; i += 2) {
+        select_precomp(t, table, i / 2, e[i]);
+        pt_madd(h, h, t);
+    }
+    r = h;
+}
+
+// Test entry: n clamped scalars -> n compressed public keys via the windowed path.
+extern "C" __global__ void k_scalarmult_base_windowed(const u8* scalars, u8* pubs, int n, const u8* table)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    Pt P;
+    scalarmult_base_windowed(P, scalars + i * 32, table);
+    pt_compress(pubs + i * 32, P);
+}
