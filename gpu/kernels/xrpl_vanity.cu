@@ -796,6 +796,10 @@ __device__ void scalarmult_base_windowed(Pt& r, const u8* a, const u8* table)
         e[2 * i]     = (signed char)(a[i] & 15);
         e[2 * i + 1] = (signed char)((a[i] >> 4) & 15);
     }
+    // Carry recoding into signed digits e[i] in [-8, 7]. Before the shift e[i] + 8 is in
+    // [8, 24] (never negative), so the right shift is well defined. Because the scalar is
+    // clamped (a[31] <= 127) the top digit ends in [4, 8], so select_precomp's largest
+    // index is 31*8 + 7 = 255 and never leaves the 256-entry table.
     signed char carry = 0;
     for (int i = 0; i < 63; i++) {
         e[i] = (signed char)(e[i] + carry);
