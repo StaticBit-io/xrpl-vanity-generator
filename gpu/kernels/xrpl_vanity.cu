@@ -609,3 +609,64 @@ extern "C" __global__ void k_prf_entropy(const u8* key32, u64 start, u8* out, in
     sha512(m, 40, h);
     for (int j = 0; j < 16; j++) out[i * 16 + j] = h[j];
 }
+
+// ---------------------------------------------------------------------------
+// M5: device-side matching over host-sorted target groups.
+// groups: 4 x u32 per group = { position (0 starts, 1 ends, 2 contains), length,
+//         offset into chars, count }. Targets inside a group are sorted ordinal
+//         (unsigned byte order) and packed at stride = length.
+// The predicate below equals XrplVanity.Core.PatternSet.TryMatch's hit / no-hit result.
+// ---------------------------------------------------------------------------
+__device__ __forceinline__ int cmp_bytes(const u8* a, const u8* b, int len)
+{
+    for (int i = 0; i < len; i++) {
+        if (a[i] != b[i]) return (a[i] < b[i]) ? -1 : 1;
+    }
+    return 0;
+}
+
+// Binary search for `slice` (exactly `len` bytes) inside one sorted group.
+__device__ bool group_has(const u8* chars, u32 offset, u32 count, u32 len, const u8* slice)
+{
+    int lo = 0;
+    int hi = (int)count - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) >> 1;
+        int c = cmp_bytes(chars + offset + (u32)mid * len, slice, (int)len);
+        if (c == 0) return true;
+        if (c < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    return false;
+}
+
+// body = the address WITHOUT its leading 'r'; bodyLen = its length.
+__device__ bool matches_any(const u8* body, int bodyLen, const u32* groups, int groupCount, const u8* chars)
+{
+    for (int g = 0; g < groupCount; g++) {
+        u32 pos = groups[g * 4];
+        u32 len = groups[g * 4 + 1];
+        u32 off = groups[g * 4 + 2];
+        u32 cnt = groups[g * 4 + 3];
+        if ((int)len > bodyLen || cnt == 0 || len == 0) continue;
+        if (pos == 0) {
+            if (group_has(chars, off, cnt, len, body)) return true;
+        } else if (pos == 1) {
+            if (group_has(chars, off, cnt, len, body + bodyLen - (int)len)) return true;
+        } else {
+            for (int s = 0; s + (int)len <= bodyLen; s++) {
+                if (group_has(chars, off, cnt, len, body + s)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Test entry: n x 36-byte address records ([len][chars...]) -> flags[i] = 1 on a hit.
+extern "C" __global__ void k_match_records(const u8* records, int n, const u32* groups, int groupCount, const u8* chars, u8* flags)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    const u8* rec = records + i * 36;
+    int len = rec[0];
+    flags[i] = (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars)) ? 1 : 0;
+}
