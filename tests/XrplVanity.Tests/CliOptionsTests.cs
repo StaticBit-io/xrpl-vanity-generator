@@ -48,4 +48,11 @@ public class CliOptionsTests
         Assert.False(CliOptions.Parse(new[] { "hodl" }).Gpu);
         Assert.True(CliOptions.Parse(new[] { "--gpu", "hodl" }).Gpu);
     }
+
+    [Fact]
+    public void ThreadsSpecified_Reflects_Whether_The_User_Passed_Threads()
+    {
+        Assert.True(CliOptions.Parse(new[] { "--threads", "4", "x" }).ThreadsSpecified);
+        Assert.False(CliOptions.Parse(new[] { "x" }).ThreadsSpecified);
+    }
 }

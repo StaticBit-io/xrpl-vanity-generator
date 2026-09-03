@@ -51,7 +51,7 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--contains P...` | — | patterns to match anywhere |
 | `--list FILE [minLen]` | — | load `starts` patterns from a word list, optional min length filter (default 4) |
 | `--case-sensitive` | off (case-insensitive) | match the pattern exactly as typed; by default every case combination is matched |
-| `--threads N` | `ProcessorCount` | number of worker threads |
+| `--threads N` | `ProcessorCount` | number of worker threads (CPU path only; ignored with `--gpu`) |
 | `--out FILE` | — | append matches to a file as well as stdout |
 | `--count N` | — | stop after N matches (otherwise run until interrupted, e.g. Ctrl+C) |
 | `--gpu` | off | search on the NVIDIA GPU (requires the driver; every GPU hit is re-verified by the CPU before it is printed) |

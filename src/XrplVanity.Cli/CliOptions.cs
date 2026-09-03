@@ -11,6 +11,7 @@ public sealed class CliOptions
     public bool CaseSensitive { get; init; }
     public bool Gpu { get; init; }
     public int Threads { get; init; } = Environment.ProcessorCount;
+    public bool ThreadsSpecified { get; init; }
     public string? OutFile { get; init; }
     public int? Count { get; init; }
     public string? ListFile { get; init; }
@@ -22,6 +23,7 @@ public sealed class CliOptions
         bool caseSensitive = false;
         bool gpu = false;
         int threads = Environment.ProcessorCount;
+        bool threadsSpecified = false;
         string? outFile = null;
         int? count = null;
         string? listFile = null;
@@ -49,6 +51,7 @@ public sealed class CliOptions
                     break;
                 case "--threads":
                     threads = NextInt(args, ref i, arg);
+                    threadsSpecified = true;
                     break;
                 case "--out":
                     outFile = Next(args, ref i, arg);
@@ -81,6 +84,7 @@ public sealed class CliOptions
             CaseSensitive = caseSensitive,
             Gpu = gpu,
             Threads = threads,
+            ThreadsSpecified = threadsSpecified,
             OutFile = outFile,
             Count = count,
             ListFile = listFile,

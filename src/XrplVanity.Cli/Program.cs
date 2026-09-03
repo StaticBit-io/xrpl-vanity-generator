@@ -16,11 +16,8 @@ public static class SearchRunner
         PatternSet.Builder builder = new();
         foreach ((MatchPosition position, string pattern) in options.Patterns)
         {
-            if (string.IsNullOrWhiteSpace(pattern))
-            {
-                continue;
-            }
-
+            // Core classifies blank/empty patterns as unreachable (PatternSet.Builder.Add);
+            // let them flow through so that classification - and the warning it drives - fires.
             builder.Add(position, pattern, ignoreCase: !options.CaseSensitive);
         }
 
@@ -106,8 +103,15 @@ public static class Program
         PatternSet patterns = SearchRunner.BuildPatternSet(options);
         foreach (NormalizedPattern u in patterns.Unreachable)
         {
-            Console.Error.WriteLine(
-                $"warning: pattern '{u.Original}' cannot occur in an XRPL address; skipped.");
+            if (u.Value.Length == 0)
+            {
+                Console.Error.WriteLine("warning: empty pattern ignored (it would match every address).");
+            }
+            else
+            {
+                Console.Error.WriteLine(
+                    $"warning: pattern '{u.Original}' cannot occur in an XRPL address; skipped.");
+            }
         }
 
         foreach (NormalizedPattern s in patterns.CaseFoldingSkipped)
@@ -130,6 +134,11 @@ public static class Program
             return 2;
         }
 
+        if (options.Gpu && options.ThreadsSpecified)
+        {
+            Console.Error.WriteLine("note: --threads is ignored with --gpu (the search runs on the device).");
+        }
+
         Console.Error.WriteLine(
             "WARNING: a seed is a secret. Anyone who holds it controls the account. " +
             "Keep matches offline and verify this tool before using generated keys for real funds.");
@@ -140,9 +149,17 @@ public static class Program
 
         if (gpuContext is not null)
         {
-            using (gpuContext)
+            try
             {
-                RunGpu(gpuContext, patterns, sink, cts);
+                using (gpuContext)
+                {
+                    RunGpu(gpuContext, patterns, sink, cts);
+                }
+            }
+            catch (XrplVanity.Gpu.CudaException ex)
+            {
+                Console.Error.WriteLine($"error: GPU search failed: {ex.Message}");
+                return 2;
             }
         }
         else
