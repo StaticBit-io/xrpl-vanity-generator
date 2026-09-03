@@ -541,3 +541,61 @@ extern "C" __global__ void k_base58(const u8* in, u8* out, int n)
     o[0] = (u8)len;
     for (int j = 0; j < 35; j++) o[1 + j] = (j < len) ? (u8)buf[j] : 0;
 }
+
+// ---------------------------------------------------------------------------
+// M4: full XRPL Ed25519 derivation, entropy16 -> classic address. Step for step the
+// same algorithm as XrplVanity.Core.BouncyCastleDeriver.
+// ---------------------------------------------------------------------------
+__device__ void derive_address(const u8* entropy16, u8* out36)
+{
+    u8 h1[64];
+    sha512(entropy16, 16, h1);                 // seed32 = h1[0..32]  (XRPL)
+    u8 h2[64];
+    sha512(h1, 32, h2);                        // RFC 8032: scalar = clamp(SHA-512(seed32)[0..32])
+    u8 a[32];
+    for (int j = 0; j < 32; j++) a[j] = h2[j];
+    a[0] &= 248; a[31] &= 127; a[31] |= 64;
+
+    Pt P;
+    scalarmult_base(P, a);
+    u8 pub[33];
+    pub[0] = 0xED;
+    pt_compress(pub + 1, P);
+
+    u8 s[32];
+    sha256(pub, 33, s);
+    u8 payload[25];
+    payload[0] = 0x00;                         // AccountID version
+    ripemd160(s, 32, payload + 1);
+    u8 c1[32], c2[32];
+    sha256(payload, 21, c1);
+    sha256(c1, 32, c2);
+    for (int j = 0; j < 4; j++) payload[21 + j] = c2[j];
+
+    char addr[48];
+    int len = base58_encode(payload, 25, addr);
+    out36[0] = (u8)len;
+    for (int j = 0; j < 35; j++) out36[1 + j] = (j < len) ? (u8)addr[j] : 0;
+}
+
+// Verification mode: n x 16-byte entropies -> n x 36-byte address records.
+extern "C" __global__ void k_derive_address(const u8* entropy, u8* out, int n)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    derive_address(entropy + i * 16, out + i * 36);
+}
+
+// Per-launch entropy PRF: out[i] = SHA-512(key32 || LE64(start + i))[0..16].
+extern "C" __global__ void k_prf_entropy(const u8* key32, u64 start, u8* out, int n)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    u8 m[40];
+    for (int j = 0; j < 32; j++) m[j] = key32[j];
+    u64 c = start + (u64)i;
+    for (int j = 0; j < 8; j++) m[32 + j] = (u8)(c >> (8 * j));
+    u8 h[64];
+    sha512(m, 40, h);
+    for (int j = 0; j < 16; j++) out[i * 16 + j] = h[j];
+}
