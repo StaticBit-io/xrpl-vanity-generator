@@ -9,6 +9,7 @@ public sealed class CliOptions
 {
     public required IReadOnlyList<(MatchPosition Position, string Pattern)> Patterns { get; init; }
     public bool CaseSensitive { get; init; }
+    public bool Gpu { get; init; }
     public int Threads { get; init; } = Environment.ProcessorCount;
     public string? OutFile { get; init; }
     public int? Count { get; init; }
@@ -19,6 +20,7 @@ public sealed class CliOptions
     {
         List<(MatchPosition, string)> patterns = new();
         bool caseSensitive = false;
+        bool gpu = false;
         int threads = Environment.ProcessorCount;
         string? outFile = null;
         int? count = null;
@@ -41,6 +43,9 @@ public sealed class CliOptions
                     break;
                 case "--case-sensitive":
                     caseSensitive = true;
+                    break;
+                case "--gpu":
+                    gpu = true;
                     break;
                 case "--threads":
                     threads = NextInt(args, ref i, arg);
@@ -74,6 +79,7 @@ public sealed class CliOptions
         {
             Patterns = patterns,
             CaseSensitive = caseSensitive,
+            Gpu = gpu,
             Threads = threads,
             OutFile = outFile,
             Count = count,

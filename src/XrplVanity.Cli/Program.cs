@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
 using XrplVanity.Core;
+using XrplVanity.Gpu;
 
 namespace XrplVanity.Cli;
 
@@ -56,6 +58,28 @@ public static class SearchRunner
 
         return null;
     }
+
+    /// <summary>Headless GPU search: runs the given number of launches and returns every verified match.</summary>
+    public static List<Match> SearchGpu(CliOptions options, int launches)
+    {
+        if (!CudaContext.TryCreate(out CudaContext? context, out string reason))
+        {
+            throw new InvalidOperationException($"CUDA is not available: {reason}");
+        }
+
+        using (context)
+        {
+            PatternSet patterns = BuildPatternSet(options);
+            using GpuSearchEngine engine = new(context!, patterns);
+            List<Match> all = new();
+            for (int i = 0; i < launches; i++)
+            {
+                all.AddRange(engine.RunLaunch());
+            }
+
+            return all;
+        }
+    }
 }
 
 public static class Program
@@ -99,23 +123,45 @@ public static class Program
             return 2;
         }
 
+        CudaContext? gpuContext = null;
+        if (options.Gpu && !CudaContext.TryCreate(out gpuContext, out string reason))
+        {
+            Console.Error.WriteLine($"error: --gpu requested but CUDA is not available: {reason}");
+            return 2;
+        }
+
         Console.Error.WriteLine(
             "WARNING: a seed is a secret. Anyone who holds it controls the account. " +
             "Keep matches offline and verify this tool before using generated keys for real funds.");
 
-        long found = 0;
-        long total = 0;
-        bool countSatisfied = false;
-        object gate = new();
+        using MatchSink sink = new(options.Count, options.OutFile, Console.Out);
         using CancellationTokenSource cts = new();
-        TextWriter? outFile = options.OutFile is null ? null : new StreamWriter(options.OutFile, append: true);
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
+        if (gpuContext is not null)
+        {
+            using (gpuContext)
+            {
+                RunGpu(gpuContext, patterns, sink, cts);
+            }
+        }
+        else
+        {
+            RunCpu(options, patterns, sink, cts);
+        }
+
+        // 0 only when a --count target was fully satisfied; otherwise the run ended
+        // via Ctrl+C (or a --count-less search the user stopped), reported as 130.
+        return sink.CountSatisfied ? 0 : 130;
+    }
+
+    private static void RunCpu(CliOptions options, PatternSet patterns, MatchSink sink, CancellationTokenSource cts)
+    {
         void Worker()
         {
             CandidateEvaluator evaluator = new(new BouncyCastleDeriver(), patterns);
             byte[] pool = new byte[16 * 512];
             int poolPos = pool.Length;
-            long local = 0;
 
             while (!cts.IsCancellationRequested)
             {
@@ -127,35 +173,11 @@ public static class Program
 
                 ReadOnlySpan<byte> entropy = pool.AsSpan(poolPos, 16);
                 poolPos += 16;
-                local++;
 
-                if (evaluator.TryEvaluate(entropy, out Match match))
+                if (evaluator.TryEvaluate(entropy, out Match match) && !sink.TryReport(match))
                 {
-                    lock (gate)
-                    {
-                        if (options.Count is int reached && found >= reached)
-                        {
-                            // Another thread already hit --count; drop this surplus
-                            // match instead of writing an extra secret seed.
-                            break;
-                        }
-
-                        Console.WriteLine($"Address: {match.Address}\tSeed: {match.Seed}");
-                        outFile?.WriteLine($"{match.Address}\t{match.Seed}");
-                        outFile?.Flush();
-                        found++;
-                        if (options.Count is int limit && found >= limit)
-                        {
-                            countSatisfied = true;
-                            cts.Cancel();
-                        }
-                    }
-                }
-
-                if ((local & 0xFFFF) == 0)
-                {
-                    Interlocked.Add(ref total, 0x10000);
-                    local = 0;
+                    cts.Cancel();
+                    break;
                 }
             }
         }
@@ -167,16 +189,51 @@ public static class Program
             workers[t].Start();
         }
 
-        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
         foreach (Thread worker in workers)
         {
             worker.Join();
         }
+    }
 
-        outFile?.Dispose();
+    private static void RunGpu(CudaContext context, PatternSet patterns, MatchSink sink, CancellationTokenSource cts)
+    {
+        using GpuSearchEngine engine = new(context, patterns);
+        Console.Error.WriteLine($"GPU: {engine.DeviceName}");
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        long reportedOverflow = 0;
+        long reportedErrors = 0;
 
-        // 0 only when a --count target was fully satisfied; otherwise the run ended
-        // via Ctrl+C (or a --count-less search the user stopped), reported as 130.
-        return countSatisfied ? 0 : 130;
+        while (!cts.IsCancellationRequested)
+        {
+            foreach (Match match in engine.RunLaunch())
+            {
+                if (!sink.TryReport(match))
+                {
+                    cts.Cancel();
+                    break;
+                }
+            }
+
+            if (engine.OverflowDrops > reportedOverflow)
+            {
+                Console.Error.WriteLine(
+                    $"warning: {engine.OverflowDrops - reportedOverflow:N0} hits dropped this launch " +
+                    $"(hit buffer holds {GpuSearchEngine.HitCapacity}); use a more selective pattern.");
+                reportedOverflow = engine.OverflowDrops;
+            }
+
+            if (engine.ConsistencyErrors > reportedErrors)
+            {
+                Console.Error.WriteLine(
+                    $"GPU consistency error: {engine.ConsistencyErrors - reportedErrors} device hit(s) the CPU " +
+                    "reference could not reproduce were discarded.");
+                reportedErrors = engine.ConsistencyErrors;
+            }
+        }
+
+        double seconds = Math.Max(stopwatch.Elapsed.TotalSeconds, 1e-9);
+        Console.Error.WriteLine(
+            $"GPU: searched {engine.CandidatesSearched:N0} candidates in {seconds:F1} s " +
+            $"({engine.CandidatesSearched / seconds:N0}/s); consistency errors: {engine.ConsistencyErrors}.");
     }
 }

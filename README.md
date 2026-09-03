@@ -54,6 +54,7 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--threads N` | `ProcessorCount` | number of worker threads |
 | `--out FILE` | — | append matches to a file as well as stdout |
 | `--count N` | — | stop after N matches (otherwise run until interrupted, e.g. Ctrl+C) |
+| `--gpu` | off | search on the NVIDIA GPU (requires the driver; every GPU hit is re-verified by the CPU before it is printed) |
 
 Patterns are normalized into the XRPL base58 alphabet (`l -> L`, `0 -> o`,
 `O -> o`, `I -> i`). A pattern that still contains a character that cannot
@@ -98,10 +99,13 @@ counter.
 
 The address-derivation core (`XrplVanity.Core`) is deliberately kept free of
 CLI and threading concerns so its semantics — `entropy -> address` — can be
-reproduced bit-for-bit by a GPU backend for much higher throughput. The
-`--gpu` flag and the GPU-side pattern search are not implemented yet; that is
-planned future work. What exists today is the verified derivation pipeline
-described below.
+reproduced bit-for-bit by a GPU backend for much higher throughput. `--gpu`
+runs the search on the device. The host builds the same pattern set the CPU
+path uses and uploads it; the kernel derives and matches candidates on the
+GPU; every reported hit is re-derived by the CPU reference and printed only
+if it agrees, so a GPU arithmetic error can cost throughput but never a wrong
+key. Without an NVIDIA driver `--gpu` exits with code 2 rather than silently
+using the CPU.
 
 ## GPU backend (CUDA)
 

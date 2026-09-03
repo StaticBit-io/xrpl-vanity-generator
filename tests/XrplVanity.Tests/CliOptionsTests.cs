@@ -41,4 +41,11 @@ public class CliOptionsTests
         Assert.Equal(8, options.Threads);
         Assert.Equal(3, options.Count);
     }
+
+    [Fact]
+    public void Gpu_Flag_Is_Off_By_Default_And_Parsed()
+    {
+        Assert.False(CliOptions.Parse(new[] { "hodl" }).Gpu);
+        Assert.True(CliOptions.Parse(new[] { "--gpu", "hodl" }).Gpu);
+    }
 }
