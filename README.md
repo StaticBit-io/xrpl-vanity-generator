@@ -50,16 +50,35 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--ends P...` | — | patterns to match at address end |
 | `--contains P...` | — | patterns to match anywhere |
 | `--list FILE [minLen]` | — | load `starts` patterns from a word list, optional min length filter (default 4) |
-| `--case-sensitive` | off (case-insensitive) | match patterns exactly; default expands case variants |
+| `--case-sensitive` | off (case-insensitive) | match the pattern exactly as typed; by default every case combination is matched |
 | `--threads N` | `ProcessorCount` | number of worker threads |
 | `--out FILE` | — | append matches to a file as well as stdout |
 | `--count N` | — | stop after N matches (otherwise run until interrupted, e.g. Ctrl+C) |
 
 Patterns are normalized into the XRPL base58 alphabet (`l -> L`, `0 -> o`,
-`O -> o`, `I -> i`), matching how the original tool behaved. A pattern that
-still contains a character that cannot occur in an address (outside the
-base58 alphabet, even after normalization) is reported as unreachable and
-skipped instead of searching forever.
+`O -> o`, `I -> i`). A pattern that still contains a character that cannot
+occur in an address (outside the base58 alphabet, even after normalization)
+is reported as unreachable and skipped instead of searching forever.
+
+### Case-insensitive matching
+
+By default (no `--case-sensitive`), a pattern matches **every** reachable
+case combination: `--starts ab` matches an address body starting with `ab`,
+`aB`, `Ab`, or `AB`. Letters that exist in only one case in the base58
+alphabet do not multiply the count — `i` and `o` are lower-case only and
+`l` only exists as `L`, so `oil` has the single reachable form `oiL`.
+
+To keep the number of combinations bounded, case expansion applies only to
+patterns of at most 12 characters (up to 2^12 combinations). A longer
+pattern is still searched, but case-sensitively — the tool prints a warning
+saying so. Pass `--case-sensitive` to match any pattern exactly as typed.
+
+## Exit codes
+
+`0` — a `--count` target was fully satisfied. `2` — invalid usage (unknown
+or malformed option, or no reachable pattern). `130` — the run was ended by
+Ctrl+C, or a `--count`-less search was interrupted, before a `--count`
+target was met.
 
 ## Secret handling
 

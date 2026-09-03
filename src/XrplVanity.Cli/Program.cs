@@ -86,6 +86,13 @@ public static class Program
                 $"warning: pattern '{u.Original}' cannot occur in an XRPL address; skipped.");
         }
 
+        foreach (NormalizedPattern s in patterns.CaseFoldingSkipped)
+        {
+            Console.Error.WriteLine(
+                $"warning: pattern '{s.Original}' is longer than {PatternSet.MaxIgnoreCaseLength} " +
+                "characters; searching it case-sensitively instead of case-insensitively.");
+        }
+
         if (!patterns.HasPatterns)
         {
             Console.Error.WriteLine("error: no reachable patterns to search for.");

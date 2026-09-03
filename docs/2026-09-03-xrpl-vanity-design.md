@@ -104,10 +104,21 @@ The address is matched excluding the leading `r`, mirroring the original tool
 
 ### Case handling
 
-Matching is case-insensitive by default. As in the original, this is implemented
-by expanding each user pattern into case variants (upper-case and title-case) at
-startup and inserting all variants into the sets, so the hot loop stays a plain
-ordinal set lookup. `--case-sensitive` inserts the pattern as given.
+Matching is case-insensitive by default. This is implemented by expanding each
+pattern at build time into *every* reachable case combination — the Cartesian
+product of each character's alphabet-legal cases — and inserting them all into the
+sets, so the hot loop stays a plain ordinal set lookup. A character that exists in
+only one case in the base58 alphabet (`i`, `o` lower-only; `l` as `L`) contributes
+a single choice, so the count is `2^(two-case letters)`, not `2^length`.
+
+To bound the expansion, case-folding applies only to patterns up to
+`PatternSet.MaxIgnoreCaseLength` (12) characters. A longer pattern is still
+searched but case-sensitively, and is surfaced via `PatternSet.CaseFoldingSkipped`
+so the CLI can warn. `--case-sensitive` inserts the pattern as given.
+
+(The original Java tool expanded only the upper-case and title-case forms, which
+missed most mixed-case combinations; this SDK covers them all under the length
+cap.)
 
 ### Pattern normalization into the base58 alphabet
 
