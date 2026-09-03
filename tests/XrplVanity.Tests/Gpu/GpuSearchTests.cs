@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using XrplVanity.Core;
 using XrplVanity.Gpu;
 using Xunit;
@@ -8,6 +9,13 @@ namespace XrplVanity.Tests.Gpu;
 
 public class GpuSearchTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public GpuSearchTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
     [Fact]
     public void Finds_Cpu_Verified_Matches_Without_Overflow()
     {
@@ -78,5 +86,28 @@ public class GpuSearchTests
         PatternSet empty = new PatternSet.Builder().Add(MatchPosition.Starts, "bit@coin", ignoreCase: true).Build();
 
         Assert.Throws<ArgumentException>(() => new GpuSearchEngine(context, empty));
+    }
+
+    [Fact]
+    public void Throughput_Is_At_Least_Half_A_Million_Candidates_Per_Second()
+    {
+        using CudaContext context = GpuTestHelper.RequireContext();
+        // 8 characters case-sensitive: effectively never matches, so this measures pure search throughput.
+        PatternSet patterns = new PatternSet.Builder().Add(MatchPosition.Starts, "zzzzzzzz", ignoreCase: false).Build();
+        using GpuSearchEngine engine = new(context, patterns);
+        engine.RunLaunch(); // warm-up (module JIT, first launch)
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        const int launches = 4;
+        for (int i = 0; i < launches; i++)
+        {
+            engine.RunLaunch();
+        }
+
+        double seconds = stopwatch.Elapsed.TotalSeconds;
+        double rate = (double)launches * GpuSearchEngine.CandidatesPerLaunch / seconds;
+        _output.WriteLine($"GPU search throughput: {rate:N0} candidates/s on {engine.DeviceName}");
+
+        Assert.True(rate >= 500_000, $"throughput {rate:N0}/s is below the 500,000/s floor");
     }
 }

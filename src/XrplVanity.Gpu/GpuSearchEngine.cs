@@ -18,6 +18,7 @@ public sealed class GpuSearchEngine : IDisposable
     public const int SubLaunchSize = 1 << 16;
     private const int HitRecordSize = 52;
     private const int BlockSize = 128;
+    private const int TableBytes = 256 * 96;
 
     private readonly CudaContext _context;
     private readonly CudaFunction _search;
@@ -26,6 +27,7 @@ public sealed class GpuSearchEngine : IDisposable
     private readonly DeviceBuffer _chars;
     private readonly DeviceBuffer _hits;
     private readonly DeviceBuffer _hitCount;
+    private readonly DeviceBuffer _table;
     private readonly int _groupCount;
     private readonly CandidateEvaluator _verifier;
     private ulong _counter;
@@ -43,6 +45,10 @@ public sealed class GpuSearchEngine : IDisposable
         CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
         _search = module.GetFunction("k_search");
         _groupCount = table.GroupCount;
+
+        _table = context.Alloc(TableBytes);
+        context.Launch(module.GetFunction("k_build_base_table"), 2, 128, _table);
+        context.Synchronize();
 
         _groups = context.Alloc(table.Groups.Length * 4);
         _groups.CopyFrom(MemoryMarshal.AsBytes(new ReadOnlySpan<uint>(table.Groups)));
@@ -78,7 +84,7 @@ public sealed class GpuSearchEngine : IDisposable
         {
             int count = Math.Min(SubLaunchSize, CandidatesPerLaunch - offset);
             _context.Launch(_search, (count + BlockSize - 1) / BlockSize, BlockSize,
-                _key, start + (ulong)offset, count, _groups, _groupCount, _chars, _hits, _hitCount, HitCapacity);
+                _key, start + (ulong)offset, count, _groups, _groupCount, _chars, _hits, _hitCount, HitCapacity, _table);
             _context.Synchronize();
         }
 
@@ -136,5 +142,6 @@ public sealed class GpuSearchEngine : IDisposable
         _key.Dispose();
         _chars.Dispose();
         _groups.Dispose();
+        _table.Dispose();
     }
 }

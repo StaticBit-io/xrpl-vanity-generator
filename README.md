@@ -113,7 +113,10 @@ The CUDA kernel source lives at `gpu/kernels/xrpl_vanity.cu` (device-only —
 it is not built by `dotnet build` or any `.csproj`). It implements the same
 `entropy -> address` derivation as `XrplVanity.Core`, verified kernel by
 kernel against the .NET/BouncyCastle reference and against RFC 8032 test
-vectors.
+vectors. The kernel uses a windowed fixed-base scalar multiplication over a
+256-entry table that is built on the device at start-up by the naive
+(independently verified) multiplication; both paths are checked against RFC
+8032 and each other in the test suite.
 
 At development time, the kernel is compiled to PTX (target `compute_75`,
 i.e. NVIDIA Turing / 2018 or newer — the driver JIT-compiles the PTX for the

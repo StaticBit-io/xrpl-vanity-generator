@@ -556,7 +556,9 @@ extern "C" __global__ void k_base58(const u8* in, u8* out, int n)
 // M4: full XRPL Ed25519 derivation, entropy16 -> classic address. Step for step the
 // same algorithm as XrplVanity.Core.BouncyCastleDeriver.
 // ---------------------------------------------------------------------------
-__device__ void derive_address(const u8* entropy16, u8* out36)
+__device__ void scalarmult_base_windowed(Pt& r, const u8* a, const u8* table);
+
+__device__ void derive_address(const u8* entropy16, u8* out36, const u8* table)
 {
     u8 h1[64];
     sha512(entropy16, 16, h1);                 // seed32 = h1[0..32]  (XRPL)
@@ -567,7 +569,7 @@ __device__ void derive_address(const u8* entropy16, u8* out36)
     a[0] &= 248; a[31] &= 127; a[31] |= 64;
 
     Pt P;
-    scalarmult_base(P, a);
+    scalarmult_base_windowed(P, a, table);
     u8 pub[33];
     pub[0] = 0xED;
     pt_compress(pub + 1, P);
@@ -589,11 +591,11 @@ __device__ void derive_address(const u8* entropy16, u8* out36)
 }
 
 // Verification mode: n x 16-byte entropies -> n x 36-byte address records.
-extern "C" __global__ void k_derive_address(const u8* entropy, u8* out, int n)
+extern "C" __global__ void k_derive_address(const u8* entropy, u8* out, int n, const u8* table)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    derive_address(entropy + i * 16, out + i * 36);
+    derive_address(entropy + i * 16, out + i * 36, table);
 }
 
 // Per-launch entropy PRF: out16 = SHA-512(key32 || LE64(counter))[0..16].
@@ -683,14 +685,14 @@ extern "C" __global__ void k_match_records(const u8* records, int n, const u32* 
 // ---------------------------------------------------------------------------
 extern "C" __global__ void k_search(const u8* key32, u64 start, int n,
                                     const u32* groups, int groupCount, const u8* chars,
-                                    u8* hits, u32* hitCount, int hitCapacity)
+                                    u8* hits, u32* hitCount, int hitCapacity, const u8* table)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     u8 e[16];
     prf_entropy(key32, start + (u64)i, e);
     u8 rec[36];
-    derive_address(e, rec);
+    derive_address(e, rec, table);
     int len = rec[0];
     if (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars)) {
         u32 slot = atomicAdd(hitCount, 1u);

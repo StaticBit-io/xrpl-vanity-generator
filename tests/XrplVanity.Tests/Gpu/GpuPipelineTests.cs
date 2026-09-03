@@ -22,6 +22,10 @@ public class GpuPipelineTests
         CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
         CudaFunction fn = module.GetFunction("k_derive_address");
 
+        using DeviceBuffer table = context.Alloc(256 * 96);
+        context.Launch(module.GetFunction("k_build_base_table"), 2, 128, table);
+        context.Synchronize();
+
         using DeviceBuffer din = context.Alloc(entropies.Length);
         using DeviceBuffer dout = context.Alloc((long)n * 36);
         din.CopyFrom(entropies);
@@ -31,7 +35,7 @@ public class GpuPipelineTests
             int batchLength = Math.Min(BatchSize, n - batchStart);
             ulong inPointer = din.Pointer + (ulong)batchStart * 16;
             ulong outPointer = dout.Pointer + (ulong)batchStart * 36;
-            context.Launch(fn, (batchLength + 127) / 128, 128, inPointer, outPointer, batchLength);
+            context.Launch(fn, (batchLength + 127) / 128, 128, inPointer, outPointer, batchLength, table);
             context.Synchronize();
         }
 
