@@ -27,6 +27,11 @@ public static class SearchRunner
             foreach (string line in File.ReadLines(options.ListFile))
             {
                 string word = line.Trim();
+                if (word.Length == 0)
+                {
+                    continue;
+                }
+
                 if (word.Length >= options.ListMinLength)
                 {
                     builder.Add(MatchPosition.Starts, word, ignoreCase: !options.CaseSensitive);
