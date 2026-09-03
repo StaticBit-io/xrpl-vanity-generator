@@ -113,6 +113,12 @@ public sealed class GpuSearchEngine : IDisposable
             int at = i * HitRecordSize;
             ReadOnlySpan<byte> entropy = raw.AsSpan(at, 16);
             int len = raw[at + 16];
+            if (len < 1 || len > 35)
+            {
+                ConsistencyErrors++;
+                continue;
+            }
+
             string gpuAddress = Encoding.ASCII.GetString(raw, at + 17, len);
 
             // The gate: print nothing the CPU does not independently reproduce.
