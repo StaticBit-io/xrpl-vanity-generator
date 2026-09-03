@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile gpu/kernels/xrpl_vanity.cu to PTX with NVRTC. No host C++ compiler needed.
+"""Compile cuda_shim.h + xrpl_vanity_body.h to PTX with NVRTC. No host C++ compiler needed.
 
 NVRTC comes from the `nvidia-cuda-nvrtc` pip wheel (pip install --user nvidia-cuda-nvrtc);
 set NVRTC_DIR to override the lookup. Target: compute_75 (Turing and newer; the driver
@@ -11,7 +11,8 @@ import site
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CU = os.path.join(ROOT, "gpu", "kernels", "xrpl_vanity.cu")
+SHIM = os.path.join(ROOT, "gpu", "kernels", "cuda_shim.h")
+BODY = os.path.join(ROOT, "gpu", "kernels", "xrpl_vanity_body.h")
 PTX = os.path.join(ROOT, "gpu", "kernels", "xrpl_vanity.ptx")
 ARCH = b"compute_75"
 
@@ -45,8 +46,11 @@ def load_nvrtc(directory: str) -> C.CDLL:
 
 def main() -> None:
     nvrtc = load_nvrtc(find_nvrtc_dir())
-    with open(CU, "rb") as f:
-        source = f.read()
+    with open(SHIM, "rb") as f:
+        shim = f.read()
+    with open(BODY, "rb") as f:
+        body = f.read()
+    source = shim + b"\n" + body
 
     program = C.c_void_p()
     if nvrtc.nvrtcCreateProgram(C.byref(program), source, b"xrpl_vanity.cu", 0, None, None) != 0:
