@@ -157,6 +157,14 @@ public sealed class PatternSet
                 return this;
             }
 
+            if (normalized.Value.Length == 0)
+            {
+                // An empty pattern would match every address; treat it as unreachable so it is
+                // reported and skipped rather than turning the search into a match-everything.
+                _unreachable.Add(normalized);
+                return this;
+            }
+
             bool expandCase = ignoreCase && normalized.Value.Length <= MaxIgnoreCaseLength;
             if (ignoreCase && !expandCase)
             {

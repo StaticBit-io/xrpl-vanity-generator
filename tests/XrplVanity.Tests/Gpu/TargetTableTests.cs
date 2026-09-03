@@ -55,4 +55,14 @@ public class TargetTableTests
         Assert.Equal(0, table.GroupCount);
         Assert.Empty(table.Chars);
     }
+
+    [Fact]
+    public void Empty_Pattern_Produces_No_Zero_Length_Group()
+    {
+        PatternSet set = new PatternSet.Builder().Add(MatchPosition.Starts, "", ignoreCase: true).Build();
+
+        TargetTable table = TargetTable.Build(set);
+
+        Assert.Equal(0, table.GroupCount);
+    }
 }

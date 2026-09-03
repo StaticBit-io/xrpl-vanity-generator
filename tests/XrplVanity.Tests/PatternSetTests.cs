@@ -138,4 +138,18 @@ public class PatternSetTests
         Assert.Equal(new[] { "q" },
             targets.Where(t => t.Position == MatchPosition.Contains).Select(t => t.Value));
     }
+
+    [Fact]
+    public void Empty_Pattern_Is_Reported_As_Unreachable_And_Never_Matches()
+    {
+        PatternSet set = new PatternSet.Builder()
+            .Add(MatchPosition.Starts, "", ignoreCase: true)
+            .Add(MatchPosition.Contains, "   ", ignoreCase: false)
+            .Build();
+
+        Assert.Equal(2, set.Unreachable.Count);
+        Assert.False(set.HasPatterns);
+        Assert.False(set.TryMatch("rDiskmQdynWqgxoNv4CHsqFHdgsnpJMHGK", out _, out _));
+        Assert.Empty(set.EnumerateTargets());
+    }
 }
