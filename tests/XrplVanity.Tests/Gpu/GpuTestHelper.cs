@@ -8,12 +8,25 @@ namespace XrplVanity.Tests.Gpu;
 
 internal static class GpuTestHelper
 {
-    /// <summary>Returns a live CUDA context, or skips the calling test when CUDA is unavailable.</summary>
+    /// <summary>
+    /// Returns a live CUDA context, or skips the calling test when CUDA is unavailable or the
+    /// device is older than the PTX's compute_75 (Turing) target.
+    /// </summary>
     public static CudaContext RequireContext()
     {
         if (!CudaContext.TryCreate(out CudaContext? context, out string reason))
         {
             Assert.Skip($"CUDA not available: {reason}");
+        }
+
+        int capability = context!.ComputeCapabilityMajor * 10 + context.ComputeCapabilityMinor;
+        if (capability < 75)
+        {
+            string name = context.DeviceName;
+            int major = context.ComputeCapabilityMajor;
+            int minor = context.ComputeCapabilityMinor;
+            context.Dispose();
+            Assert.Skip($"CUDA device {name} is compute capability {major}.{minor}; the PTX targets compute_75 (Turing) or newer");
         }
 
         return context!;
