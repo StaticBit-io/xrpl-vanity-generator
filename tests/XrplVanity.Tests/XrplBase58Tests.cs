@@ -29,4 +29,17 @@ public class XrplBase58Tests
 
         Assert.StartsWith("rr", encoded); // 'r' is alphabet[0]; two leading zero bytes -> "rr"
     }
+
+    [Fact]
+    public void Decode_All_Zero_Value_Roundtrips_Without_Extra_Byte()
+    {
+        byte[] input = { 0x00, 0x00, 0x00 };
+        Span<char> buffer = stackalloc char[16];
+        int len = XrplBase58.Encode(input, buffer);
+        string encoded = new string(buffer[..len]); // "rrr"
+
+        byte[] decoded = XrplBase58.Decode(encoded);
+
+        Assert.Equal(input, decoded); // 3 bytes, not 4
+    }
 }

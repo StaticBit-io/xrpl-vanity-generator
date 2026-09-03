@@ -56,7 +56,7 @@ public static class XrplBase58
     public static byte[] Decode(string text)
     {
         Span<byte> acc = stackalloc byte[128];
-        int accLen = 1;
+        int accLen = 0;
         foreach (char c in text)
         {
             int digit = Alphabet.IndexOf(c);
