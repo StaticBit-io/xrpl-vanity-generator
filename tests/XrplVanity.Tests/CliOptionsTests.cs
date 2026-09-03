@@ -1,3 +1,4 @@
+using System;
 using XrplVanity.Cli;
 using XrplVanity.Core;
 using Xunit;
@@ -6,6 +7,16 @@ namespace XrplVanity.Tests;
 
 public class CliOptionsTests
 {
+    [Theory]
+    [InlineData("--threads")]
+    [InlineData("--count")]
+    public void Non_Numeric_Value_Throws_ArgumentException_Not_A_Crash(string option)
+    {
+        // FormatException from int.Parse used to escape Main's ArgumentException catch
+        // and crash with a stack trace; it must now surface as a clean ArgumentException.
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { option, "abc" }));
+    }
+
     [Fact]
     public void Positional_Words_Default_To_Starts()
     {

@@ -43,13 +43,13 @@ public sealed class CliOptions
                     caseSensitive = true;
                     break;
                 case "--threads":
-                    threads = int.Parse(Next(args, ref i, arg));
+                    threads = NextInt(args, ref i, arg);
                     break;
                 case "--out":
                     outFile = Next(args, ref i, arg);
                     break;
                 case "--count":
-                    count = int.Parse(Next(args, ref i, arg));
+                    count = NextInt(args, ref i, arg);
                     break;
                 case "--list":
                     listFile = Next(args, ref i, arg);
@@ -90,5 +90,16 @@ public sealed class CliOptions
         }
 
         return args[++i];
+    }
+
+    private static int NextInt(string[] args, ref int i, string option)
+    {
+        string value = Next(args, ref i, option);
+        if (!int.TryParse(value, out int result))
+        {
+            throw new ArgumentException($"Option '{option}' requires a whole number, but got '{value}'.");
+        }
+
+        return result;
     }
 }

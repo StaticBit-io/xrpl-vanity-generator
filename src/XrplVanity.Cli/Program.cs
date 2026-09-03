@@ -98,6 +98,7 @@ public static class Program
 
         long found = 0;
         long total = 0;
+        bool countSatisfied = false;
         object gate = new();
         using CancellationTokenSource cts = new();
         TextWriter? outFile = options.OutFile is null ? null : new StreamWriter(options.OutFile, append: true);
@@ -125,12 +126,20 @@ public static class Program
                 {
                     lock (gate)
                     {
+                        if (options.Count is int reached && found >= reached)
+                        {
+                            // Another thread already hit --count; drop this surplus
+                            // match instead of writing an extra secret seed.
+                            break;
+                        }
+
                         Console.WriteLine($"Address: {match.Address}\tSeed: {match.Seed}");
                         outFile?.WriteLine($"{match.Address}\t{match.Seed}");
                         outFile?.Flush();
-                        long done = Interlocked.Increment(ref found);
-                        if (options.Count is int limit && done >= limit)
+                        found++;
+                        if (options.Count is int limit && found >= limit)
                         {
+                            countSatisfied = true;
                             cts.Cancel();
                         }
                     }
@@ -158,6 +167,9 @@ public static class Program
         }
 
         outFile?.Dispose();
-        return 0;
+
+        // 0 only when a --count target was fully satisfied; otherwise the run ended
+        // via Ctrl+C (or a --count-less search the user stopped), reported as 130.
+        return countSatisfied ? 0 : 130;
     }
 }
