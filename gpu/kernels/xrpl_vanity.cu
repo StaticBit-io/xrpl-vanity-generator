@@ -188,3 +188,90 @@ extern "C" __global__ void k_fe_op(const u32* a, const u32* b, u32* out, int n, 
     }
     for (int k = 0; k < 8; k++) out[i * 8 + k] = r.v[k];
 }
+
+// ---------------------------------------------------------------------------
+// M2: Ed25519 points in extended twisted-Edwards coordinates (X, Y, Z, T), a = -1.
+// Formulas: RFC 8032 s5.1.4 (dbl-2008-hwcd, add-2008-hwcd-3 with 2d).
+// Constants verified against RFC 8032 s7.1 TEST 1-3 with an independent reference.
+// ---------------------------------------------------------------------------
+struct Pt { Fe X, Y, Z, T; };
+
+__device__ __constant__ u32 D2_LIMBS[8] = {
+    0x26b2f159u, 0xebd69b94u, 0x8283b156u, 0x00e0149au, 0xeef3d130u, 0x198e80f2u, 0x56dffce7u, 0x2406d9dcu,
+};
+__device__ __constant__ u32 BX_LIMBS[8] = {
+    0x8f25d51au, 0xc9562d60u, 0x9525a7b2u, 0x692cc760u, 0xfdd6dc5cu, 0xc0a4e231u, 0xcd6e53feu, 0x216936d3u,
+};
+__device__ __constant__ u32 BY_LIMBS[8] = {
+    0x66666658u, 0x66666666u, 0x66666666u, 0x66666666u, 0x66666666u, 0x66666666u, 0x66666666u, 0x66666666u,
+};
+__device__ __constant__ u32 BT_LIMBS[8] = {
+    0xa5b7dda3u, 0x6dde8ab3u, 0x775152f5u, 0x20f09f80u, 0x64abe37du, 0x66ea4e8eu, 0xd78b7665u, 0x67875f0fu,
+};
+
+__device__ __forceinline__ void fe_load_const(Fe& r, const u32* limbs) { for (int i = 0; i < 8; i++) r.v[i] = limbs[i]; }
+
+__device__ __forceinline__ void pt_identity(Pt& r) { fe_zero(r.X); fe_one(r.Y); fe_one(r.Z); fe_zero(r.T); }
+__device__ __forceinline__ void pt_base(Pt& r)
+{
+    fe_load_const(r.X, BX_LIMBS);
+    fe_load_const(r.Y, BY_LIMBS);
+    fe_one(r.Z);
+    fe_load_const(r.T, BT_LIMBS);
+}
+
+// r = p + q. All reads of p and q complete before r is written, so r may alias p or q.
+__device__ void pt_add(Pt& r, const Pt& p, const Pt& q)
+{
+    Fe A, B, C, D, E, F, G, H, t1, t2, d2;
+    fe_sub(t1, p.Y, p.X); fe_sub(t2, q.Y, q.X); fe_mul(A, t1, t2);
+    fe_add(t1, p.Y, p.X); fe_add(t2, q.Y, q.X); fe_mul(B, t1, t2);
+    fe_load_const(d2, D2_LIMBS); fe_mul(t1, p.T, d2); fe_mul(C, t1, q.T);
+    fe_add(t1, p.Z, p.Z); fe_mul(D, t1, q.Z);
+    fe_sub(E, B, A); fe_sub(F, D, C); fe_add(G, D, C); fe_add(H, B, A);
+    fe_mul(r.X, E, F); fe_mul(r.Y, G, H); fe_mul(r.Z, F, G); fe_mul(r.T, E, H);
+}
+
+// r = 2p. Same aliasing guarantee as pt_add.
+__device__ void pt_dbl(Pt& r, const Pt& p)
+{
+    Fe A, B, C, H, E, G, F, t;
+    fe_sqr(A, p.X); fe_sqr(B, p.Y); fe_sqr(t, p.Z); fe_add(C, t, t);
+    fe_add(H, A, B); fe_add(t, p.X, p.Y); fe_sqr(t, t); fe_sub(E, H, t);
+    fe_sub(G, A, B); fe_add(F, C, G);
+    fe_mul(r.X, E, F); fe_mul(r.Y, G, H); fe_mul(r.Z, F, G); fe_mul(r.T, E, H);
+}
+
+// r = scalar * B, scalar as 32 little-endian bytes (already clamped). Naive double-and-add.
+__device__ void scalarmult_base(Pt& r, const u8* scalar32)
+{
+    Pt R, B;
+    pt_identity(R);
+    pt_base(B);
+    for (int i = 255; i >= 0; i--) {
+        pt_dbl(R, R);
+        if ((scalar32[i >> 3] >> (i & 7)) & 1u) pt_add(R, R, B);
+    }
+    r = R;
+}
+
+// RFC 8032 s5.1.2: encode y little-endian, sign bit of x in the top bit of the last byte.
+__device__ void pt_compress(u8* out32, const Pt& p)
+{
+    Fe zi, x, y;
+    fe_inv(zi, p.Z);
+    fe_mul(x, p.X, zi);
+    fe_mul(y, p.Y, zi);
+    fe_to_bytes(out32, y);
+    out32[31] |= (u8)((x.v[0] & 1u) << 7);
+}
+
+// Test entry: n clamped scalars (32 bytes each) -> n compressed public keys (32 bytes each).
+extern "C" __global__ void k_scalarmult_base(const u8* scalars, u8* pubs, int n)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    Pt P;
+    scalarmult_base(P, scalars + i * 32);
+    pt_compress(pubs + i * 32, P);
+}
