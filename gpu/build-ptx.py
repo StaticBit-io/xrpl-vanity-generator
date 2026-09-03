@@ -22,10 +22,11 @@ def find_nvrtc_dir() -> str:
         return env
     candidates = [site.getusersitepackages()] + site.getsitepackages()
     for base in candidates:
-        for sub in (("nvidia", "cu13", "bin", "x86_64"), ("nvidia", "cu13", "lib")):
-            path = os.path.join(base, *sub)
-            if os.path.isdir(path):
-                return path
+        for cu in ("cu13", "cu12"):
+            for sub in (("nvidia", cu, "bin", "x86_64"), ("nvidia", cu, "lib")):
+                path = os.path.join(base, *sub)
+                if os.path.isdir(path):
+                    return path
     sys.exit("NVRTC not found: run `pip install --user nvidia-cuda-nvrtc` or set NVRTC_DIR")
 
 
@@ -39,7 +40,7 @@ def load_nvrtc(directory: str) -> C.CDLL:
         names = [f for f in os.listdir(directory) if f.startswith("libnvrtc.so") and "builtins" not in f]
     if not names:
         sys.exit(f"no NVRTC library in {directory}")
-    return C.CDLL(os.path.join(directory, sorted(names)[0]))
+    return C.CDLL(os.path.join(directory, sorted(names)[-1]))
 
 
 def main() -> None:
