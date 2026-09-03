@@ -147,6 +147,7 @@ __device__ __forceinline__ void fe_from_bytes(Fe& r, const u8* in32)
     for (int i = 0; i < 8; i++) {
         r.v[i] = (u32)in32[4 * i] | ((u32)in32[4 * i + 1] << 8) | ((u32)in32[4 * i + 2] << 16) | ((u32)in32[4 * i + 3] << 24);
     }
+    fe_canon(r);
 }
 
 __device__ __forceinline__ void fe_to_bytes(u8* out32, const Fe& a)
@@ -159,7 +160,7 @@ __device__ __forceinline__ void fe_to_bytes(u8* out32, const Fe& a)
     }
 }
 
-// Test entry: element-wise field op over n elements. op: 0 add, 1 sub, 2 mul, 3 sqr, 4 inv, 5 canon.
+// Test entry: element-wise field op over n elements. op: 0 add, 1 sub, 2 mul, 3 sqr, 4 inv, 5 canon, 6 from_bytes.
 extern "C" __global__ void k_fe_op(const u32* a, const u32* b, u32* out, int n, int op)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -172,6 +173,17 @@ extern "C" __global__ void k_fe_op(const u32* a, const u32* b, u32* out, int n, 
         case 2: fe_mul(r, x, y); break;
         case 3: fe_sqr(r, x); break;
         case 4: fe_inv(r, x); break;
+        case 6: {
+            u8 raw[32];
+            for (int k = 0; k < 8; k++) {
+                raw[4 * k]     = (u8)(x.v[k]);
+                raw[4 * k + 1] = (u8)(x.v[k] >> 8);
+                raw[4 * k + 2] = (u8)(x.v[k] >> 16);
+                raw[4 * k + 3] = (u8)(x.v[k] >> 24);
+            }
+            fe_from_bytes(r, raw);
+            break;
+        }
         default: fe_copy(r, x); fe_canon(r); break;
     }
     for (int k = 0; k < 8; k++) out[i * 8 + k] = r.v[k];

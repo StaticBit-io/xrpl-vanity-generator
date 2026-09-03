@@ -8,7 +8,7 @@ namespace XrplVanity.Tests.Gpu;
 
 public class GpuFieldTests
 {
-    private const int OpAdd = 0, OpSub = 1, OpMul = 2, OpSqr = 3, OpInv = 4, OpCanon = 5;
+    private const int OpAdd = 0, OpSub = 1, OpMul = 2, OpSqr = 3, OpInv = 4, OpCanon = 5, OpFromBytes = 6;
 
     private static readonly BigInteger P = GpuTestHelper.P;
 
@@ -109,6 +109,18 @@ public class GpuFieldTests
             P, P + 1, P + 37, 2 * P, 2 * P + 37, BigInteger.Pow(2, 256) - 1, BigInteger.Pow(2, 255),
         };
         AssertEach(RunOp(OpCanon, a, a), Map(a, a, (x, _) => x % P));
+    }
+
+    [Fact]
+    public void FromBytes_Reduces_Non_Canonical_Encodings()
+    {
+        // fe_from_bytes must canonicalize: values >= p, and a few already-canonical ones for good measure.
+        BigInteger[] a =
+        {
+            P, P + 1, P + 37, 2 * P, 2 * P + 37, BigInteger.Pow(2, 256) - 1, BigInteger.Pow(2, 255),
+            BigInteger.Zero, BigInteger.One, P - 1,
+        };
+        AssertEach(RunOp(OpFromBytes, a, a), Map(a, a, (x, _) => x % P));
     }
 
     private static BigInteger[] Map(BigInteger[] a, BigInteger[] b, Func<BigInteger, BigInteger, BigInteger> f)
