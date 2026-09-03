@@ -43,4 +43,38 @@ public class GpuInfrastructureTests
 
         Assert.Equal(data, back);
     }
+
+    [Fact]
+    public void Embedded_Ptx_Loads_And_A_Kernel_Runs()
+    {
+        using CudaContext context = GpuTestHelper.RequireContext();
+        CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
+        CudaFunction add = module.GetFunction("k_add_arrays");
+
+        const int n = 1000;
+        uint[] a = new uint[n];
+        uint[] b = new uint[n];
+        for (int i = 0; i < n; i++)
+        {
+            a[i] = (uint)i;
+            b[i] = (uint)(i * 3);
+        }
+
+        using DeviceBuffer da = context.Alloc(n * 4);
+        using DeviceBuffer db = context.Alloc(n * 4);
+        using DeviceBuffer dout = context.Alloc(n * 4);
+        da.CopyFrom(GpuTestHelper.AsBytes(a));
+        db.CopyFrom(GpuTestHelper.AsBytes(b));
+
+        context.Launch(add, (n + 255) / 256, 256, da, db, dout, n);
+        context.Synchronize();
+
+        byte[] raw = new byte[n * 4];
+        dout.CopyTo(raw);
+        uint[] result = GpuTestHelper.AsUInts(raw);
+        for (int i = 0; i < n; i++)
+        {
+            Assert.Equal(a[i] + b[i], result[i]);
+        }
+    }
 }

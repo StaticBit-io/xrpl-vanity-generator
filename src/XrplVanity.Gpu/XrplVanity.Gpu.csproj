@@ -12,4 +12,8 @@
     <ProjectReference Include="..\XrplVanity.Core\XrplVanity.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\gpu\kernels\xrpl_vanity.ptx" LogicalName="xrpl_vanity.ptx" />
+  </ItemGroup>
+
 </Project>
