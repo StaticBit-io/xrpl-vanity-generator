@@ -57,4 +57,14 @@ public class CliRuntimeTests
             File.Delete(listFile);
         }
     }
+
+    [Fact]
+    public void BuildPatternSet_Reports_No_Patterns_When_All_Are_Unreachable()
+    {
+        CliOptions options = CliOptions.Parse(new[] { "bit@coin" }); // '@' is not in the base58 alphabet
+        PatternSet patterns = SearchRunner.BuildPatternSet(options);
+
+        Assert.False(patterns.HasPatterns);
+        Assert.Single(patterns.Unreachable);
+    }
 }

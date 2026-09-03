@@ -22,6 +22,9 @@ public sealed class PatternSet
 
     public IReadOnlyList<NormalizedPattern> Unreachable => _unreachable;
 
+    /// <summary>True when at least one reachable pattern remains to search for.</summary>
+    public bool HasPatterns => _starts.Length > 0 || _ends.Length > 0 || _contains.Count > 0;
+
     public bool TryMatch(ReadOnlySpan<char> address, out MatchPosition position, out string pattern)
     {
         ReadOnlySpan<char> body = address[1..]; // drop leading 'r'

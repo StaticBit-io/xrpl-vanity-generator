@@ -86,6 +86,12 @@ public static class Program
                 $"warning: pattern '{u.Original}' cannot occur in an XRPL address; skipped.");
         }
 
+        if (!patterns.HasPatterns)
+        {
+            Console.Error.WriteLine("error: no reachable patterns to search for.");
+            return 2;
+        }
+
         Console.Error.WriteLine(
             "WARNING: a seed is a secret. Anyone who holds it controls the account. " +
             "Keep matches offline and verify this tool before using generated keys for real funds.");
