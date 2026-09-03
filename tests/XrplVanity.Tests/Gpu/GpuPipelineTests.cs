@@ -16,31 +16,28 @@ public class GpuPipelineTests
     // via pointer offsets so the wall-clock cost stays the same.
     private const int BatchSize = 65_536;
 
-    private static byte[] RunDerive(byte[] entropies, int n)
+    private static byte[] RunDerive(string backend, byte[] entropies, int n)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
-        CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
-        CudaFunction fn = module.GetFunction("k_derive_address");
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
+        IGpuKernel fn = device.GetKernel("k_derive_address");
 
-        using DeviceBuffer table = context.Alloc(256 * 96);
-        context.Launch(module.GetFunction("k_build_base_table"), 2, 128, table);
-        context.Synchronize();
+        using IGpuBuffer table = device.Alloc(256 * 96);
+        device.Launch(device.GetKernel("k_build_base_table"), 256, 128, table);
+        device.Synchronize();
 
-        using DeviceBuffer din = context.Alloc(entropies.Length);
-        using DeviceBuffer dout = context.Alloc((long)n * 36);
-        din.CopyFrom(entropies);
+        byte[] output = new byte[n * 36];
 
         for (int batchStart = 0; batchStart < n; batchStart += BatchSize)
         {
             int batchLength = Math.Min(BatchSize, n - batchStart);
-            ulong inPointer = din.Pointer + (ulong)batchStart * 16;
-            ulong outPointer = dout.Pointer + (ulong)batchStart * 36;
-            context.Launch(fn, (batchLength + 127) / 128, 128, inPointer, outPointer, batchLength, table);
-            context.Synchronize();
+            using IGpuBuffer bin = device.Alloc(batchLength * 16);
+            using IGpuBuffer bout = device.Alloc(batchLength * 36);
+            bin.CopyFrom(entropies.AsSpan(batchStart * 16, batchLength * 16));
+            device.Launch(fn, batchLength, 128, bin, bout, batchLength, table);
+            device.Synchronize();
+            bout.CopyTo(output.AsSpan(batchStart * 36, batchLength * 36));
         }
 
-        byte[] output = new byte[n * 36];
-        dout.CopyTo(output);
         return output;
     }
 
@@ -50,24 +47,26 @@ public class GpuPipelineTests
         return Encoding.ASCII.GetString(output, i * 36 + 1, len);
     }
 
-    [Fact]
-    public void Derives_The_Known_Vector()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Derives_The_Known_Vector(string backend)
     {
         byte[] entropy = Seed.DecodeEntropy("sEdTuRgwYiEcubPJfRJUArVyn7AXkVj");
 
-        byte[] output = RunDerive(entropy, 1);
+        byte[] output = RunDerive(backend, entropy, 1);
 
         Assert.Equal("rDiskmQdynWqgxoNv4CHsqFHdgsnpJMHGK", AddressAt(output, 0));
     }
 
-    [Fact]
-    public void One_Million_Random_Entropies_Match_The_Cpu_Reference()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void One_Million_Random_Entropies_Match_The_Cpu_Reference(string backend)
     {
         const int n = 1_000_000;
         byte[] entropies = new byte[n * 16];
         new Random(20260903).NextBytes(entropies);
 
-        byte[] output = RunDerive(entropies, n);
+        byte[] output = RunDerive(backend, entropies, n);
 
         // CPU reference, one deriver per worker (BouncyCastleDeriver is not thread-safe).
         int mismatches = 0;
@@ -99,22 +98,22 @@ public class GpuPipelineTests
         Assert.True(mismatches == 0, $"{mismatches} of {n} addresses differ; first: {firstMismatch}");
     }
 
-    [Fact]
-    public void Prf_Entropy_Matches_Sha512_Of_Key_And_Counter()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Prf_Entropy_Matches_Sha512_Of_Key_And_Counter(string backend)
     {
         byte[] key = new byte[32];
         new Random(777).NextBytes(key);
         const ulong start = 1_000_000_007UL;
         const int n = 1000;
 
-        using CudaContext context = GpuTestHelper.RequireContext();
-        CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
-        CudaFunction fn = module.GetFunction("k_prf_entropy");
-        using DeviceBuffer dkey = context.Alloc(32);
-        using DeviceBuffer dout = context.Alloc(n * 16);
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
+        IGpuKernel fn = device.GetKernel("k_prf_entropy");
+        using IGpuBuffer dkey = device.Alloc(32);
+        using IGpuBuffer dout = device.Alloc(n * 16);
         dkey.CopyFrom(key);
-        context.Launch(fn, (n + 255) / 256, 256, dkey, start, dout, n);
-        context.Synchronize();
+        device.Launch(fn, n, 256, dkey, start, dout, n);
+        device.Synchronize();
         byte[] output = new byte[n * 16];
         dout.CopyTo(output);
 

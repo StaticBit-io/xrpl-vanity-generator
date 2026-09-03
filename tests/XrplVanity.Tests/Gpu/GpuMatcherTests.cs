@@ -21,16 +21,15 @@ public class GpuMatcherTests
         return records;
     }
 
-    private static byte[] MatchOnDevice(byte[] records, int n, TargetTable table)
+    private static byte[] MatchOnDevice(string backend, byte[] records, int n, TargetTable table)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
-        CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
-        CudaFunction fn = module.GetFunction("k_match_records");
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
+        IGpuKernel fn = device.GetKernel("k_match_records");
 
-        using DeviceBuffer drec = context.Alloc(records.Length);
-        using DeviceBuffer dgroups = context.Alloc(Math.Max(4, table.Groups.Length * 4));
-        using DeviceBuffer dchars = context.Alloc(Math.Max(1, table.Chars.Length));
-        using DeviceBuffer dflags = context.Alloc(n);
+        using IGpuBuffer drec = device.Alloc(records.Length);
+        using IGpuBuffer dgroups = device.Alloc(Math.Max(4, table.Groups.Length * 4));
+        using IGpuBuffer dchars = device.Alloc(Math.Max(1, table.Chars.Length));
+        using IGpuBuffer dflags = device.Alloc(n);
         drec.CopyFrom(records);
         if (table.Groups.Length > 0)
         {
@@ -42,8 +41,8 @@ public class GpuMatcherTests
             dchars.CopyFrom(table.Chars);
         }
 
-        context.Launch(fn, (n + 255) / 256, 256, drec, n, dgroups, table.GroupCount, dchars, dflags);
-        context.Synchronize();
+        device.Launch(fn, n, 256, drec, n, dgroups, table.GroupCount, dchars, dflags);
+        device.Synchronize();
 
         byte[] flags = new byte[n];
         dflags.CopyTo(flags);
@@ -67,8 +66,9 @@ public class GpuMatcherTests
         return addresses;
     }
 
-    [Fact]
-    public void Device_Predicate_Equals_Cpu_TryMatch_Over_Real_Addresses()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Device_Predicate_Equals_Cpu_TryMatch_Over_Real_Addresses(string backend)
     {
         // Short patterns so every position gets plenty of hits among 20,000 real addresses.
         PatternSet set = new PatternSet.Builder()
@@ -81,7 +81,7 @@ public class GpuMatcherTests
             .Build();
         string[] addresses = DeriveAddresses(20_000, 20260903);
 
-        byte[] gpu = MatchOnDevice(Records(addresses), addresses.Length, TargetTable.Build(set));
+        byte[] gpu = MatchOnDevice(backend, Records(addresses), addresses.Length, TargetTable.Build(set));
 
         int hits = 0;
         for (int i = 0; i < addresses.Length; i++)
@@ -97,8 +97,9 @@ public class GpuMatcherTests
         Assert.True(hits > 100, $"only {hits} hits; the pattern set should hit often"); // sanity: the test exercised real matches
     }
 
-    [Fact]
-    public void Each_Position_Is_Checked_Independently()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Each_Position_Is_Checked_Independently(string backend)
     {
         string[] addresses =
         {
@@ -108,22 +109,23 @@ public class GpuMatcherTests
         };
         byte[] records = Records(addresses);
 
-        byte[] starts = MatchOnDevice(records, 3, TargetTable.Build(new PatternSet.Builder().Add(MatchPosition.Starts, "ABC", ignoreCase: false).Build()));
-        byte[] ends = MatchOnDevice(records, 3, TargetTable.Build(new PatternSet.Builder().Add(MatchPosition.Ends, "ZZZ", ignoreCase: false).Build()));
-        byte[] contains = MatchOnDevice(records, 3, TargetTable.Build(new PatternSet.Builder().Add(MatchPosition.Contains, "hijk", ignoreCase: false).Build()));
+        byte[] starts = MatchOnDevice(backend, records, 3, TargetTable.Build(new PatternSet.Builder().Add(MatchPosition.Starts, "ABC", ignoreCase: false).Build()));
+        byte[] ends = MatchOnDevice(backend, records, 3, TargetTable.Build(new PatternSet.Builder().Add(MatchPosition.Ends, "ZZZ", ignoreCase: false).Build()));
+        byte[] contains = MatchOnDevice(backend, records, 3, TargetTable.Build(new PatternSet.Builder().Add(MatchPosition.Contains, "hijk", ignoreCase: false).Build()));
 
         Assert.Equal(new byte[] { 1, 0, 0 }, starts);
         Assert.Equal(new byte[] { 0, 1, 1 }, ends);
         Assert.Equal(new byte[] { 1, 1, 1 }, contains);
     }
 
-    [Fact]
-    public void Empty_Table_Matches_Nothing()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Empty_Table_Matches_Nothing(string backend)
     {
         string[] addresses = DeriveAddresses(64, 7);
         TargetTable empty = TargetTable.Build(new PatternSet.Builder().Build());
 
-        byte[] gpu = MatchOnDevice(Records(addresses), addresses.Length, empty);
+        byte[] gpu = MatchOnDevice(backend, Records(addresses), addresses.Length, empty);
 
         Assert.All(gpu, f => Assert.Equal(0, f));
     }

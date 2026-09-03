@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using XrplVanity.Gpu;
@@ -12,6 +13,7 @@ internal static class GpuTestHelper
     /// Returns a live CUDA context, or skips the calling test when CUDA is unavailable or the
     /// device is older than the PTX's compute_75 (Turing) target.
     /// </summary>
+    /// <remarks>Kept for <see cref="GpuSearchEngine"/>-based tests (Task 5 migrates them and removes this).</remarks>
     public static CudaContext RequireContext()
     {
         if (!CudaContext.TryCreate(out CudaContext? context, out string reason))
@@ -30,6 +32,40 @@ internal static class GpuTestHelper
         }
 
         return context!;
+    }
+
+    public static IEnumerable<object[]> Backends()
+    {
+        yield return new object[] { "cuda" };
+        yield return new object[] { "opencl" };
+    }
+
+    /// <summary>Opens device 0 of the backend, or skips the calling test when it is unavailable / pre-Turing.</summary>
+    public static IGpuDevice RequireDevice(string backend)
+    {
+        if (!GpuBackends.TryOpen(backend, 0, out IGpuDevice? device, out string reason))
+        {
+            Assert.Skip($"{backend} not available: {reason}");
+        }
+
+        if (backend == "cuda")
+        {
+            // Keep the Plan A compute-capability floor for the PTX (compute_75).
+            if (CudaContext.TryCreate(out CudaContext? probe, out _))
+            {
+                using (probe)
+                {
+                    int capability = probe!.ComputeCapabilityMajor * 10 + probe.ComputeCapabilityMinor;
+                    if (capability < 75)
+                    {
+                        device!.Dispose();
+                        Assert.Skip($"CUDA device {probe.DeviceName} is compute capability {probe.ComputeCapabilityMajor}.{probe.ComputeCapabilityMinor}; the PTX targets compute_75 (Turing) or newer");
+                    }
+                }
+            }
+        }
+
+        return device!;
     }
 
     public static readonly BigInteger P = BigInteger.Pow(2, 255) - 19;

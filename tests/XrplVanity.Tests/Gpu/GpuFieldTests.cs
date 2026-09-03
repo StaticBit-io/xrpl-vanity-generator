@@ -12,11 +12,10 @@ public class GpuFieldTests
 
     private static readonly BigInteger P = GpuTestHelper.P;
 
-    private static uint[] RunOp(int op, BigInteger[] a, BigInteger[] b)
+    private static uint[] RunOp(string backend, int op, BigInteger[] a, BigInteger[] b)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
-        CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
-        CudaFunction fn = module.GetFunction("k_fe_op");
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
+        IGpuKernel fn = device.GetKernel("k_fe_op");
 
         int n = a.Length;
         uint[] la = new uint[n * 8];
@@ -27,13 +26,13 @@ public class GpuFieldTests
             GpuTestHelper.ToLimbs(b[i]).CopyTo(lb, i * 8);
         }
 
-        using DeviceBuffer da = context.Alloc(n * 32);
-        using DeviceBuffer db = context.Alloc(n * 32);
-        using DeviceBuffer dout = context.Alloc(n * 32);
+        using IGpuBuffer da = device.Alloc(n * 32);
+        using IGpuBuffer db = device.Alloc(n * 32);
+        using IGpuBuffer dout = device.Alloc(n * 32);
         da.CopyFrom(GpuTestHelper.AsBytes(la));
         db.CopyFrom(GpuTestHelper.AsBytes(lb));
-        context.Launch(fn, (n + 255) / 256, 256, da, db, dout, n, op);
-        context.Synchronize();
+        device.Launch(fn, n, 256, da, db, dout, n, op);
+        device.Synchronize();
 
         byte[] raw = new byte[n * 32];
         dout.CopyTo(raw);
@@ -71,8 +70,9 @@ public class GpuFieldTests
         }
     }
 
-    [Fact]
-    public void Add_Sub_Mul_Sqr_Match_BigInteger()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Add_Sub_Mul_Sqr_Match_BigInteger(string backend)
     {
         BigInteger[] a = Inputs();
         BigInteger[] b = new BigInteger[a.Length];
@@ -81,17 +81,18 @@ public class GpuFieldTests
             b[i] = a[(i * 7 + 3) % a.Length];
         }
 
-        AssertEach(RunOp(OpAdd, a, b), Map(a, b, (x, y) => (x + y) % P));
-        AssertEach(RunOp(OpSub, a, b), Map(a, b, (x, y) => ((x - y) % P + P) % P));
-        AssertEach(RunOp(OpMul, a, b), Map(a, b, (x, y) => (x * y) % P));
-        AssertEach(RunOp(OpSqr, a, b), Map(a, b, (x, _) => (x * x) % P));
+        AssertEach(RunOp(backend, OpAdd, a, b), Map(a, b, (x, y) => (x + y) % P));
+        AssertEach(RunOp(backend, OpSub, a, b), Map(a, b, (x, y) => ((x - y) % P + P) % P));
+        AssertEach(RunOp(backend, OpMul, a, b), Map(a, b, (x, y) => (x * y) % P));
+        AssertEach(RunOp(backend, OpSqr, a, b), Map(a, b, (x, _) => (x * x) % P));
     }
 
-    [Fact]
-    public void Inverse_Times_Value_Is_One()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Inverse_Times_Value_Is_One(string backend)
     {
         BigInteger[] a = Array.FindAll(Inputs(), v => v != 0);
-        uint[] inv = RunOp(OpInv, a, a);
+        uint[] inv = RunOp(backend, OpInv, a, a);
         for (int i = 0; i < a.Length; i++)
         {
             BigInteger got = GpuTestHelper.FromLimbs(inv.AsSpan(i * 8, 8));
@@ -100,19 +101,21 @@ public class GpuFieldTests
         }
     }
 
-    [Fact]
-    public void Canon_Reduces_Any_256_Bit_Value()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Canon_Reduces_Any_256_Bit_Value(string backend)
     {
         // Values >= p (not canonical) up to 2^256-1 must reduce to value mod p.
         BigInteger[] a =
         {
             P, P + 1, P + 37, 2 * P, 2 * P + 37, BigInteger.Pow(2, 256) - 1, BigInteger.Pow(2, 255),
         };
-        AssertEach(RunOp(OpCanon, a, a), Map(a, a, (x, _) => x % P));
+        AssertEach(RunOp(backend, OpCanon, a, a), Map(a, a, (x, _) => x % P));
     }
 
-    [Fact]
-    public void FromBytes_Reduces_Non_Canonical_Encodings()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void FromBytes_Reduces_Non_Canonical_Encodings(string backend)
     {
         // fe_from_bytes must canonicalize: values >= p, and a few already-canonical ones for good measure.
         BigInteger[] a =
@@ -120,7 +123,7 @@ public class GpuFieldTests
             P, P + 1, P + 37, 2 * P, 2 * P + 37, BigInteger.Pow(2, 256) - 1, BigInteger.Pow(2, 255),
             BigInteger.Zero, BigInteger.One, P - 1,
         };
-        AssertEach(RunOp(OpFromBytes, a, a), Map(a, a, (x, _) => x % P));
+        AssertEach(RunOp(backend, OpFromBytes, a, a), Map(a, a, (x, _) => x % P));
     }
 
     private static BigInteger[] Map(BigInteger[] a, BigInteger[] b, Func<BigInteger, BigInteger, BigInteger> f)

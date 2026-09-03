@@ -26,17 +26,18 @@ public class GpuInfrastructureTests
         Assert.True(context.ComputeCapabilityMajor >= 7); // Turing (7.5) or newer per the spec
     }
 
-    [Fact]
-    public void Device_Buffer_Roundtrips_Bytes()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Device_Buffer_Roundtrips_Bytes(string backend)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
         byte[] data = new byte[4096];
         for (int i = 0; i < data.Length; i++)
         {
             data[i] = (byte)(i * 7);
         }
 
-        using DeviceBuffer buffer = context.Alloc(data.Length);
+        using IGpuBuffer buffer = device.Alloc(data.Length);
         buffer.CopyFrom(data);
         byte[] back = new byte[data.Length];
         buffer.CopyTo(back);
@@ -44,12 +45,12 @@ public class GpuInfrastructureTests
         Assert.Equal(data, back);
     }
 
-    [Fact]
-    public void Embedded_Ptx_Loads_And_A_Kernel_Runs()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Kernel_Program_Loads_And_A_Kernel_Runs(string backend)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
-        CudaModule module = context.LoadModule(GpuKernels.ReadPtx());
-        CudaFunction add = module.GetFunction("k_add_arrays");
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
+        IGpuKernel add = device.GetKernel("k_add_arrays");
 
         const int n = 1000;
         uint[] a = new uint[n];
@@ -60,14 +61,14 @@ public class GpuInfrastructureTests
             b[i] = (uint)(i * 3);
         }
 
-        using DeviceBuffer da = context.Alloc(n * 4);
-        using DeviceBuffer db = context.Alloc(n * 4);
-        using DeviceBuffer dout = context.Alloc(n * 4);
+        using IGpuBuffer da = device.Alloc(n * 4);
+        using IGpuBuffer db = device.Alloc(n * 4);
+        using IGpuBuffer dout = device.Alloc(n * 4);
         da.CopyFrom(GpuTestHelper.AsBytes(a));
         db.CopyFrom(GpuTestHelper.AsBytes(b));
 
-        context.Launch(add, (n + 255) / 256, 256, da, db, dout, n);
-        context.Synchronize();
+        device.Launch(add, n, 256, da, db, dout, n);
+        device.Synchronize();
 
         byte[] raw = new byte[n * 4];
         dout.CopyTo(raw);
