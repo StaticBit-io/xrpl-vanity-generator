@@ -484,7 +484,11 @@ __device__ void ripemd160(const u8* msg, int len, u8* out20)
 
 __device__ __constant__ char B58_ALPHABET[59] = "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz";
 
-// Port of XrplVanity.Core.XrplBase58.Encode for len <= 32 bytes. Returns the char count (<= 44).
+// Port of XrplVanity.Core.XrplBase58.Encode. Intended for the 25-byte XRPL AccountID payload
+// (a leading 0x00 version byte plus a 20-byte RIPEMD-160 hash and 4-byte checksum), which encodes
+// to at most 34 characters. `tmp` and `rev` are sized for that case; callers writing into the
+// 36-byte [length][chars...] record used throughout this file (35 char slots) must not pass a
+// longer input. Returns the char count.
 __device__ int base58_encode(const u8* in, int len, char* out)
 {
     u8 tmp[32];
@@ -511,23 +515,29 @@ __device__ int base58_encode(const u8* in, int len, char* out)
     return pos;
 }
 
-// Test entries: each thread hashes in[i*inLen .. +inLen].
+// Test entries: each thread hashes in[i*inLen .. +inLen]. inLen comes from the host, so each
+// guards against overrunning the fixed-size stack buffer inside the corresponding hash function
+// (sha512: 256 bytes / 239-byte limit, sha256: 192 bytes / 183-byte limit, ripemd160: 128 bytes /
+// 119-byte limit) before it writes the 0x80 padding byte.
 extern "C" __global__ void k_sha512(const u8* in, u8* out, int n, int inLen)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
+    if (inLen < 0 || inLen > 239) return;
     sha512(in + i * inLen, inLen, out + i * 64);
 }
 extern "C" __global__ void k_sha256(const u8* in, u8* out, int n, int inLen)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
+    if (inLen < 0 || inLen > 183) return;
     sha256(in + i * inLen, inLen, out + i * 32);
 }
 extern "C" __global__ void k_ripemd160(const u8* in, u8* out, int n, int inLen)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
+    if (inLen < 0 || inLen > 119) return;
     ripemd160(in + i * inLen, inLen, out + i * 20);
 }
 // n x 25-byte payloads -> n x 36 bytes: [length][chars...][zero padding].
