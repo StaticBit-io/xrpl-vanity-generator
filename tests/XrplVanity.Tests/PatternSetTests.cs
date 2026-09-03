@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using XrplVanity.Core;
 using Xunit;
 
@@ -115,5 +117,25 @@ public class PatternSetTests
 
         Assert.Empty(set.CaseFoldingSkipped);
         Assert.True(set.TryMatch("rAbcdefghjkmnXXXXXXXXXXXXXXXXXXXXX", out _, out _));
+    }
+
+    [Fact]
+    public void EnumerateTargets_Yields_Exactly_The_Expanded_Set()
+    {
+        PatternSet set = new PatternSet.Builder()
+            .Add(MatchPosition.Starts, "ab", ignoreCase: true)      // ab aB Ab AB
+            .Add(MatchPosition.Ends, "z", ignoreCase: true)         // z Z
+            .Add(MatchPosition.Contains, "q", ignoreCase: false)    // q
+            .Build();
+
+        List<(MatchPosition Position, string Value)> targets = set.EnumerateTargets().ToList();
+
+        Assert.Equal(7, targets.Count);
+        Assert.Equal(new[] { "AB", "Ab", "aB", "ab" },
+            targets.Where(t => t.Position == MatchPosition.Starts).Select(t => t.Value).OrderBy(v => v, StringComparer.Ordinal));
+        Assert.Equal(new[] { "Z", "z" },
+            targets.Where(t => t.Position == MatchPosition.Ends).Select(t => t.Value).OrderBy(v => v, StringComparer.Ordinal));
+        Assert.Equal(new[] { "q" },
+            targets.Where(t => t.Position == MatchPosition.Contains).Select(t => t.Value));
     }
 }

@@ -41,6 +41,35 @@ public sealed class PatternSet
     /// <summary>True when at least one reachable pattern remains to search for.</summary>
     public bool HasPatterns => _starts.Length > 0 || _ends.Length > 0 || _contains.Count > 0;
 
+    /// <summary>
+    /// Every expanded target string with its position — exactly the set <see cref="TryMatch"/>
+    /// checks. Consumers that match elsewhere (the GPU) build their structures from this so the
+    /// Builder stays the single source of truth for normalization and case expansion.
+    /// </summary>
+    public IEnumerable<(MatchPosition Position, string Value)> EnumerateTargets()
+    {
+        foreach (Bucket bucket in _starts)
+        {
+            foreach (string value in bucket.Values)
+            {
+                yield return (MatchPosition.Starts, value);
+            }
+        }
+
+        foreach (Bucket bucket in _ends)
+        {
+            foreach (string value in bucket.Values)
+            {
+                yield return (MatchPosition.Ends, value);
+            }
+        }
+
+        foreach (string value in _contains)
+        {
+            yield return (MatchPosition.Contains, value);
+        }
+    }
+
     public bool TryMatch(ReadOnlySpan<char> address, out MatchPosition position, out string pattern)
     {
         ReadOnlySpan<char> body = address[1..]; // drop leading 'r'
