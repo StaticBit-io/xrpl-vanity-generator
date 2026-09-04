@@ -222,18 +222,28 @@ usable device, or (CUDA) when the device is older than compute_75.
 
 The test suite runs on Linux inside Docker, with two modes:
 
-- **GPU mode** (`bash linux/run-linux-tests.sh`): runs the full suite (150
+- **GPU mode** (`bash linux/run-linux-tests.sh`): runs the full suite (165
   tests) with CUDA and OpenCL both required. CUDA comes from the NVIDIA
   container runtime (included with Docker Desktop on Windows; install the
   NVIDIA Container Toolkit on Linux); OpenCL comes from pocl 5.0 (an
   independent CPU OpenCL implementation bundled in the image). The run
-  asserts both backends are present and green, 0 skipped.
+  asserts both backends are present and green, 0 skipped. After the suite,
+  the harness runs a series of CLI smokes and asserts each one's exit code
+  and output: `--list-devices` (lists `cuda:0` and `opencl:0`),
+  `--backend opencl`, `--gpu` (falls to the first available backend,
+  `cuda:0` here), and `--gpu-devices all` (both `cuda:0` and `opencl:0`
+  search together, `on 2 device(s)`, one shared exact `--count`, no
+  consistency errors).
 - **CPU-only mode** (`bash linux/run-linux-tests.sh --cpu-only`): runs the
-  suite without GPU passthrough; CUDA rows are skipped (50 tests) with the
+  suite without GPU passthrough; CUDA rows are skipped (59 tests) with the
   reason "CUDA driver library not found"; OpenCL rows run on pocl. The run
-  asserts OpenCL is present and the remaining 100 tests pass, 0 failed. This
+  asserts OpenCL is present and the remaining 106 tests pass, 0 failed. This
   exercises the "machine without NVIDIA" scenario and makes a CPU-only CI
-  job now possible.
+  job now possible. The same CLI smokes run against `opencl:0` only
+  (`--gpu-devices all` reports `on 1 device(s)`), plus two additional exit-2
+  smokes specific to this mode: `--gpu-devices cuda` and `--backend cuda`
+  each fail with a "no matching device" / "no usable device" reason, since
+  there is no CUDA device to select.
 
 Both modes use the same single kernel source and exercise the same test
 anchors: field arithmetic vs BigInteger, RFC 8032 vectors, hash padding
@@ -285,11 +295,23 @@ GPU 0: NVIDIA GeForce RTX 5070 Ti (UUID: ...)
 
 == tests (required backends: cuda,opencl)
 [... suite output ...]
-   XrplVanity.Tests  Total: 150, Errors: 0, Failed: 0, Skipped: 0, Time: 273.083s
+   XrplVanity.Tests  Total: 165, Errors: 0, Failed: 0, Skipped: 0, Time: 353.451s
+ok   no skipped rows
 
 == smoke: --list-devices
  0  cuda:0  NVIDIA GeForce RTX 5070 Ti  (sm_120)
  1  opencl:0  cpu-skylake-avx512-11th Gen Intel(R) Core(TM) i5-11400F @ 2.60GHz  (Portable Computing Language, OpenCL 3.0 PoCL ...) [cpu]
+ok   list shows opencl:0
+ok   list shows cuda:0
+
+== smoke: --gpu-devices all
+ok   multi-device search (exit 0)
+ok   opencl worker ran
+ok   no consistency errors
+ok   cuda worker ran
+ok   two devices
+
+== done: mode=gpu, all expectations met
 ```
 
 The `[cpu]` tag marks CPU devices in `--list-devices`. The suite on pocl

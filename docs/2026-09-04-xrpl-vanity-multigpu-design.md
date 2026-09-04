@@ -207,3 +207,17 @@ aggregate rate for `cuda:0`+`opencl:0` on Windows and for RTX+pocl in the contai
 3. One device failing is a warning; none opening is exit 2.
 4. Match output order across devices is unspecified.
 5. Plan order C → D → E complete after this; secp256k1 permanently excluded.
+
+## Measured (reference machine, one RTX 5070 Ti)
+
+| Configuration | Result |
+| --- | --- |
+| Windows, `--gpu-devices all` (cuda:0 + opencl:0 = one card through two APIs), CLI | `GPU: searched 2,097,152 candidates on 2 device(s) in 0.7 s (3,135,286/s); consistency errors: 0.` (~3,100,000/s) |
+| Windows, `--gpu-devices cuda` (single engine), CLI | `GPU: searched 1,048,576 candidates on 1 device(s) in 0.4 s (2,374,051/s); consistency errors: 0.` (~2,400,000/s) |
+| Linux container, `--gpu-devices all` (RTX via CUDA + pocl on 12 vCPU), CLI | `GPU: searched 1,048,576 candidates on 2 device(s) in 35.7 s (29,357/s); consistency errors: 0.` (~29,000/s; pocl-dominated — see note) |
+| Two engines on `cuda:0` (test) | limit reached exactly; both workers > 0 candidates (`Two_Engines_On_The_Same_Cuda_Device_Stop_Exactly_At_The_Limit`, 8/8 across 3 isolated class runs and the 165/165 whole-suite runs) |
+| Start-up with two OpenCL programs | no `note: compiling the OpenCL program...` line observed in this task's Linux runs — the `xrpl-vanity-pocl` named volume already held a warm kernel cache from earlier Plan D/E harness runs on this machine, so every OpenCL open in both the GPU-mode and CPU-only harness logs and the ad hoc CLI runs below completed under a second. Consistent with Plan D's own "not measured separately" note for pocl's cold-compile cost (`docs/2026-09-03-xrpl-vanity-linux-design.md`). `OpenClNative.SetupLock`'s concurrent-build serialization was not exercised here either, since only one OpenCL device (`opencl:0`, pocl) ever participates on this one-card, one-CPU-implementation machine. |
+
+Two ad hoc `--gpu-devices all --starts ab` CLI runs in the Linux container (`--count 3` and `--count 500`, both outside the harness's own smoke checks, which discard passing output) reproduced the same shape twice: `opencl:0` (pocl) satisfied the whole shared `--count` from its own first launch (1,048,576 candidates in 25.7-25.8 s) before `cuda:0` ever completed a launch, so CUDA's own `DeviceSearchStats.CandidatesSearched` was honestly reported as 0 both times — the by-design "cancelled before its first launch" outcome the Task 4 test fixes account for, not a bug. A follow-up standalone `--backend cuda` run on the same container showed CUDA is not slow in isolation — `GPU: searched 1,048,576 candidates in 0.4 s (2,555,684/s); consistency errors: 0.` — so the likely explanation is that pocl's OpenCL kernel is CPU-bound and saturates all 12 vCPUs for the ~25 s of its first launch, starving the host-side CUDA driver calls (context creation, module load, kernel launch) enough to push CUDA's own open-and-launch well past that window. This was not deliberately engineered or reproduced beyond these two ad hoc runs and is recorded as an observation, not a guarantee.
+
+**Scaling across two or more NVIDIA cards was not measured** — the reference machine has one physical GPU; `--gpu-devices cuda` on a multi-card machine (every CUDA ordinal, one engine each) is implemented and covered by `CudaEnumerationTests`/`CudaBackend.EnumerateDevices`, but its aggregate throughput has not been observed on real hardware.

@@ -9,7 +9,9 @@ case "$MODE" in gpu|cpu) ;; *) echo "usage: $0 <gpu|cpu>" >&2; exit 2 ;; esac
 
 step() { printf '\n== %s\n' "$*"; }
 expect_contains() { # expect_contains <label> <needle> <haystack>
-    if printf '%s' "$3" | grep -q -- "$2"; then printf 'ok   %s\n' "$1"; else printf 'FAIL %s: expected "%s"\n%s\n' "$1" "$2" "$3"; exit 1; fi
+    # -F: needles are literal text, not BRE patterns — several device selectors we grep for
+    # (e.g. "GPU[opencl:0]: searched") contain brackets, which BRE reads as a character class.
+    if printf '%s' "$3" | grep -qF -- "$2"; then printf 'ok   %s\n' "$1"; else printf 'FAIL %s: expected "%s"\n%s\n' "$1" "$2" "$3"; exit 1; fi
 }
 expect_exit() { # expect_exit <label> <expected> <actual>
     if [ "$3" -eq "$2" ]; then printf 'ok   %s (exit %s)\n' "$1" "$3"; else printf 'FAIL %s: expected exit %s, got %s\n' "$1" "$2" "$3"; exit 1; fi
@@ -56,6 +58,18 @@ step "smoke: --gpu (first available backend)"
 set +e; OUT="$("${CLI[@]}" --gpu --starts ab --count 1 2>&1)"; RC=$?; set -e
 expect_exit "gpu search" 0 "$RC"
 if [ "$MODE" = gpu ]; then expect_contains "ran on cuda" "GPU: cuda:" "$OUT"; else expect_contains "fell to opencl (no CUDA)" "GPU: opencl:" "$OUT"; fi
+
+step "smoke: --gpu-devices all"
+set +e; OUT="$("${CLI[@]}" --gpu-devices all --starts ab --count 2 2>&1)"; RC=$?; set -e
+expect_exit "multi-device search" 0 "$RC"; expect_contains "opencl worker ran" "GPU[opencl:0]: searched" "$OUT"; expect_contains "no consistency errors" "consistency errors: 0." "$OUT"
+if [ "$MODE" = gpu ]; then
+    expect_contains "cuda worker ran" "GPU[cuda:0]: searched" "$OUT"; expect_contains "two devices" "on 2 device(s)" "$OUT"
+else
+    expect_contains "one device" "on 1 device(s)" "$OUT"
+    step "smoke: --gpu-devices cuda without a GPU must exit 2"
+    set +e; OUT="$("${CLI[@]}" --gpu-devices cuda --starts ab --count 1 2>&1)"; RC=$?; set -e
+    expect_exit "no cuda devices" 2 "$RC"; expect_contains "reason printed" "no matching device" "$OUT"
+fi
 
 if [ "$MODE" = cpu ]; then
     step "smoke: --backend cuda without a GPU must exit 2"
