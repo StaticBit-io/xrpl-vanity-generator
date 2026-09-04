@@ -12,7 +12,13 @@ public sealed class OpenClBackend : IGpuBackend
 
     public string Name => BackendName;
 
-    private static bool TryEnumerate(out List<(IntPtr Platform, IntPtr Device, GpuDeviceInfo Info)> devices, out string reason)
+    /// <summary>
+    /// Internal (not private) so tests can obtain a real device handle to construct
+    /// <see cref="OpenClDevice"/> directly with a deliberately broken program source, exercising
+    /// the build-failure cleanup path without needing a vendor compiler that can be made to fail
+    /// on demand from the public API.
+    /// </summary>
+    internal static bool TryEnumerate(out List<(IntPtr Platform, IntPtr Device, GpuDeviceInfo Info)> devices, out string reason)
     {
         devices = new List<(IntPtr, IntPtr, GpuDeviceInfo)>();
         try
@@ -175,6 +181,15 @@ internal sealed class OpenClDevice : IGpuDevice
     private bool _disposed;
 
     internal OpenClDevice(IntPtr device, GpuDeviceInfo info)
+        : this(device, info, GpuKernels.ReadOpenClSource())
+    {
+    }
+
+    /// <summary>
+    /// Takes the program source directly rather than reading the embedded kernel, so a test can
+    /// exercise the build-failure cleanup path with a deliberately broken program.
+    /// </summary>
+    internal OpenClDevice(IntPtr device, GpuDeviceInfo info, string source)
     {
         _device = device;
         Name = $"{info.Name} ({info.Details})";
@@ -185,7 +200,7 @@ internal sealed class OpenClDevice : IGpuDevice
         {
             _queue = OpenClNative.clCreateCommandQueue(_context, device, 0, out error);
             OpenClNative.Check(error, "clCreateCommandQueue");
-            _program = Build(GpuKernels.ReadOpenClSource());
+            _program = Build(source);
         }
         catch
         {

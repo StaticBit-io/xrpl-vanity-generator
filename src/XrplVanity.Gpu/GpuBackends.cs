@@ -23,10 +23,19 @@ public static class GpuBackends
         return null;
     }
 
-    public static bool TryOpenFirst(out IGpuDevice? device, out string reason)
+    public static bool TryOpenFirst(out IGpuDevice? device, out string reason) => TryOpenFirst(All, out device, out reason);
+
+    public static bool TryOpen(string backendName, int index, out IGpuDevice? device, out string reason) =>
+        TryOpen(All, backendName, index, out device, out reason);
+
+    /// <summary>
+    /// Testable core of <see cref="TryOpenFirst(out IGpuDevice?, out string)"/>: takes the backend
+    /// list as a parameter so tests can substitute a fake backend that fails deterministically.
+    /// </summary>
+    internal static bool TryOpenFirst(IReadOnlyList<IGpuBackend> backends, out IGpuDevice? device, out string reason)
     {
         List<string> reasons = new();
-        foreach (IGpuBackend backend in All)
+        foreach (IGpuBackend backend in backends)
         {
             if (backend.EnumerateDevices().Count > 0)
             {
@@ -36,7 +45,7 @@ public static class GpuBackends
                     reason = string.Empty;
                     return true;
                 }
-                catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException)
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException or CudaException or OpenClException)
                 {
                     reasons.Add($"{backend.Name}: {ex.Message}");
                 }
@@ -52,9 +61,22 @@ public static class GpuBackends
         return false;
     }
 
-    public static bool TryOpen(string backendName, int index, out IGpuDevice? device, out string reason)
+    /// <summary>
+    /// Testable core of <see cref="TryOpen(string, int, out IGpuDevice?, out string)"/>: takes the
+    /// backend list as a parameter so tests can substitute a fake backend that fails deterministically.
+    /// </summary>
+    internal static bool TryOpen(IReadOnlyList<IGpuBackend> backends, string backendName, int index, out IGpuDevice? device, out string reason)
     {
-        IGpuBackend? backend = Get(backendName);
+        IGpuBackend? backend = null;
+        foreach (IGpuBackend candidate in backends)
+        {
+            if (string.Equals(candidate.Name, backendName, StringComparison.OrdinalIgnoreCase))
+            {
+                backend = candidate;
+                break;
+            }
+        }
+
         if (backend is null)
         {
             device = null;
@@ -68,7 +90,7 @@ public static class GpuBackends
             reason = string.Empty;
             return true;
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException)
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException or CudaException or OpenClException)
         {
             device = null;
             reason = ex.Message;
