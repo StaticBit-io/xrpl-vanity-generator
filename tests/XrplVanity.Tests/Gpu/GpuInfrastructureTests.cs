@@ -98,7 +98,7 @@ public class GpuInfrastructureTests
         IReadOnlyList<GpuDeviceInfo> devices = backend.EnumerateDevices();
         if (devices.Count == 0)
         {
-            Assert.Skip("opencl not available: no devices");
+            GpuTestHelper.SkipOrFail("opencl", "no devices");
         }
 
         Assert.Throws<ArgumentOutOfRangeException>(() => backend.Open(devices.Count));

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace XrplVanity.Gpu;
 
-public sealed record GpuDeviceInfo(string Backend, int Index, string Name, string Details);
+public sealed record GpuDeviceInfo(string Backend, int Index, string Name, string Details, bool IsCpuDevice = false);
 
 public interface IGpuKernel
 {
@@ -22,6 +22,9 @@ public interface IGpuDevice : IDisposable
 {
     string Backend { get; }
     string Name { get; }
+
+    /// <summary>True for a CPU OpenCL device (pocl, Intel/AMD CPU runtimes); false for GPUs.</summary>
+    bool IsCpuDevice { get; }
     IGpuKernel GetKernel(string name);
     IGpuBuffer Alloc(long bytes);
 

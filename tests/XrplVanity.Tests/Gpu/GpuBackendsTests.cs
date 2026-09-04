@@ -91,7 +91,7 @@ public class GpuBackendsTests
     {
         if (!OpenClBackend.TryEnumerate(out List<(IntPtr Platform, IntPtr Device, GpuDeviceInfo Info)> devices, out string enumerateReason) || devices.Count == 0)
         {
-            Assert.Skip($"opencl not available: {enumerateReason}");
+            GpuTestHelper.SkipOrFail("opencl", enumerateReason);
         }
 
         (IntPtr _, IntPtr device, GpuDeviceInfo info) = devices[0];

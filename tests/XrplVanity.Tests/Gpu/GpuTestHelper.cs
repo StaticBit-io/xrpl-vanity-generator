@@ -22,7 +22,7 @@ internal static class GpuTestHelper
     {
         if (!CudaContext.TryCreate(out CudaContext? context, out string reason))
         {
-            Assert.Skip($"CUDA not available: {reason}");
+            SkipOrFail("cuda", reason);
         }
 
         int capability = context!.ComputeCapabilityMajor * 10 + context.ComputeCapabilityMinor;
@@ -32,10 +32,40 @@ internal static class GpuTestHelper
             int major = context.ComputeCapabilityMajor;
             int minor = context.ComputeCapabilityMinor;
             context.Dispose();
-            Assert.Skip($"CUDA device {name} is compute capability {major}.{minor}; the PTX targets compute_75 (Turing) or newer");
+            SkipOrFail("cuda", $"CUDA device {name} is compute capability {major}.{minor}; the PTX targets compute_75 (Turing) or newer");
         }
 
         return context!;
+    }
+
+    /// <summary>Backends named in XRPL_VANITY_REQUIRE_BACKENDS (comma-separated, case-insensitive). A listed backend that is unavailable fails the test instead of skipping it.</summary>
+    public static IReadOnlySet<string> RequiredBackends { get; } = ParseRequired(Environment.GetEnvironmentVariable("XRPL_VANITY_REQUIRE_BACKENDS"));
+
+    private static IReadOnlySet<string> ParseRequired(string? value)
+    {
+        HashSet<string> set = new(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return set;
+        }
+
+        foreach (string part in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            set.Add(part);
+        }
+
+        return set;
+    }
+
+    /// <summary>Skips the calling test, or fails it when the backend is required by XRPL_VANITY_REQUIRE_BACKENDS.</summary>
+    public static void SkipOrFail(string backend, string reason)
+    {
+        if (RequiredBackends.Contains(backend))
+        {
+            Assert.Fail($"{backend} is required by XRPL_VANITY_REQUIRE_BACKENDS but unavailable: {reason}");
+        }
+
+        Assert.Skip($"{backend} not available: {reason}");
     }
 
     public static IEnumerable<object[]> Backends()
@@ -49,7 +79,7 @@ internal static class GpuTestHelper
     {
         if (!GpuBackends.TryOpen(backend, 0, out IGpuDevice? device, out string reason))
         {
-            Assert.Skip($"{backend} not available: {reason}");
+            SkipOrFail(backend, reason);
         }
 
         if (backend == "cuda")
@@ -63,7 +93,7 @@ internal static class GpuTestHelper
                     if (capability < 75)
                     {
                         device!.Dispose();
-                        Assert.Skip($"CUDA device {probe.DeviceName} is compute capability {probe.ComputeCapabilityMajor}.{probe.ComputeCapabilityMinor}; the PTX targets compute_75 (Turing) or newer");
+                        SkipOrFail("cuda", $"CUDA device {probe.DeviceName} is compute capability {probe.ComputeCapabilityMajor}.{probe.ComputeCapabilityMinor}; the PTX targets compute_75 (Turing) or newer");
                     }
                 }
             }

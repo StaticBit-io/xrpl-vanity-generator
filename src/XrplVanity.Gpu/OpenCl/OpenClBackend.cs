@@ -48,7 +48,8 @@ public sealed class OpenClBackend : IGpuBackend
                 {
                     string name = OpenClNative.DeviceString(device, OpenClNative.DeviceName);
                     string version = OpenClNative.DeviceString(device, OpenClNative.DeviceVersion);
-                    devices.Add((platform, device, new GpuDeviceInfo(BackendName, index, name, $"{platformName}, {version}")));
+                    bool isCpu = (OpenClNative.DeviceUlong(device, OpenClNative.DeviceType) & OpenClNative.DeviceTypeCpu) != 0;
+                    devices.Add((platform, device, new GpuDeviceInfo(BackendName, index, name, $"{platformName}, {version}", isCpu)));
                     index++;
                 }
             }
@@ -108,12 +109,14 @@ public sealed class OpenClBackend : IGpuBackend
 
 internal sealed class OpenClKernel : IGpuKernel
 {
-    internal OpenClKernel(IntPtr handle)
+    internal OpenClKernel(IntPtr handle, nuint maxWorkGroupSize)
     {
         Handle = handle;
+        MaxWorkGroupSize = maxWorkGroupSize;
     }
 
     internal IntPtr Handle { get; }
+    internal nuint MaxWorkGroupSize { get; }
 }
 
 internal sealed class OpenClBuffer : IGpuBuffer
@@ -182,6 +185,7 @@ internal sealed class OpenClDevice : IGpuDevice
     private readonly IntPtr _context;
     private readonly IntPtr _queue;
     private readonly IntPtr _program;
+    private readonly nuint _deviceMaxWorkGroupSize;
     private readonly List<IntPtr> _kernels = new();
     private bool _disposed;
 
@@ -198,6 +202,8 @@ internal sealed class OpenClDevice : IGpuDevice
     {
         _device = device;
         Name = $"{info.Name} ({info.Details})";
+        IsCpuDevice = info.IsCpuDevice;
+        _deviceMaxWorkGroupSize = OpenClNative.DeviceSize(device, OpenClNative.DeviceMaxWorkGroupSize);
         IntPtr[] devices = { device };
         _context = OpenClNative.clCreateContext(IntPtr.Zero, 1, devices, IntPtr.Zero, IntPtr.Zero, out int error);
         OpenClNative.Check(error, "clCreateContext");
@@ -225,6 +231,7 @@ internal sealed class OpenClDevice : IGpuDevice
 
     public string Backend => "opencl";
     public string Name { get; }
+    public bool IsCpuDevice { get; }
 
     private IntPtr Build(string source)
     {
@@ -297,7 +304,8 @@ internal sealed class OpenClDevice : IGpuDevice
         IntPtr kernel = OpenClNative.clCreateKernel(_program, name, out int error);
         OpenClNative.Check(error, $"clCreateKernel({name})");
         _kernels.Add(kernel);
-        return new OpenClKernel(kernel);
+        nuint maxWorkGroupSize = OpenClNative.KernelMaxWorkGroupSize(kernel, _device);
+        return new OpenClKernel(kernel, maxWorkGroupSize);
     }
 
     public IGpuBuffer Alloc(long bytes)
@@ -315,8 +323,10 @@ internal sealed class OpenClDevice : IGpuDevice
             SetArg(handle, (uint)i, args[i]);
         }
 
-        nuint local = (nuint)blockSize;
-        nuint global = (nuint)(((threads + blockSize - 1) / blockSize) * blockSize);
+        nuint limit = Math.Min(((OpenClKernel)kernel).MaxWorkGroupSize, _deviceMaxWorkGroupSize);
+        if (limit == 0) limit = 1;
+        nuint local = Math.Min((nuint)blockSize, limit);
+        nuint global = ((nuint)threads + local - 1) / local * local;
         OpenClNative.Check(
             OpenClNative.clEnqueueNDRangeKernel(_queue, handle, 1, IntPtr.Zero, new[] { global }, new[] { local }, 0, IntPtr.Zero, IntPtr.Zero),
             "clEnqueueNDRangeKernel");

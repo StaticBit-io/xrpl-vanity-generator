@@ -16,6 +16,10 @@ internal static class OpenClNative
     internal const uint DeviceName = 0x102B;
     internal const uint DeviceVersion = 0x102F;
     internal const uint ProgramBuildLog = 0x1183;
+    internal const uint DeviceType = 0x1000;
+    internal const uint DeviceMaxWorkGroupSize = 0x1004;
+    internal const uint KernelWorkGroupSize = 0x11B0;
+    internal const ulong DeviceTypeCpu = 1UL << 1;
 
     static OpenClNative()
     {
@@ -44,6 +48,7 @@ internal static class OpenClNative
     [DllImport(Lib)] internal static extern int clReleaseProgram(IntPtr program);
     [DllImport(Lib)] internal static extern int clReleaseCommandQueue(IntPtr queue);
     [DllImport(Lib)] internal static extern int clReleaseContext(IntPtr context);
+    [DllImport(Lib)] internal static extern int clGetKernelWorkGroupInfo(IntPtr kernel, IntPtr device, uint param, nuint size, out nuint value, out nuint sizeRet);
 
     internal static void Check(int code, string operation, string detail = "")
     {
@@ -95,5 +100,25 @@ internal static class OpenClNative
         byte[] buffer = new byte[(int)size];
         Check(clGetDeviceInfo(device, param, size, buffer, out _), "clGetDeviceInfo");
         return System.Text.Encoding.ASCII.GetString(buffer).TrimEnd('\0', ' ');
+    }
+
+    internal static ulong DeviceUlong(IntPtr device, uint param)
+    {
+        byte[] buffer = new byte[8];
+        Check(clGetDeviceInfo(device, param, 8, buffer, out _), "clGetDeviceInfo(ulong)");
+        return BitConverter.ToUInt64(buffer, 0);
+    }
+
+    internal static nuint DeviceSize(IntPtr device, uint param)
+    {
+        byte[] buffer = new byte[IntPtr.Size];
+        Check(clGetDeviceInfo(device, param, (nuint)IntPtr.Size, buffer, out _), "clGetDeviceInfo(size_t)");
+        return IntPtr.Size == 8 ? (nuint)BitConverter.ToUInt64(buffer, 0) : (nuint)BitConverter.ToUInt32(buffer, 0);
+    }
+
+    internal static nuint KernelMaxWorkGroupSize(IntPtr kernel, IntPtr device)
+    {
+        Check(clGetKernelWorkGroupInfo(kernel, device, KernelWorkGroupSize, (nuint)IntPtr.Size, out nuint value, out _), "clGetKernelWorkGroupInfo");
+        return value;
     }
 }

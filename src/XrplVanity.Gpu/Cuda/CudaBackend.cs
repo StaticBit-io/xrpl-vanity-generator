@@ -88,6 +88,7 @@ internal sealed class CudaDevice : IGpuDevice
 
     public string Backend => "cuda";
     public string Name => $"{_context.DeviceName} (sm_{_context.ComputeCapabilityMajor}{_context.ComputeCapabilityMinor})";
+    public bool IsCpuDevice => false;
 
     public IGpuKernel GetKernel(string name) => new CudaKernel(_module.GetFunction(name));
 

@@ -278,7 +278,8 @@ public static class Program
         {
             foreach (GpuDeviceInfo info in backend.EnumerateDevices())
             {
-                Console.WriteLine($"{flat,2}  {backend.Name}:{info.Index}  {info.Name}  ({info.Details})");
+                string tag = info.IsCpuDevice ? " [cpu]" : string.Empty;
+                Console.WriteLine($"{flat,2}  {backend.Name}:{info.Index}  {info.Name}  ({info.Details}){tag}");
                 flat++;
                 any = true;
             }

@@ -6,6 +6,7 @@ set NVRTC_DIR to override the lookup. Target: compute_75 (Turing and newer; the 
 JIT-compiles the PTX for the actual GPU).
 """
 import ctypes as C
+import hashlib
 import os
 import site
 import sys
@@ -51,6 +52,7 @@ def main() -> None:
     with open(BODY, "rb") as f:
         body = f.read()
     source = shim + b"\n" + body
+    body_hash = hashlib.sha256(source.replace(b"\r\n", b"\n")).hexdigest()
 
     program = C.c_void_p()
     if nvrtc.nvrtcCreateProgram(C.byref(program), source, b"xrpl_vanity.cu", 0, None, None) != 0:
@@ -74,8 +76,9 @@ def main() -> None:
     ptx = C.create_string_buffer(ptx_size.value)
     nvrtc.nvrtcGetPTX(program, ptx)
     with open(PTX, "wb") as f:
+        f.write(b"// body-sha256: " + body_hash.encode("ascii") + b"\n")
         f.write(ptx.value)
-    print(f"wrote {PTX} ({len(ptx.value)} bytes, {ARCH.decode()})")
+    print(f"wrote {PTX} ({len(ptx.value)} bytes, {ARCH.decode()}, body-sha256 {body_hash[:12]}...)")
 
 
 if __name__ == "__main__":
