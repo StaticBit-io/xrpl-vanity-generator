@@ -208,13 +208,13 @@ internal sealed class OpenClDevice : IGpuDevice
         _device = device;
         Name = $"{info.Name} ({info.Details})";
         IsCpuDevice = info.IsCpuDevice;
-        _deviceMaxWorkGroupSize = OpenClNative.DeviceSize(device, OpenClNative.DeviceMaxWorkGroupSize);
         IntPtr[] devices = { device };
 
         // See OpenClNative.SetupLock: context creation and program build are serialized against
         // every other device's setup for the same reason enumeration is.
         lock (OpenClNative.SetupLock)
         {
+            _deviceMaxWorkGroupSize = OpenClNative.DeviceSize(device, OpenClNative.DeviceMaxWorkGroupSize);
             _context = OpenClNative.clCreateContext(IntPtr.Zero, 1, devices, IntPtr.Zero, IntPtr.Zero, out int error);
             OpenClNative.Check(error, "clCreateContext");
             try
@@ -328,6 +328,11 @@ internal sealed class OpenClDevice : IGpuDevice
 
     public void Launch(IGpuKernel kernel, int threads, int blockSize, params object[] args)
     {
+        if (blockSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(blockSize), "blockSize must be positive.");
+        }
+
         IntPtr handle = ((OpenClKernel)kernel).Handle;
         for (int i = 0; i < args.Length; i++)
         {

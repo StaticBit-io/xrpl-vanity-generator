@@ -96,6 +96,11 @@ internal sealed class CudaDevice : IGpuDevice
 
     public void Launch(IGpuKernel kernel, int threads, int blockSize, params object[] args)
     {
+        if (blockSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(blockSize), "blockSize must be positive.");
+        }
+
         object[] unwrapped = new object[args.Length];
         for (int i = 0; i < args.Length; i++)
         {

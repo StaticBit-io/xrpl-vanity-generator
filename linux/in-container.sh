@@ -29,7 +29,16 @@ dotnet build XrplVanity.sln -c Release
 
 if [ "$MODE" = gpu ]; then export XRPL_VANITY_REQUIRE_BACKENDS=cuda,opencl; else export XRPL_VANITY_REQUIRE_BACKENDS=opencl; fi
 step "tests (required backends: $XRPL_VANITY_REQUIRE_BACKENDS)"
-dotnet run --project tests/XrplVanity.Tests -c Release --no-build
+# Captured via a redirect to a file rather than a pipe: piping the suite's stdout/stderr through
+# `tee` (even to /dev/stderr) changes fd/buffering characteristics enough to trip a pocl race
+# (pocl_release_dlhandle_cache assertion, observed reproducibly in --cpu-only mode) that a plain
+# redirect does not.
+SUITE_LOG="$(mktemp)"
+dotnet run --project tests/XrplVanity.Tests -c Release --no-build > "$SUITE_LOG" 2>&1
+cat "$SUITE_LOG"
+SUITE="$(cat "$SUITE_LOG")"
+rm -f "$SUITE_LOG"
+if [ "$MODE" = gpu ]; then expect_contains "no skipped rows" "Skipped: 0," "$SUITE"; fi
 
 CLI=(dotnet run --project src/XrplVanity.Cli -c Release --no-build --)
 

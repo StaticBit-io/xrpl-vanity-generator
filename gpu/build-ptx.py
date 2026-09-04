@@ -78,7 +78,7 @@ def main() -> None:
     with open(PTX, "wb") as f:
         f.write(b"// body-sha256: " + body_hash.encode("ascii") + b"\n")
         f.write(ptx.value)
-    print(f"wrote {PTX} ({len(ptx.value)} bytes, {ARCH.decode()}, body-sha256 {body_hash[:12]}...)")
+    print(f"wrote {PTX} ({os.path.getsize(PTX)} bytes, {ARCH.decode()}, body-sha256 {body_hash[:12]}...)")
 
 
 if __name__ == "__main__":
