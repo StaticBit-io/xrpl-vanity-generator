@@ -195,17 +195,6 @@ GPU tests (`tests/XrplVanity.Tests/Gpu`) are parameterized over both
 backends and skip automatically, per backend, when that backend has no
 usable device, or (CUDA) when the device is older than compute_75.
 
-### GPU backend validation
-
-The CUDA backend has been production-verified on NVIDIA hardware since the
-project's start. The OpenCL backend has been validated on NVIDIA's OpenCL
-implementation (Windows) and on pocl 5.0 (an independent CPU implementation
-used in the Linux test harness). AMD and Intel OpenCL implementations are
-expected to work (OpenCL C 1.2 is a portable standard) but remain untested
-on this hardware. Every backend is re-verified by the CPU reference before a
-hit is printed, so a device the reference disagrees with only costs
-throughput (reported as a consistency error), never a wrong key.
-
 ## Linux
 
 The test suite runs on Linux inside Docker, with two modes:
@@ -221,12 +210,27 @@ The test suite runs on Linux inside Docker, with two modes:
   reason "CUDA driver library not found"; OpenCL rows run on pocl. The run
   asserts OpenCL is present and the remaining 100 tests pass, 0 failed. This
   exercises the "machine without NVIDIA" scenario and makes a CPU-only CI
-  job possible later.
+  job now possible.
 
 Both modes use the same single kernel source and exercise the same test
 anchors: field arithmetic vs BigInteger, RFC 8032 vectors, hash padding
 boundaries, base58 encoding, the 1,000,000-input cross-check, the 20,000-address
 matcher equivalence, and the search engine gate with consistency re-verification.
+
+The "0 skipped" / "0 failed" assertions above are enforced through the
+`XRPL_VANITY_REQUIRE_BACKENDS` environment variable, which the GPU tests read
+via `GpuTestHelper.RequiredBackends` (`tests/XrplVanity.Tests/Gpu/GpuTestHelper.cs`).
+It takes a comma-separated, case-insensitive list of backend names (e.g.
+`cuda,opencl`); for any backend named in it, a device that is unavailable
+fails that test instead of letting it skip — this is what turns "0 skipped"
+into a checked property rather than an unverified transcript line.
+`linux/in-container.sh` sets it per mode: `cuda,opencl` in GPU mode, `opencl`
+in `--cpu-only` (leaving CUDA free to skip, since the mode intentionally runs
+without GPU passthrough). The same variable can be set when running the test
+suite directly, without the Linux harness, on Windows or Linux — e.g.
+`XRPL_VANITY_REQUIRE_BACKENDS=opencl dotnet test ...` — to get the same
+fail-instead-of-skip behavior for a backend you expect to be present, in
+addition to the validation already recorded for OpenCL above.
 
 **Requirements:**
 
