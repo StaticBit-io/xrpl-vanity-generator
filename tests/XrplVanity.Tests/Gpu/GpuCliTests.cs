@@ -8,13 +8,14 @@ namespace XrplVanity.Tests.Gpu;
 
 public class GpuCliTests
 {
-    [Fact]
-    public void SearchGpu_Returns_Matches_That_Satisfy_The_Same_Pattern_Set()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void SearchGpu_Returns_Matches_That_Satisfy_The_Same_Pattern_Set(string backend)
     {
-        using CudaContext probe = GpuTestHelper.RequireContext(); // skip cleanly without CUDA
+        using IGpuDevice probe = GpuTestHelper.RequireDevice(backend); // skips cleanly when unavailable
         probe.Dispose();
 
-        CliOptions options = CliOptions.Parse(new[] { "--gpu", "--starts", "ab" });
+        CliOptions options = CliOptions.Parse(new[] { "--gpu", "--backend", backend, "--starts", "ab" });
         PatternSet patterns = SearchRunner.BuildPatternSet(options);
 
         List<Match> matches = SearchRunner.SearchGpu(options, launches: 1);

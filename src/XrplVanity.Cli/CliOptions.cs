@@ -16,6 +16,9 @@ public sealed class CliOptions
     public int? Count { get; init; }
     public string? ListFile { get; init; }
     public int ListMinLength { get; init; } = 4;
+    public string? Backend { get; init; }
+    public int? Device { get; init; }
+    public bool ListDevices { get; init; }
 
     public static CliOptions Parse(string[] args)
     {
@@ -28,6 +31,9 @@ public sealed class CliOptions
         int? count = null;
         string? listFile = null;
         int listMinLength = 4;
+        string? backend = null;
+        int? device = null;
+        bool listDevices = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -68,6 +74,25 @@ public sealed class CliOptions
                         i++;
                     }
                     break;
+                case "--backend":
+                    backend = Next(args, ref i, arg);
+                    if (backend != "cuda" && backend != "opencl")
+                    {
+                        throw new ArgumentException("Option '--backend' must be 'cuda' or 'opencl'.");
+                    }
+
+                    break;
+                case "--device":
+                    device = NextInt(args, ref i, arg);
+                    if (device < 0)
+                    {
+                        throw new ArgumentException("Option '--device' must be a non-negative whole number.");
+                    }
+
+                    break;
+                case "--list-devices":
+                    listDevices = true;
+                    break;
                 default:
                     if (arg.StartsWith("--", StringComparison.Ordinal))
                     {
@@ -89,6 +114,9 @@ public sealed class CliOptions
             Count = count,
             ListFile = listFile,
             ListMinLength = listMinLength,
+            Backend = backend,
+            Device = device,
+            ListDevices = listDevices,
         };
     }
 

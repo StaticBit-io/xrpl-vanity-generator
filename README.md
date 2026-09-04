@@ -54,7 +54,10 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--threads N` | `ProcessorCount` | number of worker threads (CPU path only; ignored with `--gpu`) |
 | `--out FILE` | — | append matches to a file as well as stdout |
 | `--count N` | — | stop after N matches (otherwise run until interrupted, e.g. Ctrl+C) |
-| `--gpu` | off | search on the NVIDIA GPU (requires the driver; every GPU hit is re-verified by the CPU before it is printed) |
+| `--gpu` | off | search on the GPU (CUDA preferred, then OpenCL; every GPU hit is re-verified by the CPU before it is printed) |
+| `--backend NAME` | — | force the GPU backend: `cuda` or `opencl` (implies `--gpu`'s device requirement; combine with `--device` to pick a specific one) |
+| `--device N` | — | pick a device by index: within the chosen `--backend`, or (without `--backend`) into the flat list `--list-devices` prints |
+| `--list-devices` | — | list every device from every backend, one per line, and exit (`0` if any device was found, `2` otherwise) |
 
 Patterns are normalized into the XRPL base58 alphabet (`l -> L`, `0 -> o`,
 `O -> o`, `I -> i`). A pattern that still contains a character that cannot
@@ -103,18 +106,34 @@ reproduced bit-for-bit by a GPU backend for much higher throughput. `--gpu`
 runs the search on the device. The host builds the same pattern set the CPU
 path uses and uploads it; the kernel derives and matches candidates on the
 GPU; every reported hit is re-derived by the CPU reference and printed only
-if it agrees, so a GPU arithmetic error can cost throughput but never a wrong
-key. Without an NVIDIA driver `--gpu` exits with code 2 rather than silently
-using the CPU.
+if it agrees — this gate applies to every backend, so a device the CPU
+reference disagrees with only costs throughput (reported as a consistency
+error), never a wrong key. Without a usable GPU device `--gpu` exits with
+code 2 rather than silently using the CPU.
 
-## GPU backend (CUDA)
+## GPU backends (CUDA and OpenCL)
+
+Two backends implement the same kernel source: CUDA (NVIDIA only) and OpenCL
+(any ICD-installed vendor). `--gpu` without `--backend` opens the first
+usable device in preference order — CUDA, then OpenCL — since CUDA is the
+faster, more thoroughly verified path on NVIDIA hardware. Pass `--backend
+cuda` or `--backend opencl` to force one, optionally with `--device N` to
+pick a specific device within it; run `--list-devices` first to see what is
+available and at which flat index (`--device N` without `--backend` indexes
+that flat list). The OpenCL backend compiles the kernel source to a program
+at run time, in the device's constructor — the first run against a given
+device can take tens of seconds while the vendor driver JIT-compiles it; the
+CLI prints a `note: compiling the OpenCL program took N s` line whenever that
+exceeds a second, and the driver's on-disk cache makes subsequent runs fast.
 
 The CUDA kernel source lives at `gpu/kernels/xrpl_vanity.cu` (device-only —
 it is not built by `dotnet build` or any `.csproj`). It implements the same
 `entropy -> address` derivation as `XrplVanity.Core`, verified kernel by
 kernel against the .NET/BouncyCastle reference and against RFC 8032 test
-vectors. The kernel uses a windowed fixed-base scalar multiplication over a
-256-entry table that is built on the device at start-up by the naive
+vectors. The OpenCL backend shares that same source file — CUDA and OpenCL
+device code paths are selected by preprocessor guards, not maintained as
+separate kernels. The kernel uses a windowed fixed-base scalar multiplication
+over a 256-entry table that is built on the device at start-up by the naive
 (independently verified) multiplication; both paths are checked against RFC
 8032 and each other in the test suite.
 
@@ -141,8 +160,9 @@ needed at run time, to load and execute the embedded PTX. Whenever the `.cu`
 kernel changes, regenerate the PTX and commit the `.cu` and `.ptx` files
 together.
 
-GPU tests (`tests/XrplVanity.Tests/Gpu`) skip automatically when no CUDA
-device is present, or when the available device is older than compute_75.
+GPU tests (`tests/XrplVanity.Tests/Gpu`) are parameterized over both
+backends and skip automatically, per backend, when that backend has no
+usable device, or (CUDA) when the device is older than compute_75.
 
 ## Acknowledgements
 

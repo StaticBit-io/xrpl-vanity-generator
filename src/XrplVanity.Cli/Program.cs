@@ -59,15 +59,15 @@ public static class SearchRunner
     /// <summary>Headless GPU search: runs the given number of launches and returns every verified match.</summary>
     public static List<Match> SearchGpu(CliOptions options, int launches)
     {
-        if (!CudaContext.TryCreate(out CudaContext? context, out string reason))
+        if (!ResolveDevice(options, out IGpuDevice? device, out string reason))
         {
-            throw new InvalidOperationException($"CUDA is not available: {reason}");
+            throw new InvalidOperationException(reason);
         }
 
-        using (context)
+        using (device)
         {
             PatternSet patterns = BuildPatternSet(options);
-            using GpuSearchEngine engine = new(context!, patterns);
+            using GpuSearchEngine engine = new(device!, patterns);
             List<Match> all = new();
             for (int i = 0; i < launches; i++)
             {
@@ -76,6 +76,42 @@ public static class SearchRunner
 
             return all;
         }
+    }
+
+    /// <summary>
+    /// Resolves the device a GPU run should use: an explicit <c>--backend</c> (optionally with
+    /// <c>--device</c>), a bare <c>--device</c> indexing the flat list printed by
+    /// <c>--list-devices</c>, or (neither given) the first usable device in backend preference
+    /// order (CUDA, then OpenCL).
+    /// </summary>
+    public static bool ResolveDevice(CliOptions options, out IGpuDevice? device, out string reason)
+    {
+        if (options.Backend is null && options.Device is null)
+        {
+            return GpuBackends.TryOpenFirst(out device, out reason);
+        }
+
+        if (options.Backend is not null)
+        {
+            return GpuBackends.TryOpen(options.Backend, options.Device ?? 0, out device, out reason);
+        }
+
+        // --device without --backend indexes the flat list printed by --list-devices.
+        int remaining = options.Device!.Value;
+        foreach (IGpuBackend backend in GpuBackends.All)
+        {
+            int count = backend.EnumerateDevices().Count;
+            if (remaining < count)
+            {
+                return GpuBackends.TryOpen(backend.Name, remaining, out device, out reason);
+            }
+
+            remaining -= count;
+        }
+
+        device = null;
+        reason = $"device index {options.Device} is out of range; run --list-devices";
+        return false;
     }
 }
 
@@ -92,6 +128,11 @@ public static class Program
         {
             Console.Error.WriteLine(ex.Message);
             return 2;
+        }
+
+        if (options.ListDevices)
+        {
+            return ListDevices();
         }
 
         if (options.Count is int c && c <= 0)
@@ -127,11 +168,23 @@ public static class Program
             return 2;
         }
 
-        CudaContext? gpuContext = null;
-        if (options.Gpu && !CudaContext.TryCreate(out gpuContext, out string reason))
+        IGpuDevice? gpuDevice = null;
+        if (options.Gpu)
         {
-            Console.Error.WriteLine($"error: --gpu requested but CUDA is not available: {reason}");
-            return 2;
+            Stopwatch resolveStopwatch = Stopwatch.StartNew();
+            bool resolved = SearchRunner.ResolveDevice(options, out gpuDevice, out string reason);
+            resolveStopwatch.Stop();
+
+            if (!resolved)
+            {
+                Console.Error.WriteLine($"error: --gpu requested but no usable device: {reason}");
+                return 2;
+            }
+
+            if (gpuDevice!.Backend == "opencl" && resolveStopwatch.Elapsed.TotalSeconds > 1.0)
+            {
+                Console.Error.WriteLine($"note: compiling the OpenCL program took {resolveStopwatch.Elapsed.TotalSeconds:F1} s");
+            }
         }
 
         if (options.Gpu && options.ThreadsSpecified)
@@ -147,16 +200,21 @@ public static class Program
         using CancellationTokenSource cts = new();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-        if (gpuContext is not null)
+        if (gpuDevice is not null)
         {
             try
             {
-                using (gpuContext)
+                using (gpuDevice)
                 {
-                    RunGpu(gpuContext, patterns, sink, cts);
+                    RunGpu(gpuDevice, patterns, sink, cts);
                 }
             }
             catch (XrplVanity.Gpu.CudaException ex)
+            {
+                Console.Error.WriteLine($"error: GPU search failed: {ex.Message}");
+                return 2;
+            }
+            catch (XrplVanity.Gpu.OpenCl.OpenClException ex)
             {
                 Console.Error.WriteLine($"error: GPU search failed: {ex.Message}");
                 return 2;
@@ -212,9 +270,32 @@ public static class Program
         }
     }
 
-    private static void RunGpu(CudaContext context, PatternSet patterns, MatchSink sink, CancellationTokenSource cts)
+    private static int ListDevices()
     {
-        using GpuSearchEngine engine = new(context, patterns);
+        int flat = 0;
+        bool any = false;
+        foreach (IGpuBackend backend in GpuBackends.All)
+        {
+            foreach (GpuDeviceInfo info in backend.EnumerateDevices())
+            {
+                Console.WriteLine($"{flat,2}  {backend.Name}:{info.Index}  {info.Name}  ({info.Details})");
+                flat++;
+                any = true;
+            }
+        }
+
+        if (!any)
+        {
+            Console.Error.WriteLine("no GPU devices found (no CUDA driver and no OpenCL platform).");
+            return 2;
+        }
+
+        return 0;
+    }
+
+    private static void RunGpu(IGpuDevice device, PatternSet patterns, MatchSink sink, CancellationTokenSource cts)
+    {
+        using GpuSearchEngine engine = new(device, patterns);
         Console.Error.WriteLine($"GPU: {engine.DeviceName}");
         Stopwatch stopwatch = Stopwatch.StartNew();
         long reportedOverflow = 0;

@@ -2,17 +2,17 @@ namespace XrplVanity.Gpu;
 
 public static class GpuAvailability
 {
-    /// <summary>Probes for a usable CUDA device without throwing.</summary>
+    /// <summary>Probes for a usable GPU device (CUDA preferred, then OpenCL) without throwing.</summary>
     public static (bool Available, string Info) Detect()
     {
-        if (!CudaContext.TryCreate(out CudaContext? context, out string reason))
+        if (!GpuBackends.TryOpenFirst(out IGpuDevice? device, out string reason))
         {
             return (false, reason);
         }
 
-        using (context)
+        using (device)
         {
-            return (true, $"{context!.DeviceName} (sm_{context.ComputeCapabilityMajor}{context.ComputeCapabilityMinor})");
+            return (true, $"{device!.Backend}:{device.Name}");
         }
     }
 }

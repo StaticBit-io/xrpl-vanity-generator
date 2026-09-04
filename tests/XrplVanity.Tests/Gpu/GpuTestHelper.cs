@@ -13,7 +13,11 @@ internal static class GpuTestHelper
     /// Returns a live CUDA context, or skips the calling test when CUDA is unavailable or the
     /// device is older than the PTX's compute_75 (Turing) target.
     /// </summary>
-    /// <remarks>Kept for <see cref="GpuSearchEngine"/>-based tests (Task 5 migrates them and removes this).</remarks>
+    /// <remarks>
+    /// Kept for tests that probe <see cref="CudaContext"/>-specific surface (device name, compute
+    /// capability) with no equivalent on <see cref="IGpuDevice"/>; <see cref="GpuSearchEngine"/>-based
+    /// tests were migrated to <see cref="RequireDevice"/> in Task 5.
+    /// </remarks>
     public static CudaContext RequireContext()
     {
         if (!CudaContext.TryCreate(out CudaContext? context, out string reason))

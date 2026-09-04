@@ -55,4 +55,17 @@ public class CliOptionsTests
         Assert.True(CliOptions.Parse(new[] { "--threads", "4", "x" }).ThreadsSpecified);
         Assert.False(CliOptions.Parse(new[] { "x" }).ThreadsSpecified);
     }
+
+    [Fact]
+    public void Parses_Backend_Device_And_List_Devices()
+    {
+        CliOptions options = CliOptions.Parse(new[] { "--gpu", "--backend", "opencl", "--device", "1", "abc" });
+        Assert.Equal("opencl", options.Backend);
+        Assert.Equal(1, options.Device);
+        Assert.False(options.ListDevices);
+
+        Assert.True(CliOptions.Parse(new[] { "--list-devices" }).ListDevices);
+        Assert.Null(CliOptions.Parse(new[] { "abc" }).Backend);
+        Assert.Null(CliOptions.Parse(new[] { "abc" }).Device);
+    }
 }

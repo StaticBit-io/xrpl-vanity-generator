@@ -16,13 +16,14 @@ public class GpuSearchTests
         _output = output;
     }
 
-    [Fact]
-    public void Finds_Cpu_Verified_Matches_Without_Overflow()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Finds_Cpu_Verified_Matches_Without_Overflow(string backend)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
         // "abc" case-insensitive = 8 variants / 58^3 ~ 4e-5 per candidate -> ~40 hits per 2^20 candidates.
         PatternSet patterns = new PatternSet.Builder().Add(MatchPosition.Starts, "abc", ignoreCase: true).Build();
-        using GpuSearchEngine engine = new(context, patterns);
+        using GpuSearchEngine engine = new(device, patterns);
 
         List<Match> matches = engine.RunLaunch();
 
@@ -43,13 +44,14 @@ public class GpuSearchTests
         }
     }
 
-    [Fact]
-    public void Overflow_Is_Counted_And_Returned_Hits_Are_Capped()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Overflow_Is_Counted_And_Returned_Hits_Are_Capped(string backend)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
         // "a" case-insensitive = 2 / 58 ~ 3.4% -> ~36,000 hits per launch, far above the 4,096 slots.
         PatternSet patterns = new PatternSet.Builder().Add(MatchPosition.Starts, "a", ignoreCase: true).Build();
-        using GpuSearchEngine engine = new(context, patterns);
+        using GpuSearchEngine engine = new(device, patterns);
 
         List<Match> matches = engine.RunLaunch();
 
@@ -58,12 +60,13 @@ public class GpuSearchTests
         Assert.Equal(0, engine.ConsistencyErrors);
     }
 
-    [Fact]
-    public void Each_Launch_Uses_Fresh_Entropy()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Each_Launch_Uses_Fresh_Entropy(string backend)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
         PatternSet patterns = new PatternSet.Builder().Add(MatchPosition.Starts, "ab", ignoreCase: true).Build();
-        using GpuSearchEngine engine = new(context, patterns);
+        using GpuSearchEngine engine = new(device, patterns);
 
         List<Match> first = engine.RunLaunch();
         List<Match> second = engine.RunLaunch();
@@ -79,22 +82,24 @@ public class GpuSearchTests
         Assert.Equal(2L * GpuSearchEngine.CandidatesPerLaunch, engine.CandidatesSearched);
     }
 
-    [Fact]
-    public void Rejects_A_Pattern_Set_With_No_Targets()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Rejects_A_Pattern_Set_With_No_Targets(string backend)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
         PatternSet empty = new PatternSet.Builder().Add(MatchPosition.Starts, "bit@coin", ignoreCase: true).Build();
 
-        Assert.Throws<ArgumentException>(() => new GpuSearchEngine(context, empty));
+        Assert.Throws<ArgumentException>(() => new GpuSearchEngine(device, empty));
     }
 
-    [Fact]
-    public void Throughput_Is_At_Least_Half_A_Million_Candidates_Per_Second()
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Throughput_Is_At_Least_Half_A_Million_Candidates_Per_Second(string backend)
     {
-        using CudaContext context = GpuTestHelper.RequireContext();
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
         // 8 characters case-sensitive: effectively never matches, so this measures pure search throughput.
         PatternSet patterns = new PatternSet.Builder().Add(MatchPosition.Starts, "zzzzzzzz", ignoreCase: false).Build();
-        using GpuSearchEngine engine = new(context, patterns);
+        using GpuSearchEngine engine = new(device, patterns);
         engine.RunLaunch(); // warm-up (module JIT, first launch)
 
         Stopwatch stopwatch = Stopwatch.StartNew();
