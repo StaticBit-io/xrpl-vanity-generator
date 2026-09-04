@@ -39,9 +39,11 @@ public sealed class MultiDeviceSearchResult
 /// Runs one <see cref="GpuSearchEngine"/> per selected device, each on its own thread (a device
 /// is opened on the thread that uses it), and hands every CPU-verified match to
 /// <c>report</c>. <c>report</c> is called concurrently from several threads and must be
-/// thread-safe; returning <c>false</c> stops every worker. A device that fails to open or
-/// throws mid-run is recorded in its <see cref="DeviceSearchStats.Failure"/> and does not stop
-/// the others.
+/// thread-safe; returning <c>false</c> stops every worker. A device that fails to open or throws
+/// mid-run is recorded in its <see cref="DeviceSearchStats.Failure"/> and does not stop the
+/// others. A worker never lets an exception escape its thread: an exception from the device or
+/// engine is recorded locally and only that worker stops, while an exception from <c>report</c>
+/// or <c>log</c> means the caller's sink is unusable, so every worker is asked to stop.
 /// </summary>
 public sealed class MultiDeviceSearch
 {
@@ -58,6 +60,10 @@ public sealed class MultiDeviceSearch
 
     internal MultiDeviceSearch(IReadOnlyList<IGpuBackend> backends, IReadOnlyList<DeviceSelector> devices, PatternSet patterns, Func<Match, bool> report, Action<string>? log = null)
     {
+        ArgumentNullException.ThrowIfNull(backends);
+        ArgumentNullException.ThrowIfNull(devices);
+        ArgumentNullException.ThrowIfNull(patterns);
+        ArgumentNullException.ThrowIfNull(report);
         if (devices.Count == 0)
         {
             throw new ArgumentException("At least one device selector is required.", nameof(devices));
@@ -68,32 +74,57 @@ public sealed class MultiDeviceSearch
         _patterns = patterns;
         _report = report;
         _log = log ?? (_ => { });
+
+        DeviceSearchStats[] devicesStats = new DeviceSearchStats[_devices.Count];
+        for (int i = 0; i < _devices.Count; i++)
+        {
+            devicesStats[i] = new DeviceSearchStats { Selector = _devices[i] };
+        }
+
+        Devices = devicesStats;
     }
+
+    /// <summary>
+    /// One <see cref="DeviceSearchStats"/> per device selector, in the order they were passed to
+    /// the constructor, created up front and mutated live by the workers as they run — read them
+    /// (without locking; a torn read of a <c>long</c> is not a concern on x64) at any time,
+    /// including while <see cref="Run"/> is still in progress. <see cref="Run"/> returns these
+    /// same instances in <see cref="MultiDeviceSearchResult.Devices"/>.
+    /// </summary>
+    public IReadOnlyList<DeviceSearchStats> Devices { get; }
 
     public MultiDeviceSearchResult Run(CancellationToken cancellationToken)
     {
         using CancellationTokenSource stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        DeviceSearchStats[] stats = new DeviceSearchStats[_devices.Count];
-        Thread[] workers = new Thread[_devices.Count];
+        Thread?[] workers = new Thread?[Devices.Count];
         Stopwatch total = Stopwatch.StartNew();
 
-        for (int i = 0; i < _devices.Count; i++)
+        try
         {
-            DeviceSearchStats s = new() { Selector = _devices[i] };
-            stats[i] = s;
-            workers[i] = new Thread(() => Worker(s, stop)) { IsBackground = true, Name = $"gpu-{s.Selector}" };
-            workers[i].Start();
-        }
+            for (int i = 0; i < Devices.Count; i++)
+            {
+                DeviceSearchStats s = Devices[i];
+                Thread worker = new(() => Worker(s, stop)) { IsBackground = true, Name = $"gpu-{s.Selector}" };
+                workers[i] = worker;
+                worker.Start();
+            }
 
-        foreach (Thread worker in workers)
+            JoinAll(workers);
+        }
+        finally
         {
-            worker.Join();
+            // If Thread.Start() threw partway through the loop above, the already-started
+            // workers are still running and reference `stop`, which the `using` above is about
+            // to dispose. Cancel first so they observe it and exit, then join whichever workers
+            // actually got started (the rest are still null) before letting `using` dispose.
+            stop.Cancel();
+            JoinAll(workers);
         }
 
         total.Stop();
         int opened = 0;
         long candidates = 0, errors = 0, drops = 0;
-        foreach (DeviceSearchStats s in stats)
+        foreach (DeviceSearchStats s in Devices)
         {
             if (s.Opened) opened++;
             candidates += s.CandidatesSearched;
@@ -103,7 +134,7 @@ public sealed class MultiDeviceSearch
 
         return new MultiDeviceSearchResult
         {
-            Devices = stats,
+            Devices = Devices,
             DevicesOpened = opened,
             TotalCandidates = candidates,
             TotalConsistencyErrors = errors,
@@ -112,13 +143,37 @@ public sealed class MultiDeviceSearch
         };
     }
 
+    private static void JoinAll(Thread?[] workers)
+    {
+        foreach (Thread? worker in workers)
+        {
+            worker?.Join();
+        }
+    }
+
     private void Worker(DeviceSearchStats stats, CancellationTokenSource stop)
+    {
+        try
+        {
+            RunDevice(stats, stop);
+        }
+        catch (Exception ex)
+        {
+            // Last-resort safety net: whatever threw here (device/engine failure not already
+            // handled below, or anything else unexpected) must never escape this thread — an
+            // unhandled exception on a Thread delegate crashes the whole process.
+            stats.Failure = ex.Message;
+            SafeLog($"warning: {stats.Selector} stopped: {ex.Message}");
+        }
+    }
+
+    private void RunDevice(DeviceSearchStats stats, CancellationTokenSource stop)
     {
         Stopwatch open = Stopwatch.StartNew();
         if (!GpuBackends.TryOpen(_backends, stats.Selector.Backend, stats.Selector.Index, out IGpuDevice? device, out string reason))
         {
             stats.Failure = reason;
-            _log($"warning: {stats.Selector} could not be opened: {reason}");
+            TryLog(stats, stop, $"warning: {stats.Selector} could not be opened: {reason}");
             return;
         }
 
@@ -126,10 +181,10 @@ public sealed class MultiDeviceSearch
         using (device)
         {
             stats.DeviceName = device!.Name;
-            _log($"GPU[{stats.Selector}]: {device.Name}");
+            TryLog(stats, stop, $"GPU[{stats.Selector}]: {device.Name}");
             if (string.Equals(device.Backend, "opencl", StringComparison.OrdinalIgnoreCase) && open.Elapsed.TotalSeconds > 1.0)
             {
-                _log($"note: compiling the OpenCL program for {stats.Selector} took {open.Elapsed.TotalSeconds:F1} s");
+                TryLog(stats, stop, $"note: compiling the OpenCL program for {stats.Selector} took {open.Elapsed.TotalSeconds:F1} s");
             }
 
             Stopwatch run = Stopwatch.StartNew();
@@ -138,50 +193,95 @@ public sealed class MultiDeviceSearch
                 using GpuSearchEngine engine = new(device, _patterns);
                 long reportedOverflow = 0;
                 long reportedErrors = 0;
-                try
+                while (!stop.IsCancellationRequested)
                 {
-                    while (!stop.IsCancellationRequested)
+                    foreach (Match match in engine.RunLaunch())
                     {
-                        foreach (Match match in engine.RunLaunch())
+                        if (!TryReport(stats, match))
                         {
-                            if (!_report(match))
-                            {
-                                stop.Cancel();
-                                break;
-                            }
-                        }
-
-                        if (engine.OverflowDrops > reportedOverflow)
-                        {
-                            _log($"warning: {stats.Selector}: {engine.OverflowDrops - reportedOverflow:N0} hits dropped this launch " +
-                                 $"(hit buffer holds {GpuSearchEngine.HitCapacity}); use a more selective pattern.");
-                            reportedOverflow = engine.OverflowDrops;
-                        }
-
-                        if (engine.ConsistencyErrors > reportedErrors)
-                        {
-                            _log($"GPU consistency error on {stats.Selector}: {engine.ConsistencyErrors - reportedErrors} device hit(s) " +
-                                 "the CPU reference could not reproduce were discarded.");
-                            reportedErrors = engine.ConsistencyErrors;
+                            // Covers both a legitimate "stop" from report (e.g. a match-count
+                            // limit reached) and a caught exception from report (handled inside
+                            // TryReport) — either way every worker must stop.
+                            stop.Cancel();
+                            break;
                         }
                     }
-                }
-                finally
-                {
+
+                    // Update live so callers reading Devices while Run is still in progress
+                    // (e.g. to gate on "has this device found anything yet") see current counts.
                     stats.CandidatesSearched = engine.CandidatesSearched;
                     stats.ConsistencyErrors = engine.ConsistencyErrors;
                     stats.OverflowDrops = engine.OverflowDrops;
+
+                    if (engine.OverflowDrops > reportedOverflow)
+                    {
+                        TryLog(stats, stop, $"warning: {stats.Selector}: {engine.OverflowDrops - reportedOverflow:N0} hits dropped this launch " +
+                             $"(hit buffer holds {GpuSearchEngine.HitCapacity}); use a more selective pattern.");
+                        reportedOverflow = engine.OverflowDrops;
+                    }
+
+                    if (engine.ConsistencyErrors > reportedErrors)
+                    {
+                        TryLog(stats, stop, $"GPU consistency error on {stats.Selector}: {engine.ConsistencyErrors - reportedErrors} device hit(s) " +
+                             "the CPU reference could not reproduce were discarded.");
+                        reportedErrors = engine.ConsistencyErrors;
+                    }
                 }
-            }
-            catch (Exception ex) when (ex is CudaException or OpenClException or ArgumentException or InvalidOperationException)
-            {
-                stats.Failure = ex.Message;
-                _log($"warning: {stats.Selector} stopped: {ex.Message}");
             }
             finally
             {
                 stats.Seconds = run.Elapsed.TotalSeconds;
             }
+        }
+    }
+
+    /// <summary>
+    /// Calls <c>_report</c>, catching anything it throws. A throwing report callback means the
+    /// caller's sink is unusable, so it is treated the same as a legitimate "stop" (a
+    /// <c>false</c> return): the caller cancels <paramref name="stop"/> either way, unlike a
+    /// device/engine exception, which stays local to this worker.
+    /// </summary>
+    private bool TryReport(DeviceSearchStats stats, Match match)
+    {
+        try
+        {
+            return _report(match);
+        }
+        catch (Exception ex)
+        {
+            stats.Failure ??= $"report callback failed: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Calls <c>_log</c>, catching anything it throws: same reasoning as <see cref="TryReport"/>
+    /// — a throwing log callback means the sink is unusable for every worker, not just this one.
+    /// </summary>
+    private void TryLog(DeviceSearchStats stats, CancellationTokenSource stop, string message)
+    {
+        try
+        {
+            _log(message);
+        }
+        catch (Exception ex)
+        {
+            stats.Failure ??= $"log callback failed: {ex.Message}";
+            stop.Cancel();
+        }
+    }
+
+    /// <summary>Best-effort log used only by the worker's outermost safety net, where the worker
+    /// is already unwinding due to a failure — logging must never throw a second exception.</summary>
+    private void SafeLog(string message)
+    {
+        try
+        {
+            _log(message);
+        }
+        catch
+        {
+            // The worker is already recording a failure and exiting; swallow.
         }
     }
 }

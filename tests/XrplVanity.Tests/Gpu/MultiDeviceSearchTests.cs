@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using XrplVanity.Core;
@@ -74,56 +75,31 @@ public sealed class MultiDeviceSearchTests
         // shortens but does not eliminate. Under the CPU contention of a full suite run (~150
         // other tests scheduling concurrently) that JIT step can take seconds, while CUDA's very
         // first launch already finds far more than a handful of "ab"-prefixed hits. A flat
-        // match-count race therefore lets CUDA satisfy any modest limit — even thousands of
-        // matches across several launches — before OpenCl finishes opening at all, which is not
-        // what this test is checking. So the race is gated: `report` discards every match until
-        // the log callback has seen both devices announce they opened, plus a settle window for
-        // OpenCl to get its own first launch underway; only after that does the shared limit
-        // apply. This keeps the same assertions (an exact match count, both devices show
-        // CandidatesSearched > 0) but makes the "both actually ran" guarantee deterministic
-        // instead of a coin flip against unbounded scheduling delay.
+        // match-count race therefore lets CUDA satisfy any modest limit before OpenCl has even
+        // finished opening, which is not what this test is checking. So the race is gated on the
+        // live per-device stats `MultiDeviceSearch` exposes through `Devices`: `report` discards
+        // every match until BOTH devices' live `CandidatesSearched` show they have actually
+        // completed a launch; only then does the shared limit start counting. This keeps the same
+        // assertions (an exact match count, both devices show `CandidatesSearched > 0`, no
+        // failures) but makes the "both actually ran" guarantee deterministic instead of a race
+        // against unbounded scheduling delay — and the run itself is bounded by a 60s deadline so
+        // a gate that never arms (a device stuck opening, or not searching at all) fails the test
+        // instead of hanging forever. The live counters are updated by the worker after each
+        // launch; reading them here without locking is fine — a torn read of a `long` is not a
+        // concern on x64.
         const int limit = 20;
         List<Match> matches = new();
-        HashSet<string> openedSelectors = new(StringComparer.Ordinal);
         object gate = new();
-        bool armed = false;
-
-        void ArmAfterSettling()
-        {
-            Thread.Sleep(TimeSpan.FromSeconds(3));
-            lock (gate)
-            {
-                armed = true;
-            }
-        }
-
-        void OnLog(string line)
-        {
-            lock (gate)
-            {
-                if (line.Contains($"GPU[{cuda}]", StringComparison.Ordinal))
-                {
-                    openedSelectors.Add("cuda");
-                }
-
-                if (line.Contains($"GPU[{opencl}]", StringComparison.Ordinal))
-                {
-                    openedSelectors.Add("opencl");
-                }
-
-                if (!armed && openedSelectors.Count == 2)
-                {
-                    new Thread(ArmAfterSettling) { IsBackground = true, Name = "arm-after-settling" }.Start();
-                }
-            }
-        }
 
         PatternSet patterns = FrequentPattern();
+        DeviceSearchStats? cudaStats = null;
+        DeviceSearchStats? openclStats = null;
+
         MultiDeviceSearch search = new(new[] { cuda, opencl }, patterns, match =>
         {
             lock (gate)
             {
-                if (!armed)
+                if (cudaStats!.CandidatesSearched == 0 || openclStats!.CandidatesSearched == 0)
                 {
                     return true;
                 }
@@ -136,9 +112,14 @@ public sealed class MultiDeviceSearchTests
                 matches.Add(match);
                 return matches.Count < limit;
             }
-        }, OnLog);
+        });
 
-        MultiDeviceSearchResult result = search.Run(CancellationToken.None);
+        cudaStats = search.Devices.Single(d => d.Selector == cuda);
+        openclStats = search.Devices.Single(d => d.Selector == opencl);
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(60));
+        MultiDeviceSearchResult result = search.Run(cts.Token);
+        Assert.False(cts.IsCancellationRequested, "the gate never armed: a device did not search");
 
         Assert.Equal(limit, matches.Count);
         Assert.All(matches, m => Assert.True(patterns.TryMatch(m.Address, out _, out _)));
@@ -220,5 +201,49 @@ public sealed class MultiDeviceSearchTests
         MultiDeviceSearchResult result = search.Run(CancellationToken.None);
         Assert.Equal(0, result.DevicesOpened);
         Assert.Contains("unknown backend", Assert.Single(result.Devices).Failure);
+    }
+
+    [Fact]
+    public void A_Throwing_Report_Callback_Stops_All_Workers_Without_Crashing()
+    {
+        DeviceSelector cuda = new("cuda", 0);
+        RequireSelector(cuda);
+
+        // A report callback that throws (e.g. MatchSink.TryReport hitting a broken pipe) must
+        // never crash the process: the exception must be caught inside the worker thread, not
+        // escape the Thread delegate. It also means the caller's sink is unusable, so every
+        // worker must be asked to stop, not just the one whose report call happened to throw.
+        MultiDeviceSearch search = new(new[] { cuda, cuda }, FrequentPattern(), _ => throw new IOException("broken pipe"));
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(60));
+        MultiDeviceSearchResult result = search.Run(cts.Token);
+
+        Assert.False(cts.IsCancellationRequested, "workers did not stop on their own within the deadline");
+        Assert.Equal(2, result.DevicesOpened);
+        Assert.All(result.Devices, d =>
+            Assert.True(
+                d.Failure is not null &&
+                (d.Failure.Contains("report callback failed", StringComparison.Ordinal) ||
+                 d.Failure.Contains("broken pipe", StringComparison.Ordinal)),
+                $"expected a report-callback failure for {d.Selector}, got: {d.Failure}"));
+    }
+
+    [Fact]
+    public void Devices_Are_Exposed_Before_Run_In_Selector_Order()
+    {
+        DeviceSelector first = new("broken", 0);
+        DeviceSelector second = new("broken", 1);
+        List<IGpuBackend> backends = new() { new ThrowingBackend() };
+        MultiDeviceSearch search = new(backends, new[] { first, second }, FrequentPattern(), _ => true);
+
+        Assert.Equal(2, search.Devices.Count);
+        Assert.Equal(first, search.Devices[0].Selector);
+        Assert.Equal(second, search.Devices[1].Selector);
+        Assert.All(search.Devices, d => Assert.Equal(0, d.CandidatesSearched));
+
+        MultiDeviceSearchResult result = search.Run(CancellationToken.None);
+
+        Assert.Same(search.Devices[0], result.Devices[0]);
+        Assert.Same(search.Devices[1], result.Devices[1]);
     }
 }
