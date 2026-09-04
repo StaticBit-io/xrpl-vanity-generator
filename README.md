@@ -228,9 +228,10 @@ into a checked property rather than an unverified transcript line.
 in `--cpu-only` (leaving CUDA free to skip, since the mode intentionally runs
 without GPU passthrough). The same variable can be set when running the test
 suite directly, without the Linux harness, on Windows or Linux — e.g.
-`XRPL_VANITY_REQUIRE_BACKENDS=opencl dotnet test ...` — to get the same
-fail-instead-of-skip behavior for a backend you expect to be present, in
-addition to the validation already recorded for OpenCL above.
+`XRPL_VANITY_REQUIRE_BACKENDS=opencl dotnet run --project tests/XrplVanity.Tests -c Release`
+(PowerShell: `$env:XRPL_VANITY_REQUIRE_BACKENDS='opencl'; dotnet run --project tests/XrplVanity.Tests -c Release`)
+— to get the same fail-instead-of-skip behavior for a backend you expect to be
+present, in addition to the validation already recorded for OpenCL above.
 
 **Requirements:**
 
