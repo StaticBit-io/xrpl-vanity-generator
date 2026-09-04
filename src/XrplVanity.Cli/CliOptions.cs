@@ -19,6 +19,7 @@ public sealed class CliOptions
     public string? Backend { get; init; }
     public int? Device { get; init; }
     public bool ListDevices { get; init; }
+    public string? GpuDevices { get; init; }
 
     public static CliOptions Parse(string[] args)
     {
@@ -34,6 +35,7 @@ public sealed class CliOptions
         string? backend = null;
         int? device = null;
         bool listDevices = false;
+        string? gpuDevices = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -95,6 +97,9 @@ public sealed class CliOptions
                 case "--list-devices":
                     listDevices = true;
                     break;
+                case "--gpu-devices":
+                    gpuDevices = Next(args, ref i, arg);
+                    break;
                 default:
                     if (arg.StartsWith("--", StringComparison.Ordinal))
                     {
@@ -105,7 +110,17 @@ public sealed class CliOptions
             }
         }
 
+        if (gpuDevices is not null && (backend is not null || device is not null))
+        {
+            throw new ArgumentException("Use either --gpu-devices or --backend/--device, not both.");
+        }
+
         if (backend is not null || device is not null)
+        {
+            gpu = true;
+        }
+
+        if (gpuDevices is not null)
         {
             gpu = true;
         }
@@ -124,6 +139,7 @@ public sealed class CliOptions
             Backend = backend,
             Device = device,
             ListDevices = listDevices,
+            GpuDevices = gpuDevices,
         };
     }
 

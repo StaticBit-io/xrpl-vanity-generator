@@ -83,4 +83,17 @@ public class CliOptionsTests
         Assert.Equal("cuda", CliOptions.Parse(new[] { "--backend", "CUDA", "abc" }).Backend);
         Assert.Equal("opencl", CliOptions.Parse(new[] { "--backend", "OpenCL", "abc" }).Backend);
     }
+
+    [Fact]
+    public void Gpu_Devices_Implies_Gpu_And_Conflicts_With_Backend_Or_Device()
+    {
+        CliOptions options = CliOptions.Parse(new[] { "--gpu-devices", "all", "abc" });
+        Assert.True(options.Gpu);
+        Assert.Equal("all", options.GpuDevices);
+
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-devices", "all", "--backend", "cuda", "abc" }));
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-devices", "cuda:0", "--device", "0", "abc" }));
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-devices" }));
+        Assert.Null(CliOptions.Parse(new[] { "abc" }).GpuDevices);
+    }
 }

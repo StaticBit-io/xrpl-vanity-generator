@@ -58,6 +58,7 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--backend NAME` | — | force the GPU backend: `cuda` or `opencl` (case-insensitive; implies `--gpu`; combine with `--device` to pick a specific one) |
 | `--device N` | — | pick a device by index: within the chosen `--backend`, or (without `--backend`) into the flat list `--list-devices` prints (implies `--gpu`) |
 | `--list-devices` | — | list every device from every backend, one per line, and exit (`0` if any device was found, `2` otherwise) |
+| `--gpu-devices SPEC` | — | run on several devices at once: `all`, `cuda`, `opencl`, or a comma-separated list of `backend:index` / `--list-devices` indices (implies `--gpu`; not combinable with `--backend`/`--device`) |
 
 Patterns are normalized into the XRPL base58 alphabet (`l -> L`, `0 -> o`,
 `O -> o`, `I -> i`). A pattern that still contains a character that cannot
@@ -131,6 +132,28 @@ second, and the driver's on-disk cache makes subsequent runs fast. The
 OpenCL backend has been validated on NVIDIA's OpenCL implementation
 (Windows) and on pocl 5.0 (Linux, CPU). AMD and Intel implementations are
 expected to work (OpenCL C 1.2 is a portable standard) but remain untested.
+
+### Multiple devices
+
+`--gpu-devices all` runs one search engine per device across every backend
+at once — on a machine with a single NVIDIA card, that means CUDA and OpenCL
+both drive the same card, since each backend enumerates it independently;
+pass `--backend`-style filtering via `--gpu-devices cuda` for "every NVIDIA
+card, once each" instead. Each device runs its own `GpuSearchEngine` on its
+own thread with its own fresh CSPRNG-filled entropy, entirely independent of
+the others. `--count` is shared and exact across all devices: matches from
+every device funnel into the same sink, and the run stops the instant the
+target is reached, even mid-launch on the other devices. Because devices
+report from separate threads, the order matches are printed in across
+devices is not guaranteed (each device's own hits stay in order relative to
+each other). Several OpenCL devices opened together compile their programs
+one after another at start-up, not in parallel, so `--gpu-devices all` or
+`--gpu-devices opencl:0,opencl:1` on OpenCL-heavy specs can take a while
+before the first launch starts. Each device prints its own
+`GPU[backend:index]: searched N candidates in T s (rate/s); consistency
+errors: E` line as it finishes, followed by one aggregate `GPU: searched N
+candidates on D device(s) in T s (rate/s); consistency errors: E` line for
+the whole run.
 
 ### Kernel single-source discipline
 
