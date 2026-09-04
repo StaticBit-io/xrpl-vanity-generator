@@ -61,6 +61,11 @@ public sealed class OpenClBackend : IGpuBackend
             reason = "OpenCL ICD loader not found (OpenCL.dll / libOpenCL.so.1)";
             return false;
         }
+        catch (EntryPointNotFoundException ex)
+        {
+            reason = $"OpenCL ICD loader is missing an entry point: {ex.Message}";
+            return false;
+        }
         catch (OpenClException ex)
         {
             reason = ex.Message;

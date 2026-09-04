@@ -12,8 +12,8 @@ public class GpuPipelineTests
 {
     // Launching all n candidates in one cuLaunchKernel makes one very long kernel for large
     // n, which a display GPU under the default Windows WDDM TDR (2 seconds) can kill with
-    // CUDA_ERROR_LAUNCH_TIMEOUT. Process in batches instead, reusing the same device buffers
-    // via pointer offsets so the wall-clock cost stays the same.
+    // CUDA_ERROR_LAUNCH_TIMEOUT. Process in batches instead, allocating fresh device buffers
+    // per batch so each launch stays short.
     private const int BatchSize = 65_536;
 
     private static byte[] RunDerive(string backend, byte[] entropies, int n)

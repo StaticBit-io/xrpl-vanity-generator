@@ -118,7 +118,8 @@ XrplVanity.Gpu
                    void Synchronize(); IDisposable
   IGpuKernel       (opaque)
   IGpuBuffer       Size; CopyFrom(ReadOnlySpan<byte>); CopyTo(Span<byte>); Clear(); IDisposable
-  GpuBackends      static: All (CUDA then OpenCL), FirstAvailableDevice(), Find(backend, index)
+  GpuBackends      static: All (CUDA then OpenCL), TryOpenFirst(out device, out reason),
+                   TryOpen(backendName, index, out device, out reason)
 ```
 
 `Launch(kernel, threads, blockSize, args)` takes the number of threads required; the CUDA

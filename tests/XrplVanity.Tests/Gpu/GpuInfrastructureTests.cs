@@ -16,7 +16,7 @@ public class GpuInfrastructureTests
         Assert.False(string.IsNullOrWhiteSpace(info));
         if (!available)
         {
-            Assert.Skip($"CUDA not available: {info}");
+            Assert.Skip($"no usable GPU device: {info}");
         }
     }
 
@@ -87,8 +87,9 @@ public class GpuInfrastructureTests
     /// <see cref="OpenClBackend.Open"/> must not leave the backend or the driver in a state where a
     /// subsequent, valid <c>Open(0)</c> call fails or the process crashes. This drives the failure
     /// through the public API (an out-of-range index, rejected before <c>OpenClDevice</c> is
-    /// constructed) rather than through a deliberately broken kernel build, since injecting a build
-    /// failure would require exposing an internal-only constructor overload purely for testing.
+    /// constructed). The real-build-failure counterpart, which does exercise the internal
+    /// <c>OpenClDevice</c> constructor with a deliberately broken kernel source, lives in
+    /// <see cref="GpuBackendsTests.OpenClDevice_Constructor_Reports_Build_Failure_And_Leaves_The_Runtime_Usable"/>.
     /// </summary>
     [Fact]
     public void OpenCl_Open_With_Out_Of_Range_Index_Throws_And_Device_Zero_Still_Opens_Afterwards()

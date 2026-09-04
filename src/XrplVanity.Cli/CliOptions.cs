@@ -76,11 +76,13 @@ public sealed class CliOptions
                     break;
                 case "--backend":
                     backend = Next(args, ref i, arg);
-                    if (backend != "cuda" && backend != "opencl")
+                    if (!string.Equals(backend, "cuda", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(backend, "opencl", StringComparison.OrdinalIgnoreCase))
                     {
                         throw new ArgumentException("Option '--backend' must be 'cuda' or 'opencl'.");
                     }
 
+                    backend = backend.ToLowerInvariant();
                     break;
                 case "--device":
                     device = NextInt(args, ref i, arg);
@@ -101,6 +103,11 @@ public sealed class CliOptions
                     patterns.Add((MatchPosition.Starts, arg));
                     break;
             }
+        }
+
+        if (backend is not null || device is not null)
+        {
+            gpu = true;
         }
 
         return new CliOptions

@@ -10,19 +10,6 @@ public static class GpuBackends
     /// <summary>Preference order: CUDA first (verified, fastest on NVIDIA), then OpenCL.</summary>
     public static IReadOnlyList<IGpuBackend> All { get; } = new IGpuBackend[] { new CudaBackend(), new OpenClBackend() };
 
-    public static IGpuBackend? Get(string name)
-    {
-        foreach (IGpuBackend backend in All)
-        {
-            if (string.Equals(backend.Name, name, StringComparison.OrdinalIgnoreCase))
-            {
-                return backend;
-            }
-        }
-
-        return null;
-    }
-
     public static bool TryOpenFirst(out IGpuDevice? device, out string reason) => TryOpenFirst(All, out device, out reason);
 
     public static bool TryOpen(string backendName, int index, out IGpuDevice? device, out string reason) =>

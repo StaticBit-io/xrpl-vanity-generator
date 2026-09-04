@@ -68,4 +68,19 @@ public class CliOptionsTests
         Assert.Null(CliOptions.Parse(new[] { "abc" }).Backend);
         Assert.Null(CliOptions.Parse(new[] { "abc" }).Device);
     }
+
+    [Fact]
+    public void Backend_Or_Device_Implies_Gpu()
+    {
+        Assert.True(CliOptions.Parse(new[] { "--backend", "opencl", "abc" }).Gpu);
+        Assert.True(CliOptions.Parse(new[] { "--device", "1", "abc" }).Gpu);
+        Assert.False(CliOptions.Parse(new[] { "abc" }).Gpu);
+    }
+
+    [Fact]
+    public void Backend_Parse_Is_Case_Insensitive_And_Normalized_To_Lower_Case()
+    {
+        Assert.Equal("cuda", CliOptions.Parse(new[] { "--backend", "CUDA", "abc" }).Backend);
+        Assert.Equal("opencl", CliOptions.Parse(new[] { "--backend", "OpenCL", "abc" }).Backend);
+    }
 }

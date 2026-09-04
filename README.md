@@ -55,8 +55,8 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--out FILE` | — | append matches to a file as well as stdout |
 | `--count N` | — | stop after N matches (otherwise run until interrupted, e.g. Ctrl+C) |
 | `--gpu` | off | search on the GPU (CUDA preferred, then OpenCL; every GPU hit is re-verified by the CPU before it is printed) |
-| `--backend NAME` | — | force the GPU backend: `cuda` or `opencl` (implies `--gpu`'s device requirement; combine with `--device` to pick a specific one) |
-| `--device N` | — | pick a device by index: within the chosen `--backend`, or (without `--backend`) into the flat list `--list-devices` prints |
+| `--backend NAME` | — | force the GPU backend: `cuda` or `opencl` (case-insensitive; implies `--gpu`; combine with `--device` to pick a specific one) |
+| `--device N` | — | pick a device by index: within the chosen `--backend`, or (without `--backend`) into the flat list `--list-devices` prints (implies `--gpu`) |
 | `--list-devices` | — | list every device from every backend, one per line, and exit (`0` if any device was found, `2` otherwise) |
 
 Patterns are normalized into the XRPL base58 alphabet (`l -> L`, `0 -> o`,
@@ -113,36 +113,60 @@ code 2 rather than silently using the CPU.
 
 ## GPU backends (CUDA and OpenCL)
 
-Two backends implement the same kernel source: CUDA (NVIDIA only) and OpenCL
-(any ICD-installed vendor). `--gpu` without `--backend` opens the first
-usable device in preference order — CUDA, then OpenCL. CUDA is tried first
-because its program ships precompiled (PTX, no run-time compilation and no
-dependence on the vendor's OpenCL compiler — a cold OpenCL compile takes
-30–40 s on the reference card) and because it is the longest-verified path.
-On the reference RTX 5070 Ti, the OpenCL backend measured slightly faster
-(OpenCL ~12.1M/s vs. CUDA ~10.7M/s in CLI runs), so pass `--backend opencl`
-to select it, optionally with `--device N` to pick a specific device within
-it; run `--list-devices` first to see what is available and at which flat
-index (`--device N` without `--backend` indexes that flat list). The OpenCL
-backend compiles the kernel source at run time, in the device's constructor —
-the first run can take tens of seconds while the vendor driver JIT-compiles;
-the CLI prints a `note: compiling the OpenCL program took N s` line whenever
-that exceeds a second, and the driver's on-disk cache makes subsequent runs
-fast.
+Two backends implement the same kernel source: CUDA (NVIDIA only, the
+longest-verified path) and OpenCL. `--gpu` without `--backend` opens the
+first usable device in preference order — CUDA, then OpenCL. CUDA is tried
+first because its program ships precompiled (PTX, no run-time compilation
+and no dependence on the vendor's OpenCL compiler — a cold OpenCL compile
+takes 30–40 s on the reference card). On the reference RTX 5070 Ti, the
+OpenCL backend measured slightly faster (OpenCL ~12.1M/s vs. CUDA ~10.7M/s
+in CLI runs), so pass `--backend opencl` to select it, optionally with
+`--device N` to pick a specific device within it; run `--list-devices` first
+to see what is available and at which flat index (`--device N` without
+`--backend` indexes that flat list). The OpenCL backend compiles the kernel
+source at run time, in the device's constructor — the first run can take
+tens of seconds while the vendor driver JIT-compiles; the CLI prints a
+`note: compiling the OpenCL program took N s` line whenever that exceeds a
+second, and the driver's on-disk cache makes subsequent runs fast. The
+OpenCL backend has been validated on NVIDIA's OpenCL implementation only;
+AMD and Intel ICDs are expected to work (OpenCL C 1.2 is a portable
+standard) but are untested here — exercising a non-NVIDIA implementation is
+Plan D.
 
-The CUDA kernel source lives at `gpu/kernels/xrpl_vanity.cu` (device-only —
-it is not built by `dotnet build` or any `.csproj`). It implements the same
-`entropy -> address` derivation as `XrplVanity.Core`, verified kernel by
-kernel against the .NET/BouncyCastle reference and against RFC 8032 test
-vectors. The OpenCL backend shares that same source file — CUDA and OpenCL
-device code paths are selected by preprocessor guards, not maintained as
-separate kernels. The kernel uses a windowed fixed-base scalar multiplication
-over a 256-entry table that is built on the device at start-up by the naive
-(independently verified) multiplication; both paths are checked against RFC
-8032 and each other in the test suite. On the reference RTX 5070 Ti, the CLI
-achieves ~10.7M candidates/s on CUDA and ~12.1M candidates/s on OpenCL.
+### Kernel single-source discipline
 
-At development time, the kernel is compiled to PTX (target `compute_75`,
+There is no `.cu` file and no `#ifdef`. The device code is one body,
+`gpu/kernels/xrpl_vanity_body.h`, plus two shims that each define the same
+set of macros for their platform: `gpu/kernels/cuda_shim.h` (`KERNEL` →
+`extern "C" __global__`, `GLOBAL`/`CONSTANT` pointers are plain pointers,
+64-bit literals are a native `ull`/`ll` suffix) and `gpu/kernels/opencl_shim.h`
+(`KERNEL` → `__kernel`, `GLOBAL` → `__global`, `CONSTANT` → `__constant`,
+64-bit literals go through `U64_C(...)`). `gpu/build-ptx.py` concatenates the
+CUDA shim with the body and compiles the result to PTX (see below);
+`GpuKernels.ReadOpenClSource()` concatenates the OpenCL shim with the same
+body and hands it to the vendor's OpenCL compiler at run time.
+
+Because OpenCL C 1.2 has no generic address space, the body follows a
+stricter discipline than plain CUDA would need: device functions take
+private pointers only, except for the three read-only tables that are
+threaded through the call tree as `GLOBAL const` (the base-point table, and
+the matcher's `groups` and `chars`); kernels copy their per-thread inputs out
+of `GLOBAL` memory into private arrays before calling into device functions,
+and copy results back. The full construct-by-construct mapping (kernel
+entry, device function, thread index, atomics, 64-bit literals, …) is in the
+"Kernel single-source discipline" table in
+[`docs/2026-09-03-xrpl-vanity-gpu-opencl-design.md`](docs/2026-09-03-xrpl-vanity-gpu-opencl-design.md).
+
+The body implements the same `entropy -> address` derivation as
+`XrplVanity.Core`, verified kernel by kernel against the .NET/BouncyCastle
+reference and against RFC 8032 test vectors — CUDA and OpenCL run identical
+logic, so both are checked against RFC 8032 and each other in the test
+suite. The kernel uses a windowed fixed-base scalar multiplication over a
+256-entry table that is built on the device at start-up by the naive
+(independently verified) multiplication. On the reference RTX 5070 Ti, the
+CLI achieves ~10.7M candidates/s on CUDA and ~12.1M candidates/s on OpenCL.
+
+At development time, the CUDA half is compiled to PTX (target `compute_75`,
 i.e. NVIDIA Turing / 2018 or newer — the driver JIT-compiles the PTX for the
 actual GPU at load time) with:
 
@@ -161,9 +185,12 @@ Set `NVRTC_DIR` to override where the script looks for the NVRTC library.
 The generated `gpu/kernels/xrpl_vanity.ptx` is committed to the repository
 and embedded into the `XrplVanity.Gpu` assembly as a resource, so a plain
 `dotnet build` never requires CUDA or NVRTC — only the NVIDIA driver is
-needed at run time, to load and execute the embedded PTX. Whenever the `.cu`
-kernel changes, regenerate the PTX and commit the `.cu` and `.ptx` files
-together.
+needed at run time, to load and execute the embedded PTX. The OpenCL side
+needs no build step (the body and shim are embedded as text and compiled by
+the vendor driver at run time). After ANY change to `xrpl_vanity_body.h` —
+or either shim — run `python gpu/build-ptx.py` and commit the body and the
+regenerated PTX together; otherwise the CUDA and OpenCL backends stop
+agreeing.
 
 GPU tests (`tests/XrplVanity.Tests/Gpu`) are parameterized over both
 backends and skip automatically, per backend, when that backend has no
