@@ -128,10 +128,9 @@ source at run time, in the device's constructor — the first run can take
 tens of seconds while the vendor driver JIT-compiles; the CLI prints a
 `note: compiling the OpenCL program took N s` line whenever that exceeds a
 second, and the driver's on-disk cache makes subsequent runs fast. The
-OpenCL backend has been validated on NVIDIA's OpenCL implementation only;
-AMD and Intel ICDs are expected to work (OpenCL C 1.2 is a portable
-standard) but are untested here — exercising a non-NVIDIA implementation is
-Plan D.
+OpenCL backend has been validated on NVIDIA's OpenCL implementation
+(Windows) and on pocl 5.0 (Linux, CPU). AMD and Intel implementations are
+expected to work (OpenCL C 1.2 is a portable standard) but remain untested.
 
 ### Kernel single-source discipline
 
@@ -195,6 +194,79 @@ agreeing.
 GPU tests (`tests/XrplVanity.Tests/Gpu`) are parameterized over both
 backends and skip automatically, per backend, when that backend has no
 usable device, or (CUDA) when the device is older than compute_75.
+
+### GPU backend validation
+
+The CUDA backend has been production-verified on NVIDIA hardware since the
+project's start. The OpenCL backend has been validated on NVIDIA's OpenCL
+implementation (Windows) and on pocl 5.0 (an independent CPU implementation
+used in the Linux test harness). AMD and Intel OpenCL implementations are
+expected to work (OpenCL C 1.2 is a portable standard) but remain untested
+on this hardware. Every backend is re-verified by the CPU reference before a
+hit is printed, so a device the reference disagrees with only costs
+throughput (reported as a consistency error), never a wrong key.
+
+## Linux
+
+The test suite runs on Linux inside Docker, with two modes:
+
+- **GPU mode** (`bash linux/run-linux-tests.sh`): runs the full suite (150
+  tests) with CUDA and OpenCL both required. CUDA comes from the NVIDIA
+  container runtime (included with Docker Desktop on Windows; install the
+  NVIDIA Container Toolkit on Linux); OpenCL comes from pocl 5.0 (an
+  independent CPU OpenCL implementation bundled in the image). The run
+  asserts both backends are present and green, 0 skipped.
+- **CPU-only mode** (`bash linux/run-linux-tests.sh --cpu-only`): runs the
+  suite without GPU passthrough; CUDA rows are skipped (50 tests) with the
+  reason "CUDA driver library not found"; OpenCL rows run on pocl. The run
+  asserts OpenCL is present and the remaining 100 tests pass, 0 failed. This
+  exercises the "machine without NVIDIA" scenario and makes a CPU-only CI
+  job possible later.
+
+Both modes use the same single kernel source and exercise the same test
+anchors: field arithmetic vs BigInteger, RFC 8032 vectors, hash padding
+boundaries, base58 encoding, the 1,000,000-input cross-check, the 20,000-address
+matcher equivalence, and the search engine gate with consistency re-verification.
+
+**Requirements:**
+
+- Docker (Docker Desktop on Windows or Docker Engine on Linux)
+- For GPU mode, the NVIDIA container runtime:
+  - **Windows:** Included with Docker Desktop if the NVIDIA driver is installed
+  - **Linux:** Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+
+**What is downloaded on the first run:**
+
+- Ubuntu 24.04 apt packages (~150–200 MB) — cached in the Docker image
+- NuGet packages for the Linux restore — cached in the named volume
+  `xrpl-vanity-nuget`
+- pocl's LLVM JIT kernel cache — cached in the named volume `xrpl-vanity-pocl`
+  (subsequent device opens reuse the cache; the first run of each kernel source
+  incurs a compile, reported as `note: compiling the OpenCL program took N s`
+  when it exceeds a second)
+
+**Output examples:**
+
+```
+$ bash linux/run-linux-tests.sh
+[... Docker build and test output ...]
+== environment
+Platform #0: Portable Computing Language
+ `-- Device #0: cpu-skylake-avx512-11th Gen Intel(R) Core(TM) i5-11400F @ 2.60GHz
+GPU 0: NVIDIA GeForce RTX 5070 Ti (UUID: ...)
+
+== tests (required backends: cuda,opencl)
+[... suite output ...]
+   XrplVanity.Tests  Total: 150, Errors: 0, Failed: 0, Skipped: 0, Time: 273.083s
+
+== smoke: --list-devices
+ 0  cuda:0  NVIDIA GeForce RTX 5070 Ti  (sm_120)
+ 1  opencl:0  cpu-skylake-avx512-11th Gen Intel(R) Core(TM) i5-11400F @ 2.60GHz  (Portable Computing Language, OpenCL 3.0 PoCL ...) [cpu]
+```
+
+The `[cpu]` tag marks CPU devices in `--list-devices`. The suite on pocl
+(a CPU implementation) runs to completion on any machine Docker runs, even
+without a GPU — making CPU-only CI practical.
 
 ## Acknowledgements
 

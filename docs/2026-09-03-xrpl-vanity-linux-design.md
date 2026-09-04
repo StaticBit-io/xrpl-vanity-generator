@@ -197,3 +197,15 @@ design doc's "Measured" section when the harness first runs green.
 5. Build context for the image is `linux/` only; sources are bind-mounted at run time and
    copied inside the container, never built in place.
 6. Plan order C → D → E; secp256k1 permanently excluded.
+
+## Measured (reference machine; container on Docker Desktop / WSL2, 12 vCPU)
+
+| Path | Result |
+| --- | --- |
+| pocl platform / device | Portable Computing Language / cpu-skylake-avx512-11th Gen Intel(R) Core(TM) i5-11400F @ 2.60GHz |
+| OpenCL program compile on pocl (cold / cached) | not measured separately; the pocl kernel cache lives in the `xrpl-vanity-pocl` volume |
+| Throughput test on pocl (CPU device, floor 10,000/s) | 56,000/s |
+| CLI `--backend opencl` on pocl | 58,000/s |
+| Suite wall time, GPU mode / CPU mode | 273.083 s / 207.139 s |
+| Portability fixes required by pocl | OpenCL setup serialised process-wide (SetupLock) for thread-safety; no kernel change needed |
+| pocl LLVM version | LLVM 16 (via apt package pocl 5.0-2.1build3 on Ubuntu 24.04) |

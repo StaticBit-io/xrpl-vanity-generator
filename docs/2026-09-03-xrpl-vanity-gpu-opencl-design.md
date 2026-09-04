@@ -41,8 +41,7 @@ Facts established on the reference machine before this design was written:
 
 ## Non-goals
 
-- Multi-GPU (Plan E). Linux and pocl (Plan D). Validation on AMD/Intel GPUs (no hardware;
-  "expected to work, untested" — the same honesty as Linux in the CUDA design).
+- Multi-GPU (Plan E). Linux and pocl (Plan D). Validation on AMD/Intel GPUs (no hardware; validated on NVIDIA OpenCL and on pocl 5.0 — an independent CPU implementation — by Plan D; AMD/Intel expected to work, untested).
 - Performance parity between backends. Performance is not a design goal; on the
   reference card OpenCL measured slightly faster, but the backends must be correct,
   and performance may vary on other hardware.
