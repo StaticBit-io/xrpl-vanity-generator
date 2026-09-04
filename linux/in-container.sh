@@ -34,11 +34,12 @@ step "tests (required backends: $XRPL_VANITY_REQUIRE_BACKENDS)"
 # (pocl_release_dlhandle_cache assertion, observed reproducibly in --cpu-only mode) that a plain
 # redirect does not.
 SUITE_LOG="$(mktemp)"
-dotnet run --project tests/XrplVanity.Tests -c Release --no-build > "$SUITE_LOG" 2>&1
-cat "$SUITE_LOG"
+set +e; dotnet run --project tests/XrplVanity.Tests -c Release --no-build > "$SUITE_LOG" 2>&1; RC=$?; set -e
 SUITE="$(cat "$SUITE_LOG")"
+cat "$SUITE_LOG"
 rm -f "$SUITE_LOG"
 if [ "$MODE" = gpu ]; then expect_contains "no skipped rows" "Skipped: 0," "$SUITE"; fi
+[ "$RC" -eq 0 ] || { printf 'FAIL tests exited %s\n' "$RC"; exit "$RC"; }
 
 CLI=(dotnet run --project src/XrplVanity.Cli -c Release --no-build --)
 
