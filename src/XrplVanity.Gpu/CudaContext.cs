@@ -1,56 +1,56 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace XrplVanity.Gpu;
 
-/// <summary>One CUDA context on device 0. Not thread-safe; one per thread.</summary>
+public sealed record CudaDeviceInfo(int Ordinal, string Name, int ComputeCapabilityMajor, int ComputeCapabilityMinor);
+
+/// <summary>One CUDA context on one device ordinal. Not thread-safe; one per thread.</summary>
 public sealed class CudaContext : IDisposable
 {
     private readonly IntPtr _handle;
     private bool _disposed;
 
-    private CudaContext(IntPtr handle, string deviceName, int major, int minor)
+    private CudaContext(IntPtr handle, int ordinal, string deviceName, int major, int minor)
     {
         _handle = handle;
+        Ordinal = ordinal;
         DeviceName = deviceName;
         ComputeCapabilityMajor = major;
         ComputeCapabilityMinor = minor;
     }
 
+    public int Ordinal { get; }
     public string DeviceName { get; }
     public int ComputeCapabilityMajor { get; }
     public int ComputeCapabilityMinor { get; }
 
     /// <summary>Creates a context on device 0; returns false with a reason instead of throwing.</summary>
-    public static bool TryCreate(out CudaContext? context, out string reason)
+    public static bool TryCreate(out CudaContext? context, out string reason) => TryCreate(0, out context, out reason);
+
+    /// <summary>Creates a context on the given device ordinal; returns false with a reason instead of throwing.</summary>
+    public static bool TryCreate(int ordinal, out CudaContext? context, out string reason)
     {
         context = null;
         try
         {
-            int result = CudaDriver.cuInit(0);
-            if (result != CudaDriver.CudaSuccess)
+            if (!InitAndCount(out int count, out reason))
             {
-                reason = $"cuInit failed with CUDA error {result}";
                 return false;
             }
 
-            CudaDriver.Check(CudaDriver.cuDeviceGetCount(out int count), "cuDeviceGetCount");
-            if (count == 0)
+            if (ordinal < 0 || ordinal >= count)
             {
-                reason = "no CUDA devices";
+                reason = $"CUDA device ordinal {ordinal} is out of range (0..{count - 1})";
                 return false;
             }
 
-            CudaDriver.Check(CudaDriver.cuDeviceGet(out int device, 0), "cuDeviceGet");
-            byte[] nameBytes = new byte[256];
-            CudaDriver.Check(CudaDriver.cuDeviceGetName(nameBytes, nameBytes.Length, device), "cuDeviceGetName");
-            string name = Encoding.ASCII.GetString(nameBytes).TrimEnd('\0');
-            CudaDriver.Check(CudaDriver.cuDeviceGetAttribute(out int major, CudaDriver.AttributeComputeCapabilityMajor, device), "cuDeviceGetAttribute(major)");
-            CudaDriver.Check(CudaDriver.cuDeviceGetAttribute(out int minor, CudaDriver.AttributeComputeCapabilityMinor, device), "cuDeviceGetAttribute(minor)");
+            CudaDeviceInfo info = Describe(ordinal);
+            CudaDriver.Check(CudaDriver.cuDeviceGet(out int device, ordinal), "cuDeviceGet");
             CudaDriver.Check(CudaDriver.cuCtxCreate(out IntPtr handle, 0, device), "cuCtxCreate");
-
-            context = new CudaContext(handle, name, major, minor);
+            context = new CudaContext(handle, ordinal, info.Name, info.ComputeCapabilityMajor, info.ComputeCapabilityMinor);
             reason = string.Empty;
             return true;
         }
@@ -64,6 +64,71 @@ public sealed class CudaContext : IDisposable
             reason = ex.Message;
             return false;
         }
+    }
+
+    /// <summary>Lists every CUDA device without creating a context.</summary>
+    public static bool TryEnumerate(out IReadOnlyList<CudaDeviceInfo> devices, out string reason)
+    {
+        devices = Array.Empty<CudaDeviceInfo>();
+        try
+        {
+            if (!InitAndCount(out int count, out reason))
+            {
+                return false;
+            }
+
+            CudaDeviceInfo[] list = new CudaDeviceInfo[count];
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = Describe(i);
+            }
+
+            devices = list;
+            reason = string.Empty;
+            return true;
+        }
+        catch (DllNotFoundException)
+        {
+            reason = "CUDA driver library not found (nvcuda.dll / libcuda.so.1)";
+            return false;
+        }
+        catch (CudaException ex)
+        {
+            reason = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool InitAndCount(out int count, out string reason)
+    {
+        count = 0;
+        int result = CudaDriver.cuInit(0);
+        if (result != CudaDriver.CudaSuccess)
+        {
+            reason = $"cuInit failed with CUDA error {result}";
+            return false;
+        }
+
+        CudaDriver.Check(CudaDriver.cuDeviceGetCount(out count), "cuDeviceGetCount");
+        if (count == 0)
+        {
+            reason = "no CUDA devices";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
+    private static CudaDeviceInfo Describe(int ordinal)
+    {
+        CudaDriver.Check(CudaDriver.cuDeviceGet(out int device, ordinal), "cuDeviceGet");
+        byte[] nameBytes = new byte[256];
+        CudaDriver.Check(CudaDriver.cuDeviceGetName(nameBytes, nameBytes.Length, device), "cuDeviceGetName");
+        string name = Encoding.ASCII.GetString(nameBytes).TrimEnd('\0');
+        CudaDriver.Check(CudaDriver.cuDeviceGetAttribute(out int major, CudaDriver.AttributeComputeCapabilityMajor, device), "cuDeviceGetAttribute(major)");
+        CudaDriver.Check(CudaDriver.cuDeviceGetAttribute(out int minor, CudaDriver.AttributeComputeCapabilityMinor, device), "cuDeviceGetAttribute(minor)");
+        return new CudaDeviceInfo(ordinal, name, major, minor);
     }
 
     public CudaModule LoadModule(string ptx)

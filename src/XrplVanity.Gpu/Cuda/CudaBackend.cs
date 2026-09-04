@@ -7,32 +7,31 @@ public sealed class CudaBackend : IGpuBackend
 {
     public string Name => "cuda";
 
-    /// <summary>Device 0 only until Plan E extends <see cref="CudaContext"/> with a device ordinal.</summary>
     public IReadOnlyList<GpuDeviceInfo> EnumerateDevices()
     {
-        if (!CudaContext.TryCreate(out CudaContext? context, out _))
+        if (!CudaContext.TryEnumerate(out IReadOnlyList<CudaDeviceInfo> devices, out _))
         {
             return Array.Empty<GpuDeviceInfo>();
         }
 
-        using (context)
+        GpuDeviceInfo[] list = new GpuDeviceInfo[devices.Count];
+        for (int i = 0; i < devices.Count; i++)
         {
-            return new[]
-            {
-                new GpuDeviceInfo(Name, 0, context!.DeviceName, $"sm_{context.ComputeCapabilityMajor}{context.ComputeCapabilityMinor}"),
-            };
+            list[i] = new GpuDeviceInfo(Name, devices[i].Ordinal, devices[i].Name, $"sm_{devices[i].ComputeCapabilityMajor}{devices[i].ComputeCapabilityMinor}");
         }
+
+        return list;
     }
 
     public IGpuDevice Open(int index)
     {
-        if (index != 0)
+        if (!CudaContext.TryCreate(index, out CudaContext? context, out string reason))
         {
-            throw new ArgumentOutOfRangeException(nameof(index), "The CUDA backend exposes device 0 only.");
-        }
+            if (reason.Contains("out of range", StringComparison.Ordinal))
+            {
+                throw new ArgumentOutOfRangeException(nameof(index), reason);
+            }
 
-        if (!CudaContext.TryCreate(out CudaContext? context, out string reason))
-        {
             throw new InvalidOperationException($"CUDA is not available: {reason}");
         }
 
