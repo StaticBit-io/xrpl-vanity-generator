@@ -5,14 +5,17 @@ namespace XrplVanity.Gpu;
 
 public static class GpuKernels
 {
-    private const string ResourceName = "xrpl_vanity.ptx";
-
     /// <summary>The PTX generated from gpu/kernels/xrpl_vanity.cu, embedded at build time.</summary>
-    public static string ReadPtx()
+    public static string ReadPtx() => ReadResource("xrpl_vanity.ptx");
+
+    /// <summary>The OpenCL C 1.2 program: opencl_shim.h followed by xrpl_vanity_body.h.</summary>
+    public static string ReadOpenClSource() => ReadResource("opencl_shim.h") + "\n" + ReadResource("xrpl_vanity_body.h");
+
+    private static string ReadResource(string name)
     {
         Assembly assembly = typeof(GpuKernels).Assembly;
-        using Stream? stream = assembly.GetManifestResourceStream(ResourceName)
-            ?? throw new FileNotFoundException($"Embedded resource '{ResourceName}' is missing; run gpu/build-ptx.py and rebuild.");
+        using Stream? stream = assembly.GetManifestResourceStream(name)
+            ?? throw new FileNotFoundException($"Embedded resource '{name}' is missing.");
         using StreamReader reader = new(stream);
         return reader.ReadToEnd();
     }

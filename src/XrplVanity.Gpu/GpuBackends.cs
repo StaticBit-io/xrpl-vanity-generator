@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using XrplVanity.Gpu.Cuda;
+using XrplVanity.Gpu.OpenCl;
 
 namespace XrplVanity.Gpu;
 
 public static class GpuBackends
 {
-    /// <summary>Preference order: CUDA first (verified, fastest on NVIDIA), then OpenCL (Task 3).</summary>
-    public static IReadOnlyList<IGpuBackend> All { get; } = new IGpuBackend[] { new CudaBackend() };
+    /// <summary>Preference order: CUDA first (verified, fastest on NVIDIA), then OpenCL.</summary>
+    public static IReadOnlyList<IGpuBackend> All { get; } = new IGpuBackend[] { new CudaBackend(), new OpenClBackend() };
 
     public static IGpuBackend? Get(string name)
     {

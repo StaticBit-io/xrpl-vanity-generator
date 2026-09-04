@@ -14,6 +14,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\gpu\kernels\xrpl_vanity.ptx" LogicalName="xrpl_vanity.ptx" />
+    <EmbeddedResource Include="..\..\gpu\kernels\opencl_shim.h" LogicalName="opencl_shim.h" />
+    <EmbeddedResource Include="..\..\gpu\kernels\xrpl_vanity_body.h" LogicalName="xrpl_vanity_body.h" />
   </ItemGroup>
 
 </Project>

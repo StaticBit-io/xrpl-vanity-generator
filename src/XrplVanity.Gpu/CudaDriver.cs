@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace XrplVanity.Gpu;
@@ -19,18 +18,7 @@ internal static class CudaDriver
 
     static CudaDriver()
     {
-        NativeLibrary.SetDllImportResolver(typeof(CudaDriver).Assembly, Resolve);
-    }
-
-    private static IntPtr Resolve(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
-    {
-        if (libraryName != Lib)
-        {
-            return IntPtr.Zero;
-        }
-
-        string native = OperatingSystem.IsWindows() ? "nvcuda.dll" : "libcuda.so.1";
-        return NativeLibrary.TryLoad(native, out IntPtr handle) ? handle : IntPtr.Zero;
+        NativeLibraries.EnsureResolverInstalled();
     }
 
     [DllImport(Lib)] internal static extern int cuInit(uint flags);
