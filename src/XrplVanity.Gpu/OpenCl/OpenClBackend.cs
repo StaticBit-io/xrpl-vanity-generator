@@ -181,9 +181,26 @@ internal sealed class OpenClDevice : IGpuDevice
         IntPtr[] devices = { device };
         _context = OpenClNative.clCreateContext(IntPtr.Zero, 1, devices, IntPtr.Zero, IntPtr.Zero, out int error);
         OpenClNative.Check(error, "clCreateContext");
-        _queue = OpenClNative.clCreateCommandQueue(_context, device, 0, out error);
-        OpenClNative.Check(error, "clCreateCommandQueue");
-        _program = Build(GpuKernels.ReadOpenClSource());
+        try
+        {
+            _queue = OpenClNative.clCreateCommandQueue(_context, device, 0, out error);
+            OpenClNative.Check(error, "clCreateCommandQueue");
+            _program = Build(GpuKernels.ReadOpenClSource());
+        }
+        catch
+        {
+            // Release whatever was already acquired before rethrowing, so a failure partway
+            // through construction (e.g. clCreateCommandQueue, or a clBuildProgram failure inside
+            // Build) doesn't leak a context+queue pair: the object is never fully constructed, so
+            // Dispose() is never reachable for it.
+            if (_queue != IntPtr.Zero)
+            {
+                _ = OpenClNative.clReleaseCommandQueue(_queue);
+            }
+
+            _ = OpenClNative.clReleaseContext(_context);
+            throw;
+        }
     }
 
     public string Backend => "opencl";
@@ -224,6 +241,7 @@ internal sealed class OpenClDevice : IGpuDevice
 
             if (buildThreadException is not null)
             {
+                _ = OpenClNative.clReleaseProgram(program);
                 throw buildThreadException;
             }
 

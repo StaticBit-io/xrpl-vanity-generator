@@ -73,7 +73,17 @@ internal sealed class CudaDevice : IGpuDevice
     internal CudaDevice(CudaContext context)
     {
         _context = context;
-        _module = context.LoadModule(GpuKernels.ReadPtx());
+        try
+        {
+            _module = context.LoadModule(GpuKernels.ReadPtx());
+        }
+        catch
+        {
+            // LoadModule failing leaves the object never fully constructed, so Dispose() is never
+            // reachable for it; dispose the already-created context ourselves before rethrowing.
+            _context.Dispose();
+            throw;
+        }
     }
 
     public string Backend => "cuda";

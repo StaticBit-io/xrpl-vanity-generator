@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using XrplVanity.Gpu;
+using XrplVanity.Gpu.OpenCl;
 using Xunit;
 
 namespace XrplVanity.Tests.Gpu;
@@ -77,5 +80,29 @@ public class GpuInfrastructureTests
         {
             Assert.Equal(a[i] + b[i], result[i]);
         }
+    }
+
+    /// <summary>
+    /// Covers the OpenCL constructor-failure cleanup path (Task 3 fix round 1): a failed
+    /// <see cref="OpenClBackend.Open"/> must not leave the backend or the driver in a state where a
+    /// subsequent, valid <c>Open(0)</c> call fails or the process crashes. This drives the failure
+    /// through the public API (an out-of-range index, rejected before <c>OpenClDevice</c> is
+    /// constructed) rather than through a deliberately broken kernel build, since injecting a build
+    /// failure would require exposing an internal-only constructor overload purely for testing.
+    /// </summary>
+    [Fact]
+    public void OpenCl_Open_With_Out_Of_Range_Index_Throws_And_Device_Zero_Still_Opens_Afterwards()
+    {
+        OpenClBackend backend = new();
+        IReadOnlyList<GpuDeviceInfo> devices = backend.EnumerateDevices();
+        if (devices.Count == 0)
+        {
+            Assert.Skip("opencl not available: no devices");
+        }
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => backend.Open(devices.Count));
+
+        using IGpuDevice device = backend.Open(0);
+        Assert.False(string.IsNullOrWhiteSpace(device.Name));
     }
 }
