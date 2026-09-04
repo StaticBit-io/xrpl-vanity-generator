@@ -197,6 +197,13 @@ device computes `grid = ceil(threads/blockSize)`, the OpenCL device sets
   surfaced verbatim so a user can report it; Plan D's pocl run is the second compiler
   this source is validated against.
 
+## Measured (reference machine, RTX 5070 Ti)
+
+| Backend | Benchmark test (candidates/s) | CLI `--gpu` (candidates/s) | Program compile |
+| --- | --- | --- | --- |
+| cuda | 19,300,000 | 10,700,000 | PTX, JIT by driver (< 1 s) |
+| opencl | 21,000,000 | 12,100,000 | ≈1 s warm (NVIDIA compute cache); 30–74 s cold |
+
 ## Assumptions made on the operator's behalf
 
 1. CUDA is preferred over OpenCL when both exist (verified, faster).

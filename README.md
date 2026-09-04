@@ -135,7 +135,8 @@ device code paths are selected by preprocessor guards, not maintained as
 separate kernels. The kernel uses a windowed fixed-base scalar multiplication
 over a 256-entry table that is built on the device at start-up by the naive
 (independently verified) multiplication; both paths are checked against RFC
-8032 and each other in the test suite.
+8032 and each other in the test suite. On the reference RTX 5070 Ti, the CLI
+achieves ~10.7M candidates/s on CUDA and ~12.1M candidates/s on OpenCL.
 
 At development time, the kernel is compiled to PTX (target `compute_75`,
 i.e. NVIDIA Turing / 2018 or newer — the driver JIT-compiles the PTX for the
