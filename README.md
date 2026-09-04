@@ -115,16 +115,20 @@ code 2 rather than silently using the CPU.
 
 Two backends implement the same kernel source: CUDA (NVIDIA only) and OpenCL
 (any ICD-installed vendor). `--gpu` without `--backend` opens the first
-usable device in preference order — CUDA, then OpenCL — since CUDA is the
-faster, more thoroughly verified path on NVIDIA hardware. Pass `--backend
-cuda` or `--backend opencl` to force one, optionally with `--device N` to
-pick a specific device within it; run `--list-devices` first to see what is
-available and at which flat index (`--device N` without `--backend` indexes
-that flat list). The OpenCL backend compiles the kernel source to a program
-at run time, in the device's constructor — the first run against a given
-device can take tens of seconds while the vendor driver JIT-compiles it; the
-CLI prints a `note: compiling the OpenCL program took N s` line whenever that
-exceeds a second, and the driver's on-disk cache makes subsequent runs fast.
+usable device in preference order — CUDA, then OpenCL. CUDA is tried first
+because its program ships precompiled (PTX, no run-time compilation and no
+dependence on the vendor's OpenCL compiler — a cold OpenCL compile takes
+30–40 s on the reference card) and because it is the longest-verified path.
+On the reference RTX 5070 Ti, the OpenCL backend measured slightly faster
+(OpenCL ~12.1M/s vs. CUDA ~10.7M/s in CLI runs), so pass `--backend opencl`
+to select it, optionally with `--device N` to pick a specific device within
+it; run `--list-devices` first to see what is available and at which flat
+index (`--device N` without `--backend` indexes that flat list). The OpenCL
+backend compiles the kernel source at run time, in the device's constructor —
+the first run can take tens of seconds while the vendor driver JIT-compiles;
+the CLI prints a `note: compiling the OpenCL program took N s` line whenever
+that exceeds a second, and the driver's on-disk cache makes subsequent runs
+fast.
 
 The CUDA kernel source lives at `gpu/kernels/xrpl_vanity.cu` (device-only —
 it is not built by `dotnet build` or any `.csproj`). It implements the same

@@ -43,8 +43,9 @@ Facts established on the reference machine before this design was written:
 
 - Multi-GPU (Plan E). Linux and pocl (Plan D). Validation on AMD/Intel GPUs (no hardware;
   "expected to work, untested" — the same honesty as Linux in the CUDA design).
-- Performance parity between backends. NVIDIA's OpenCL path may be slower than the
-  CUDA path; it must be correct, not equal.
+- Performance parity between backends. Performance is not a design goal; on the
+  reference card OpenCL measured slightly faster, but the backends must be correct,
+  and performance may vary on other hardware.
 - OpenCL 2.x/3.x-only features (generic address space, SVM, pipes, sub-groups). The
   kernel targets OpenCL C 1.2 so that the widest set of devices, including pocl and
   older Intel/AMD runtimes, can compile it.
@@ -189,7 +190,8 @@ device computes `grid = ceil(threads/blockSize)`, the OpenCL device sets
   multi-second `clBuildProgram` at start-up is expected and acceptable (reported once to
   stderr as "compiling OpenCL program…" when it takes over a second).
 - **Register pressure / occupancy on OpenCL** may cost throughput versus CUDA on the same
-  card; correctness is unaffected and the benchmark floor (500,000/s) stays.
+  card (on the reference RTX 5070 Ti it did not); correctness is unaffected and the
+  benchmark floor (500,000/s) stays.
 - **Silent semantic differences between compilers** (integer promotion, `char` signedness
   on exotic devices) — mitigated by the full anchor suite on every backend and by the
   runtime CPU gate.
@@ -202,11 +204,11 @@ device computes `grid = ceil(threads/blockSize)`, the OpenCL device sets
 | Backend | Benchmark test (candidates/s) | CLI `--gpu` (candidates/s) | Program compile |
 | --- | --- | --- | --- |
 | cuda | 19,300,000 | 10,700,000 | PTX, JIT by driver (< 1 s) |
-| opencl | 21,000,000 | 12,100,000 | ≈1 s warm (NVIDIA compute cache); 30–74 s cold |
+| opencl | 21,000,000 | 12,100,000 | ≈1 s warm (NVIDIA compute cache); 30–40 s cold — measured in Task 3, not remeasured here |
 
 ## Assumptions made on the operator's behalf
 
-1. CUDA is preferred over OpenCL when both exist (verified, faster).
+1. CUDA is preferred over OpenCL when both exist (precompiled, longest-verified; OpenCL measured slightly faster on the reference card).
 2. OpenCL is compiled at run time; nothing binary is committed for it.
 3. `--backend`, `--device`, `--list-devices` are flags of the same CLI.
 4. OpenCL C 1.2 is the language floor (widest device support, incl. pocl and older
