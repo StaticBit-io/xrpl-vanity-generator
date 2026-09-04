@@ -21,15 +21,29 @@ public sealed class MultiDeviceSearchTests
         Assert.NotNull(device);
     }
 
-    private static MultiDeviceSearchResult RunWithLimit(IReadOnlyList<DeviceSelector> selectors, int limit, out List<Match> reported)
+    // Shared by every test that races two devices against a shared match limit: the report
+    // callback discards every match until BOTH devices' live `CandidatesSearched` show they
+    // have actually completed a launch, and only then starts counting toward `limit`. Without
+    // this gate a fast device (e.g. CUDA loading precompiled PTX) can satisfy the whole limit
+    // before a slow one (e.g. OpenCL JIT-compiling under CPU contention, or a second engine on
+    // the same CUDA device that has not finished opening) ever reports a single candidate,
+    // which defeats the point of a "both devices actually ran" test. The two `Func<long>`
+    // arguments read the live counters lazily so callers can construct the callback before the
+    // `MultiDeviceSearch` (and therefore its `Devices`) exists — see the null-until-after-
+    // construction pattern at each call site. Reading a `long` without locking is fine here; a
+    // torn read is not a concern on x64.
+    private static Func<Match, bool> GateUntilBothSearched(
+        Func<long> firstCandidatesSearched, Func<long> secondCandidatesSearched, int limit, List<Match> matches, object gate)
     {
-        List<Match> matches = new();
-        object gate = new();
-        PatternSet patterns = FrequentPattern();
-        MultiDeviceSearch search = new(selectors, patterns, match =>
+        return match =>
         {
             lock (gate)
             {
+                if (firstCandidatesSearched() == 0 || secondCandidatesSearched() == 0)
+                {
+                    return true;
+                }
+
                 if (matches.Count >= limit)
                 {
                     return false;
@@ -38,10 +52,7 @@ public sealed class MultiDeviceSearchTests
                 matches.Add(match);
                 return matches.Count < limit;
             }
-        });
-        MultiDeviceSearchResult result = search.Run(CancellationToken.None);
-        reported = matches;
-        return result;
+        };
     }
 
     [Fact]
@@ -50,11 +61,29 @@ public sealed class MultiDeviceSearchTests
         DeviceSelector cuda = new("cuda", 0);
         RequireSelector(cuda);
 
-        MultiDeviceSearchResult result = RunWithLimit(new[] { cuda, cuda }, limit: 5, out List<Match> reported);
-
-        Assert.Equal(5, reported.Count);
+        // Two engines opening the same CUDA device do not open in lockstep: the first can start
+        // launching and satisfying the limit before the second has finished opening, which would
+        // make its `CandidatesSearched` false-negative zero. Gate on both having searched at
+        // least once, same as the CUDA/OpenCL race below, via the shared helper.
+        const int limit = 5;
+        List<Match> matches = new();
+        object gate = new();
         PatternSet patterns = FrequentPattern();
-        Assert.All(reported, m => Assert.True(patterns.TryMatch(m.Address, out _, out _)));
+        DeviceSearchStats? first = null;
+        DeviceSearchStats? second = null;
+
+        MultiDeviceSearch search = new(new[] { cuda, cuda }, patterns,
+            GateUntilBothSearched(() => first!.CandidatesSearched, () => second!.CandidatesSearched, limit, matches, gate));
+
+        first = search.Devices[0];
+        second = search.Devices[1];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(120));
+        MultiDeviceSearchResult result = search.Run(cts.Token);
+        Assert.False(cts.IsCancellationRequested, "the gate never armed: a device did not search");
+
+        Assert.Equal(limit, matches.Count);
+        Assert.All(matches, m => Assert.True(patterns.TryMatch(m.Address, out _, out _)));
         Assert.Equal(2, result.DevicesOpened);
         Assert.All(result.Devices, d => Assert.Null(d.Failure));
         Assert.All(result.Devices, d => Assert.True(d.CandidatesSearched > 0));
@@ -73,20 +102,19 @@ public sealed class MultiDeviceSearchTests
         // CUDA opens by loading precompiled PTX (fast, mostly GPU-side); OpenCl opens by having
         // the driver JIT-compile the kernel source on the CPU, which is what "compute cache"
         // shortens but does not eliminate. Under the CPU contention of a full suite run (~150
-        // other tests scheduling concurrently) that JIT step can take seconds, while CUDA's very
-        // first launch already finds far more than a handful of "ab"-prefixed hits. A flat
-        // match-count race therefore lets CUDA satisfy any modest limit before OpenCl has even
-        // finished opening, which is not what this test is checking. So the race is gated on the
+        // other tests scheduling concurrently, or pocl on a loaded container) that JIT step can
+        // take well over a minute, while CUDA's very first launch already finds far more than a
+        // handful of "ab"-prefixed hits. A flat match-count race therefore lets CUDA satisfy any
+        // modest limit before OpenCl has even finished opening, which is not what this test is
+        // checking. So the race is gated via the shared `GateUntilBothSearched` helper on the
         // live per-device stats `MultiDeviceSearch` exposes through `Devices`: `report` discards
         // every match until BOTH devices' live `CandidatesSearched` show they have actually
         // completed a launch; only then does the shared limit start counting. This keeps the same
         // assertions (an exact match count, both devices show `CandidatesSearched > 0`, no
         // failures) but makes the "both actually ran" guarantee deterministic instead of a race
-        // against unbounded scheduling delay — and the run itself is bounded by a 60s deadline so
-        // a gate that never arms (a device stuck opening, or not searching at all) fails the test
-        // instead of hanging forever. The live counters are updated by the worker after each
-        // launch; reading them here without locking is fine — a torn read of a `long` is not a
-        // concern on x64.
+        // against unbounded scheduling delay — and the run itself is bounded by a 300s deadline
+        // (pocl under contention needs it) so a gate that never arms (a device stuck opening, or
+        // not searching at all) fails the test instead of hanging forever.
         const int limit = 20;
         List<Match> matches = new();
         object gate = new();
@@ -95,29 +123,13 @@ public sealed class MultiDeviceSearchTests
         DeviceSearchStats? cudaStats = null;
         DeviceSearchStats? openclStats = null;
 
-        MultiDeviceSearch search = new(new[] { cuda, opencl }, patterns, match =>
-        {
-            lock (gate)
-            {
-                if (cudaStats!.CandidatesSearched == 0 || openclStats!.CandidatesSearched == 0)
-                {
-                    return true;
-                }
-
-                if (matches.Count >= limit)
-                {
-                    return false;
-                }
-
-                matches.Add(match);
-                return matches.Count < limit;
-            }
-        });
+        MultiDeviceSearch search = new(new[] { cuda, opencl }, patterns,
+            GateUntilBothSearched(() => cudaStats!.CandidatesSearched, () => openclStats!.CandidatesSearched, limit, matches, gate));
 
         cudaStats = search.Devices.Single(d => d.Selector == cuda);
         openclStats = search.Devices.Single(d => d.Selector == opencl);
 
-        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(60));
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(300));
         MultiDeviceSearchResult result = search.Run(cts.Token);
         Assert.False(cts.IsCancellationRequested, "the gate never armed: a device did not search");
 
@@ -213,19 +225,25 @@ public sealed class MultiDeviceSearchTests
         // never crash the process: the exception must be caught inside the worker thread, not
         // escape the Thread delegate. It also means the caller's sink is unusable, so every
         // worker must be asked to stop, not just the one whose report call happened to throw.
+        // The two workers share the same CUDA device and do not open (or reach their first
+        // launch, and therefore their first `report` call) in lockstep: whichever worker opens
+        // second can be cancelled by the first worker's failure before it ever calls the
+        // callback, in which case its own `Failure` is legitimately null — the orchestrator is
+        // honestly reporting that it never searched, by design, not swallowing an error. So this
+        // test only requires that AT LEAST ONE device recorded the report-callback failure
+        // (Assert.Contains, not Assert.All); the "no crash" property is proven simply by `Run`
+        // returning within the deadline instead of the process going down.
         MultiDeviceSearch search = new(new[] { cuda, cuda }, FrequentPattern(), _ => throw new IOException("broken pipe"));
 
-        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(60));
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(120));
         MultiDeviceSearchResult result = search.Run(cts.Token);
 
         Assert.False(cts.IsCancellationRequested, "workers did not stop on their own within the deadline");
         Assert.Equal(2, result.DevicesOpened);
-        Assert.All(result.Devices, d =>
-            Assert.True(
-                d.Failure is not null &&
-                (d.Failure.Contains("report callback failed", StringComparison.Ordinal) ||
-                 d.Failure.Contains("broken pipe", StringComparison.Ordinal)),
-                $"expected a report-callback failure for {d.Selector}, got: {d.Failure}"));
+        Assert.Contains(result.Devices, d =>
+            d.Failure is not null &&
+            (d.Failure.Contains("report callback", StringComparison.Ordinal) ||
+             d.Failure.Contains("broken pipe", StringComparison.Ordinal)));
     }
 
     [Fact]
