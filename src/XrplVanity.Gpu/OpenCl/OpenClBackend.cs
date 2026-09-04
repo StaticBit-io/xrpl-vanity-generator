@@ -23,39 +23,44 @@ public sealed class OpenClBackend : IGpuBackend
         devices = new List<(IntPtr, IntPtr, GpuDeviceInfo)>();
         try
         {
-            int rc = OpenClNative.clGetPlatformIDs(0, null, out uint platformCount);
-            if (rc != OpenClNative.Success || platformCount == 0)
+            // See OpenClNative.SetupLock: some ICDs are not safe under concurrent platform/device
+            // enumeration from independent host threads.
+            lock (OpenClNative.SetupLock)
             {
-                reason = rc == OpenClNative.Success ? "no OpenCL platforms" : $"clGetPlatformIDs: {OpenClNative.ErrorName(rc)}";
-                return false;
-            }
-
-            IntPtr[] platforms = new IntPtr[platformCount];
-            OpenClNative.Check(OpenClNative.clGetPlatformIDs(platformCount, platforms, out _), "clGetPlatformIDs");
-            int index = 0;
-            foreach (IntPtr platform in platforms)
-            {
-                string platformName = OpenClNative.PlatformString(platform, OpenClNative.PlatformName);
-                int drc = OpenClNative.clGetDeviceIDs(platform, OpenClNative.DeviceTypeAll, 0, null, out uint deviceCount);
-                if (drc != OpenClNative.Success || deviceCount == 0)
+                int rc = OpenClNative.clGetPlatformIDs(0, null, out uint platformCount);
+                if (rc != OpenClNative.Success || platformCount == 0)
                 {
-                    continue; // a platform with no devices is not an error
+                    reason = rc == OpenClNative.Success ? "no OpenCL platforms" : $"clGetPlatformIDs: {OpenClNative.ErrorName(rc)}";
+                    return false;
                 }
 
-                IntPtr[] ids = new IntPtr[deviceCount];
-                OpenClNative.Check(OpenClNative.clGetDeviceIDs(platform, OpenClNative.DeviceTypeAll, deviceCount, ids, out _), "clGetDeviceIDs");
-                foreach (IntPtr device in ids)
+                IntPtr[] platforms = new IntPtr[platformCount];
+                OpenClNative.Check(OpenClNative.clGetPlatformIDs(platformCount, platforms, out _), "clGetPlatformIDs");
+                int index = 0;
+                foreach (IntPtr platform in platforms)
                 {
-                    string name = OpenClNative.DeviceString(device, OpenClNative.DeviceName);
-                    string version = OpenClNative.DeviceString(device, OpenClNative.DeviceVersion);
-                    bool isCpu = (OpenClNative.DeviceUlong(device, OpenClNative.DeviceType) & OpenClNative.DeviceTypeCpu) != 0;
-                    devices.Add((platform, device, new GpuDeviceInfo(BackendName, index, name, $"{platformName}, {version}", isCpu)));
-                    index++;
-                }
-            }
+                    string platformName = OpenClNative.PlatformString(platform, OpenClNative.PlatformName);
+                    int drc = OpenClNative.clGetDeviceIDs(platform, OpenClNative.DeviceTypeAll, 0, null, out uint deviceCount);
+                    if (drc != OpenClNative.Success || deviceCount == 0)
+                    {
+                        continue; // a platform with no devices is not an error
+                    }
 
-            reason = devices.Count == 0 ? "no OpenCL devices" : string.Empty;
-            return devices.Count > 0;
+                    IntPtr[] ids = new IntPtr[deviceCount];
+                    OpenClNative.Check(OpenClNative.clGetDeviceIDs(platform, OpenClNative.DeviceTypeAll, deviceCount, ids, out _), "clGetDeviceIDs");
+                    foreach (IntPtr device in ids)
+                    {
+                        string name = OpenClNative.DeviceString(device, OpenClNative.DeviceName);
+                        string version = OpenClNative.DeviceString(device, OpenClNative.DeviceVersion);
+                        bool isCpu = (OpenClNative.DeviceUlong(device, OpenClNative.DeviceType) & OpenClNative.DeviceTypeCpu) != 0;
+                        devices.Add((platform, device, new GpuDeviceInfo(BackendName, index, name, $"{platformName}, {version}", isCpu)));
+                        index++;
+                    }
+                }
+
+                reason = devices.Count == 0 ? "no OpenCL devices" : string.Empty;
+                return devices.Count > 0;
+            }
         }
         catch (DllNotFoundException)
         {
@@ -205,27 +210,33 @@ internal sealed class OpenClDevice : IGpuDevice
         IsCpuDevice = info.IsCpuDevice;
         _deviceMaxWorkGroupSize = OpenClNative.DeviceSize(device, OpenClNative.DeviceMaxWorkGroupSize);
         IntPtr[] devices = { device };
-        _context = OpenClNative.clCreateContext(IntPtr.Zero, 1, devices, IntPtr.Zero, IntPtr.Zero, out int error);
-        OpenClNative.Check(error, "clCreateContext");
-        try
-        {
-            _queue = OpenClNative.clCreateCommandQueue(_context, device, 0, out error);
-            OpenClNative.Check(error, "clCreateCommandQueue");
-            _program = Build(source);
-        }
-        catch
-        {
-            // Release whatever was already acquired before rethrowing, so a failure partway
-            // through construction (e.g. clCreateCommandQueue, or a clBuildProgram failure inside
-            // Build) doesn't leak a context+queue pair: the object is never fully constructed, so
-            // Dispose() is never reachable for it.
-            if (_queue != IntPtr.Zero)
-            {
-                _ = OpenClNative.clReleaseCommandQueue(_queue);
-            }
 
-            _ = OpenClNative.clReleaseContext(_context);
-            throw;
+        // See OpenClNative.SetupLock: context creation and program build are serialized against
+        // every other device's setup for the same reason enumeration is.
+        lock (OpenClNative.SetupLock)
+        {
+            _context = OpenClNative.clCreateContext(IntPtr.Zero, 1, devices, IntPtr.Zero, IntPtr.Zero, out int error);
+            OpenClNative.Check(error, "clCreateContext");
+            try
+            {
+                _queue = OpenClNative.clCreateCommandQueue(_context, device, 0, out error);
+                OpenClNative.Check(error, "clCreateCommandQueue");
+                _program = Build(source);
+            }
+            catch
+            {
+                // Release whatever was already acquired before rethrowing, so a failure partway
+                // through construction (e.g. clCreateCommandQueue, or a clBuildProgram failure inside
+                // Build) doesn't leak a context+queue pair: the object is never fully constructed, so
+                // Dispose() is never reachable for it.
+                if (_queue != IntPtr.Zero)
+                {
+                    _ = OpenClNative.clReleaseCommandQueue(_queue);
+                }
+
+                _ = OpenClNative.clReleaseContext(_context);
+                throw;
+            }
         }
     }
 

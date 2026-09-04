@@ -21,6 +21,18 @@ internal static class OpenClNative
     internal const uint KernelWorkGroupSize = 0x11B0;
     internal const ulong DeviceTypeCpu = 1UL << 1;
 
+    /// <summary>
+    /// Guards the multi-call setup sequences (platform/device enumeration, context creation,
+    /// program build) against concurrent invocation from independent host threads. The OpenCL
+    /// spec permits this, but it is not guaranteed by every ICD: pocl's platform/device
+    /// enumeration was observed to transiently report zero devices when multiple .NET threads
+    /// called into it at the same time (surfaced by xUnit's default cross-class test
+    /// parallelism opening several independent OpenCL devices concurrently). Steady-state
+    /// per-device operations (buffer copies, kernel launches) are not covered here: each device
+    /// under test owns its own context/queue and is not shared across threads.
+    /// </summary>
+    internal static readonly object SetupLock = new();
+
     static OpenClNative()
     {
         NativeLibraries.EnsureResolverInstalled();
