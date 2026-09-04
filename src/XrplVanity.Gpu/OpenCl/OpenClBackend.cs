@@ -312,11 +312,17 @@ internal sealed class OpenClDevice : IGpuDevice
 
     public IGpuKernel GetKernel(string name)
     {
-        IntPtr kernel = OpenClNative.clCreateKernel(_program, name, out int error);
-        OpenClNative.Check(error, $"clCreateKernel({name})");
-        _kernels.Add(kernel);
-        nuint maxWorkGroupSize = OpenClNative.KernelMaxWorkGroupSize(kernel, _device);
-        return new OpenClKernel(kernel, maxWorkGroupSize);
+        // See OpenClNative.SetupLock: pocl caches compiled-kernel dlhandle entries by refcount
+        // across contexts, so clCreateKernel must be serialized against every other device's
+        // setup/teardown the same way context creation and program build are.
+        lock (OpenClNative.SetupLock)
+        {
+            IntPtr kernel = OpenClNative.clCreateKernel(_program, name, out int error);
+            OpenClNative.Check(error, $"clCreateKernel({name})");
+            _kernels.Add(kernel);
+            nuint maxWorkGroupSize = OpenClNative.KernelMaxWorkGroupSize(kernel, _device);
+            return new OpenClKernel(kernel, maxWorkGroupSize);
+        }
     }
 
     public IGpuBuffer Alloc(long bytes)
@@ -380,13 +386,22 @@ internal sealed class OpenClDevice : IGpuDevice
         }
 
         _disposed = true;
-        foreach (IntPtr kernel in _kernels)
-        {
-            _ = OpenClNative.clReleaseKernel(kernel);
-        }
 
-        _ = OpenClNative.clReleaseProgram(_program);
-        _ = OpenClNative.clReleaseCommandQueue(_queue);
-        _ = OpenClNative.clReleaseContext(_context);
+        // See OpenClNative.SetupLock: pocl's dlhandle cache for compiled kernels is shared across
+        // contexts and reference-counted; releasing kernels/program/queue/context from this
+        // device concurrently with another device's setup or teardown was observed to trip
+        // pocl's internal "found->ref_count > 0" assertion. Serialize teardown the same way
+        // setup already is.
+        lock (OpenClNative.SetupLock)
+        {
+            foreach (IntPtr kernel in _kernels)
+            {
+                _ = OpenClNative.clReleaseKernel(kernel);
+            }
+
+            _ = OpenClNative.clReleaseProgram(_program);
+            _ = OpenClNative.clReleaseCommandQueue(_queue);
+            _ = OpenClNative.clReleaseContext(_context);
+        }
     }
 }
