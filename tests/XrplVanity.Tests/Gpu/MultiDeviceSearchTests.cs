@@ -10,6 +10,7 @@ using Xunit;
 
 namespace XrplVanity.Tests.Gpu;
 
+[Collection(XrplVanity.Tests.CpuBoundCollection.Name)]
 public sealed class MultiDeviceSearchTests
 {
     private static PatternSet FrequentPattern() =>

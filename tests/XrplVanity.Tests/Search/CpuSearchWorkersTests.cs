@@ -6,6 +6,7 @@ using Xunit;
 
 namespace XrplVanity.Tests.Search;
 
+[Collection(XrplVanity.Tests.CpuBoundCollection.Name)]
 public class CpuSearchWorkersTests
 {
     // One character matches 1 in 58 candidates: a few milliseconds of CPU work.
