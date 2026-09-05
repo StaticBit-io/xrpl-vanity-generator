@@ -310,22 +310,45 @@ public sealed class MultiDeviceSearchTests
         // Warm-up: wait for the second launch to finish so timing excludes device open.
         Assert.True(Wait(Candidates, GpuSearchEngine.CandidatesPerLaunch, TimeSpan.FromSeconds(120)) > GpuSearchEngine.CandidatesPerLaunch, "device did not start");
 
+        // Time ONE full launch to learn how slow this device is. A real GPU finishes a
+        // 2^20-candidate launch in well under a second; a CPU-side OpenCL implementation such as
+        // pocl (the only OpenCL backend available inside the Linux harness container) can take
+        // 18-25s. The fixed 120s deadlines below are scaled from this measurement instead of
+        // assuming a fast device, and the duty-cadence window/expectation is chosen accordingly.
+        long beforeLaunch = Candidates();
+        Stopwatch launchTimer = Stopwatch.StartNew();
+        Wait(Candidates, beforeLaunch + GpuSearchEngine.CandidatesPerLaunch - 1, TimeSpan.FromSeconds(120));
+        launchTimer.Stop();
+        TimeSpan launch = launchTimer.Elapsed;
+
+        TimeSpan deadline = TimeSpan.FromSeconds(Math.Max(120, 10 * launch.TotalSeconds));
+        bool slowDevice = launch > TimeSpan.FromSeconds(2);
+        int launchesPerWindow = slowDevice ? 2 : 4;
+        int dutyPercent = slowDevice ? 50 : 25;
+        double expectedRatio = slowDevice ? 1.5 : 4.0;
+        double minRatio = slowDevice ? 1.3 : 2.0;
+        double maxRatio = slowDevice ? 2.5 : 8.0;
+
         long start = Candidates();
         Stopwatch full = Stopwatch.StartNew();
-        Wait(Candidates, start + 4L * GpuSearchEngine.CandidatesPerLaunch - 1, TimeSpan.FromSeconds(120));
+        Wait(Candidates, start + (long)launchesPerWindow * GpuSearchEngine.CandidatesPerLaunch - 1, deadline);
         full.Stop();
 
-        search.DutyPercent = 25;
-        long afterSet = Wait(Candidates, Candidates(), TimeSpan.FromSeconds(120)); // let the current launch drain
-        Stopwatch quarter = Stopwatch.StartNew();
-        Wait(Candidates, afterSet + 4L * GpuSearchEngine.CandidatesPerLaunch - 1, TimeSpan.FromSeconds(120));
-        quarter.Stop();
+        search.DutyPercent = dutyPercent;
+        long afterSet = Wait(Candidates, Candidates(), deadline); // let the current launch drain
+        Stopwatch reduced = Stopwatch.StartNew();
+        Wait(Candidates, afterSet + (long)launchesPerWindow * GpuSearchEngine.CandidatesPerLaunch - 1, deadline);
+        reduced.Stop();
 
         cts.Cancel();
         Assert.True(runner.Join(TimeSpan.FromSeconds(120)), "worker did not stop");
 
-        double ratio = quarter.Elapsed.TotalMilliseconds / Math.Max(full.Elapsed.TotalMilliseconds, 1);
-        Assert.True(ratio >= 2.0 && ratio <= 8.0, $"full {full.ElapsedMilliseconds} ms, at 25% {quarter.ElapsedMilliseconds} ms, ratio {ratio:F2} (expected about 4x)");
+        double ratio = reduced.Elapsed.TotalMilliseconds / Math.Max(full.Elapsed.TotalMilliseconds, 1);
+        string branch = slowDevice
+            ? $"slow device ({backend}, 2 launches/window, 50% duty)"
+            : $"fast device ({backend}, 4 launches/window, 25% duty)";
+        Assert.True(ratio >= minRatio && ratio <= maxRatio,
+            $"{branch}, single launch {launch.TotalSeconds:F2}s: full {full.ElapsedMilliseconds} ms, at {dutyPercent}% duty {reduced.ElapsedMilliseconds} ms, ratio {ratio:F2} (expected about {expectedRatio}x)");
     }
 
     [Fact]
