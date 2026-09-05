@@ -22,7 +22,8 @@ visual language of the StaticBit Wallet (`SB.MobileApp`). Facts that shape this 
 - The Wallet is a .NET MAUI Blazor Hybrid application (`Microsoft.Maui.Controls` and
   `Microsoft.AspNetCore.Components.WebView.Maui` 10.0.51, SDK 10.0.201). Its visual layer is
   HTML/SCSS on Bootstrap 5; the palette is a dark-only token set in
-  `wwwroot/scss/common/var-colors.scss`; the font is Open Sans; the Windows build is a
+  `wwwroot/scss/common/var-colors.scss`; the web font is Inter (Bootstrap
+  `$font-family-sans-serif`), with Cascadia Code / Consolas for monospace; the Windows build is a
   packaged MSIX (`Properties/PublishProfiles/MSIX-win-x86.pubxml`, development
   certificate `CN=User Name`, sideloaded).
 - The Wallet's reusable Blazor components (`SB.WalletApp.UI.Blazor.Components`) live in a
@@ -308,8 +309,11 @@ custom properties so components and inline styles share them:
 | `--yellow` | `#D3E7AB` | warnings (unreachable patterns, no GPU) |
 | `--secondary-dark` | `#202222` | secondary buttons |
 
-Typography: Open Sans (the TTF ships in `wwwroot/fonts` with an `@font-face`; the MAUI
-side also registers it as in the Wallet's `ConfigureFonts`). Bootstrap 5 CSS is vendored
+Typography: Inter for text (the Wallet's Bootstrap `$font-family-sans-serif`; the Wallet
+loads it from Google Fonts, the application ships the woff2 files in `wwwroot/fonts` with
+an `@font-face` so it works offline) and Cascadia Code, falling back to Consolas, for
+addresses and seeds (the Wallet's monospace choice in `core.scss`). Open Sans is only the
+Wallet's MAUI-side font and is not used. Bootstrap 5 CSS is vendored
 under `wwwroot/lib/bootstrap/` as the Wallet does; SCSS is compiled at build time by the
 `DartSassBuilder` package, and compiled CSS is not committed.
 
