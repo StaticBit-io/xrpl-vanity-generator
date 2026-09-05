@@ -4,3 +4,6 @@ obj/
 .vs/
 *.seed
 matches*.txt
+
+# Search output files hold seeds (secrets): never commit them.
+*.tsv
