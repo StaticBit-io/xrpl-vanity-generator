@@ -9,12 +9,21 @@ namespace XrplVanity.Gpu;
 
 public sealed record DeviceSelector(string Backend, int Index)
 {
-    public override string ToString() => $"{Backend}:{Index}";
+    /// <summary>
+    /// "The first usable device in backend preference order" (the CLI's <c>--gpu</c>). Resolved
+    /// by <see cref="MultiDeviceSearch"/> when the worker opens the device; the stats entry then
+    /// carries the concrete selector.
+    /// </summary>
+    public static DeviceSelector FirstAvailable { get; } = new("gpu", -1);
+
+    public bool IsFirstAvailable => Index < 0;
+
+    public override string ToString() => IsFirstAvailable ? "gpu" : $"{Backend}:{Index}";
 }
 
 public sealed class DeviceSearchStats
 {
-    public DeviceSelector Selector { get; init; } = null!;
+    public DeviceSelector Selector { get; internal set; } = null!;
     public string? DeviceName { get; internal set; }
     public long CandidatesSearched { get; internal set; }
     public long ConsistencyErrors { get; internal set; }
@@ -52,7 +61,7 @@ public sealed class MultiDeviceSearch
     private readonly PatternSet _patterns;
     private readonly Func<Match, bool> _report;
     private readonly Action<string> _log;
-    private readonly int _dutyPercent;
+    private int _dutyPercent;
 
     public MultiDeviceSearch(IReadOnlyList<DeviceSelector> devices, PatternSet patterns, Func<Match, bool> report, Action<string>? log = null, int dutyPercent = DutyCycle.Full)
         : this(GpuBackends.All, devices, patterns, report, log, dutyPercent)
@@ -99,6 +108,24 @@ public sealed class MultiDeviceSearch
     /// same instances in <see cref="MultiDeviceSearchResult.Devices"/>.
     /// </summary>
     public IReadOnlyList<DeviceSearchStats> Devices { get; }
+
+    /// <summary>
+    /// Duty cycle applied by every worker at its next pause (1–100). Set from any thread while
+    /// <see cref="Run"/> is in progress.
+    /// </summary>
+    public int DutyPercent
+    {
+        get => Volatile.Read(ref _dutyPercent);
+        set
+        {
+            if (value < 1 || value > DutyCycle.Full)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "The duty cycle must be a whole number from 1 to 100.");
+            }
+
+            Volatile.Write(ref _dutyPercent, value);
+        }
+    }
 
     public MultiDeviceSearchResult Run(CancellationToken cancellationToken)
     {
@@ -174,10 +201,26 @@ public sealed class MultiDeviceSearch
         }
     }
 
+    private bool TryOpenFirstAvailable(DeviceSearchStats stats, out IGpuDevice? device, out string reason)
+    {
+        if (!GpuBackends.TryOpenFirst(_backends, out device, out DeviceSelector? resolved, out reason))
+        {
+            return false;
+        }
+
+        stats.Selector = resolved!;
+        return true;
+    }
+
     private void RunDevice(DeviceSearchStats stats, CancellationTokenSource stop)
     {
         Stopwatch open = Stopwatch.StartNew();
-        if (!GpuBackends.TryOpen(_backends, stats.Selector.Backend, stats.Selector.Index, out IGpuDevice? device, out string reason))
+        IGpuDevice? device;
+        string reason;
+        bool opened = stats.Selector.IsFirstAvailable
+            ? TryOpenFirstAvailable(stats, out device, out reason)
+            : GpuBackends.TryOpen(_backends, stats.Selector.Backend, stats.Selector.Index, out device, out reason);
+        if (!opened)
         {
             stats.Failure = reason;
             TryLog(stats, stop, $"warning: {stats.Selector} could not be opened: {reason}");
@@ -235,7 +278,7 @@ public sealed class MultiDeviceSearch
                         reportedErrors = engine.ConsistencyErrors;
                     }
 
-                    DutyCycle.Pause(launch.Elapsed, _dutyPercent, stop.Token);
+                    DutyCycle.Pause(launch.Elapsed, DutyPercent, stop.Token);
                 }
             }
             finally

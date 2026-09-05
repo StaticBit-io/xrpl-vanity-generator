@@ -104,4 +104,63 @@ public class GpuBackendsTests
         Assert.True(ok, $"OpenCL device 0 must still open after a failed build: {reason}");
         reopened!.Dispose();
     }
+
+    /// <summary>Backend whose <see cref="Open"/> succeeds and hands back a no-op device, unlike
+    /// <see cref="ThrowingBackend"/> above (which always fails) — needed to exercise the "opened
+    /// successfully" path of <see cref="GpuBackends.TryOpenFirst(IReadOnlyList{IGpuBackend}, out IGpuDevice?, out DeviceSelector?, out string)"/>.</summary>
+    private sealed class FakeBackend : IGpuBackend
+    {
+        private readonly int _deviceCount;
+
+        public FakeBackend(string name, int deviceCount)
+        {
+            Name = name;
+            _deviceCount = deviceCount;
+        }
+
+        public string Name { get; }
+
+        public IReadOnlyList<GpuDeviceInfo> EnumerateDevices()
+        {
+            GpuDeviceInfo[] list = new GpuDeviceInfo[_deviceCount];
+            for (int i = 0; i < _deviceCount; i++)
+            {
+                list[i] = new GpuDeviceInfo(Name, i, $"{Name} device {i}", "fake");
+            }
+
+            return list;
+        }
+
+        public IGpuDevice Open(int index) => new FakeGpuDevice(Name);
+    }
+
+    private sealed class FakeGpuDevice : IGpuDevice
+    {
+        public FakeGpuDevice(string backend)
+        {
+            Backend = backend;
+            Name = $"{backend} fake device";
+        }
+
+        public string Backend { get; }
+        public string Name { get; }
+        public bool IsCpuDevice => false;
+        public IGpuKernel GetKernel(string name) => throw new NotSupportedException();
+        public IGpuBuffer Alloc(long bytes) => throw new NotSupportedException();
+        public void Launch(IGpuKernel kernel, int threads, int blockSize, params object[] args) => throw new NotSupportedException();
+        public void Synchronize() { }
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public void TryOpenFirst_Reports_The_Selector_Of_The_Device_It_Opened()
+    {
+        IGpuBackend[] backends = { new FakeBackend("cuda", deviceCount: 0), new FakeBackend("opencl", deviceCount: 2) };
+
+        bool opened = GpuBackends.TryOpenFirst(backends, out IGpuDevice? device, out DeviceSelector? selector, out string reason);
+
+        Assert.True(opened, reason);
+        Assert.Equal(new DeviceSelector("opencl", 0), selector);
+        device!.Dispose();
+    }
 }

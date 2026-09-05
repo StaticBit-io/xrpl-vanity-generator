@@ -19,7 +19,16 @@ public static class GpuBackends
     /// Testable core of <see cref="TryOpenFirst(out IGpuDevice?, out string)"/>: takes the backend
     /// list as a parameter so tests can substitute a fake backend that fails deterministically.
     /// </summary>
-    internal static bool TryOpenFirst(IReadOnlyList<IGpuBackend> backends, out IGpuDevice? device, out string reason)
+    internal static bool TryOpenFirst(IReadOnlyList<IGpuBackend> backends, out IGpuDevice? device, out string reason) =>
+        TryOpenFirst(backends, out device, out _, out reason);
+
+    /// <summary>
+    /// Same as <see cref="TryOpenFirst(IReadOnlyList{IGpuBackend}, out IGpuDevice?, out string)"/>
+    /// but also reports the concrete <see cref="DeviceSelector"/> of the device it opened, for
+    /// callers (namely <see cref="MultiDeviceSearch"/> resolving <see cref="DeviceSelector.FirstAvailable"/>)
+    /// that need to know which backend/index was actually picked.
+    /// </summary>
+    internal static bool TryOpenFirst(IReadOnlyList<IGpuBackend> backends, out IGpuDevice? device, out DeviceSelector? selector, out string reason)
     {
         List<string> reasons = new();
         foreach (IGpuBackend backend in backends)
@@ -29,6 +38,7 @@ public static class GpuBackends
                 try
                 {
                     device = backend.Open(0);
+                    selector = new DeviceSelector(backend.Name, 0);
                     reason = string.Empty;
                     return true;
                 }
@@ -44,6 +54,7 @@ public static class GpuBackends
         }
 
         device = null;
+        selector = null;
         reason = string.Join("; ", reasons);
         return false;
     }

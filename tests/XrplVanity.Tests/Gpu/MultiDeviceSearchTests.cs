@@ -264,4 +264,89 @@ public sealed class MultiDeviceSearchTests
         Assert.Same(search.Devices[0], result.Devices[0]);
         Assert.Same(search.Devices[1], result.Devices[1]);
     }
+
+    [Fact]
+    public void FirstAvailable_Sentinel_Is_Distinct_And_Prints_As_Gpu()
+    {
+        Assert.True(DeviceSelector.FirstAvailable.IsFirstAvailable);
+        Assert.False(new DeviceSelector("cuda", 0).IsFirstAvailable);
+        Assert.Equal("gpu", DeviceSelector.FirstAvailable.ToString());
+    }
+
+    [Fact]
+    public void Duty_Percent_Rejects_Values_Outside_1_To_100()
+    {
+        MultiDeviceSearch search = new(new[] { new DeviceSelector("cuda", 0) }, FrequentPattern(), _ => true);
+        Assert.Equal(DutyCycle.Full, search.DutyPercent);
+        Assert.Throws<ArgumentOutOfRangeException>(() => search.DutyPercent = 0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => search.DutyPercent = 101);
+        search.DutyPercent = 50;
+        Assert.Equal(50, search.DutyPercent);
+    }
+
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Lowering_Duty_Mid_Run_Slows_The_Launch_Cadence(string backend)
+    {
+        RequireSelector(new DeviceSelector(backend, 0));
+        // Never matches, so launches are uniform and no report callback fires.
+        PatternSet never = new PatternSet.Builder().Add(MatchPosition.Starts, "zzzzzzzz", ignoreCase: false).Build();
+        MultiDeviceSearch search = new(new[] { new DeviceSelector(backend, 0) }, never, _ => true);
+        DeviceSearchStats stats = search.Devices[0];
+        using CancellationTokenSource cts = new();
+
+        Thread runner = new(() => search.Run(cts.Token)) { IsBackground = true };
+        runner.Start();
+
+        long Candidates() => stats.CandidatesSearched;   // a torn read of a long is not a concern on x64 (documented on Devices)
+        static long Wait(Func<long> read, long above, TimeSpan deadline)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            while (read() <= above && sw.Elapsed < deadline) Thread.Sleep(20);
+            return read();
+        }
+
+        // Warm-up: wait for the second launch to finish so timing excludes device open.
+        Assert.True(Wait(Candidates, GpuSearchEngine.CandidatesPerLaunch, TimeSpan.FromSeconds(120)) > GpuSearchEngine.CandidatesPerLaunch, "device did not start");
+
+        long start = Candidates();
+        Stopwatch full = Stopwatch.StartNew();
+        Wait(Candidates, start + 4L * GpuSearchEngine.CandidatesPerLaunch - 1, TimeSpan.FromSeconds(120));
+        full.Stop();
+
+        search.DutyPercent = 25;
+        long afterSet = Wait(Candidates, Candidates(), TimeSpan.FromSeconds(120)); // let the current launch drain
+        Stopwatch quarter = Stopwatch.StartNew();
+        Wait(Candidates, afterSet + 4L * GpuSearchEngine.CandidatesPerLaunch - 1, TimeSpan.FromSeconds(120));
+        quarter.Stop();
+
+        cts.Cancel();
+        Assert.True(runner.Join(TimeSpan.FromSeconds(120)), "worker did not stop");
+
+        double ratio = quarter.Elapsed.TotalMilliseconds / Math.Max(full.Elapsed.TotalMilliseconds, 1);
+        Assert.True(ratio >= 2.0 && ratio <= 8.0, $"full {full.ElapsedMilliseconds} ms, at 25% {quarter.ElapsedMilliseconds} ms, ratio {ratio:F2} (expected about 4x)");
+    }
+
+    [Fact]
+    public void FirstAvailable_Resolves_To_A_Concrete_Selector_Or_Fails_Cleanly()
+    {
+        bool anyDevice = GpuBackends.All.Any(b => b.EnumerateDevices().Count > 0);
+        MultiDeviceSearch search = new(new[] { DeviceSelector.FirstAvailable }, FrequentPattern(), _ => false);
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(120));
+
+        MultiDeviceSearchResult result = search.Run(cts.Token);
+
+        DeviceSearchStats stats = result.Devices[0];
+        if (anyDevice)
+        {
+            Assert.True(stats.Opened, stats.Failure);
+            Assert.False(stats.Selector.IsFirstAvailable);
+            Assert.Contains(stats.Selector.Backend, new[] { "cuda", "opencl" });
+        }
+        else
+        {
+            Assert.False(stats.Opened);
+            Assert.NotNull(stats.Failure);
+        }
+    }
 }
