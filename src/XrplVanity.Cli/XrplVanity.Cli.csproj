@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\XrplVanity.Core\XrplVanity.Core.csproj" />
     <ProjectReference Include="..\XrplVanity.Gpu\XrplVanity.Gpu.csproj" />
+    <ProjectReference Include="..\XrplVanity.Search\XrplVanity.Search.csproj" />
   </ItemGroup>
 
   <ItemGroup>

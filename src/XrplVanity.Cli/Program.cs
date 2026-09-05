@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using XrplVanity.Core;
 using XrplVanity.Gpu;
+using XrplVanity.Search;
 
 namespace XrplVanity.Cli;
 
@@ -320,7 +321,8 @@ public static class Program
             "WARNING: a seed is a secret. Anyone who holds it controls the account. " +
             "Keep matches offline and verify this tool before using generated keys for real funds.");
 
-        using MatchSink sink = new(options.Count, options.OutFile, Console.Out);
+        using CliMatchWriter writer = new(options.OutFile, Console.Out);
+        MatchSink sink = new(options.Count, writer.Write);
         using CancellationTokenSource cts = new();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 

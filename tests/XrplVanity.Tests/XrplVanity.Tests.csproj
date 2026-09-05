@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\src\XrplVanity.Core\XrplVanity.Core.csproj" />
     <ProjectReference Include="..\..\src\XrplVanity.Cli\XrplVanity.Cli.csproj" />
     <ProjectReference Include="..\..\src\XrplVanity.Gpu\XrplVanity.Gpu.csproj" />
+    <ProjectReference Include="..\..\src\XrplVanity.Search\XrplVanity.Search.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
