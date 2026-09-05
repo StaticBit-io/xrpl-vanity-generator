@@ -413,11 +413,32 @@ public static class Program
         SearchSummary summary = session.Completion.GetAwaiter().GetResult();
 
         RenderSummary(summary, multi, stderr);
+        return ExitCodeFor(summary, multi, stderr);
+    }
 
+    /// <summary>
+    /// Maps a completed session's outcome to the process exit code, writing the matching error
+    /// line to <paramref name="stderr"/> when the run did not succeed. Two failure shapes are
+    /// distinguished: no target ever opened (<see cref="SessionOutcome.AllTargetsFailed"/> — the
+    /// pre-existing "no usable device" message), and every target opened but then died mid-run
+    /// (outcome is <see cref="SessionOutcome.Cancelled"/> because it did open, yet every target's
+    /// final <see cref="TargetState"/> is <see cref="TargetState.Failed"/> — reported as a GPU
+    /// search failure, not indistinguishable from a user Ctrl+C).
+    /// </summary>
+    internal static int ExitCodeFor(SearchSummary summary, bool multi, TextWriter stderr)
+    {
         if (summary.Outcome == SessionOutcome.AllTargetsFailed)
         {
             string failure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no device could be opened";
             stderr.WriteLine(multi ? "error: --gpu-devices: no device could be opened." : $"error: --gpu requested but no usable device: {failure}");
+            return 2;
+        }
+
+        if (summary.Outcome != SessionOutcome.CountReached && summary.Final.Targets.Count > 0
+            && summary.Final.Targets.All(t => t.State == TargetState.Failed))
+        {
+            string failure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "device lost";
+            stderr.WriteLine($"error: GPU search failed: {failure}");
             return 2;
         }
 
@@ -426,7 +447,7 @@ public static class Program
         return summary.Outcome == SessionOutcome.CountReached ? 0 : 130;
     }
 
-    private static void RenderSummary(SearchSummary summary, bool multi, TextWriter stderr)
+    internal static void RenderSummary(SearchSummary summary, bool multi, TextWriter stderr)
     {
         SearchProgress final = summary.Final;
         double seconds = Math.Max(final.Elapsed.TotalSeconds, 1e-9);
@@ -451,7 +472,8 @@ public static class Program
                 return;   // the caller prints the error line
             }
 
-            stderr.WriteLine($"GPU: searched {d.Candidates:N0} candidates in {seconds:F1} s ({d.Candidates / seconds:N0}/s).");
+            string tail = d.Failure is null || d.Candidates == 0 ? string.Empty : $" (stopped: {d.Failure})";
+            stderr.WriteLine($"GPU: searched {d.Candidates:N0} candidates in {seconds:F1} s ({d.Candidates / seconds:N0}/s).{tail}");
             return;
         }
 

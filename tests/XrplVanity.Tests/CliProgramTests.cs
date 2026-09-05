@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using XrplVanity.Cli;
+using XrplVanity.Search;
 using Xunit;
 
 namespace XrplVanity.Tests;
@@ -75,5 +78,77 @@ public class CliProgramTests
         {
             File.Delete(path);
         }
+    }
+
+    // -- ExitCodeFor: a device that fails mid-run must not read as a clean Ctrl+C exit ----------
+
+    private static TargetProgress DeviceTarget(TargetState state, long candidates, string? failure) =>
+        new("cuda:0", "Test Device", state, candidates, 0, failure);
+
+    private static SearchSummary SummaryWith(SessionOutcome outcome, params TargetProgress[] targets)
+    {
+        SearchProgress final = new(TimeSpan.FromSeconds(1), 0, 0, 0, targets);
+        return new SearchSummary(outcome, final);
+    }
+
+    [Fact]
+    public void ExitCodeFor_Device_Failed_MidRun_Writes_Gpu_Search_Failed_And_Returns_2()
+    {
+        StringWriter stderr = new();
+        SearchSummary summary = SummaryWith(SessionOutcome.Cancelled, DeviceTarget(TargetState.Failed, candidates: 100, failure: "device lost"));
+
+        int rc = Program.ExitCodeFor(summary, multi: false, stderr);
+
+        Assert.Equal(2, rc);
+        Assert.Contains("error: GPU search failed: device lost", stderr.ToString());
+    }
+
+    [Fact]
+    public void ExitCodeFor_Device_Finished_Writes_No_Error_And_Returns_130()
+    {
+        StringWriter stderr = new();
+        SearchSummary summary = SummaryWith(SessionOutcome.Cancelled, DeviceTarget(TargetState.Finished, candidates: 100, failure: null));
+
+        int rc = Program.ExitCodeFor(summary, multi: false, stderr);
+
+        Assert.Equal(130, rc);
+        Assert.Equal(string.Empty, stderr.ToString());
+    }
+
+    [Fact]
+    public void ExitCodeFor_CountReached_Returns_0()
+    {
+        StringWriter stderr = new();
+        SearchSummary summary = SummaryWith(SessionOutcome.CountReached, DeviceTarget(TargetState.Finished, candidates: 1, failure: null));
+
+        int rc = Program.ExitCodeFor(summary, multi: false, stderr);
+
+        Assert.Equal(0, rc);
+        Assert.Equal(string.Empty, stderr.ToString());
+    }
+
+    [Fact]
+    public void ExitCodeFor_AllTargetsFailed_Single_Writes_The_Existing_No_Usable_Device_Message()
+    {
+        StringWriter stderr = new();
+        SearchSummary summary = SummaryWith(SessionOutcome.AllTargetsFailed, DeviceTarget(TargetState.Failed, candidates: 0, failure: "driver not found"));
+
+        int rc = Program.ExitCodeFor(summary, multi: false, stderr);
+
+        Assert.Equal(2, rc);
+        Assert.Contains("error: --gpu requested but no usable device: driver not found", stderr.ToString());
+    }
+
+    [Fact]
+    public void RenderSummary_Single_Device_Failed_MidRun_Line_Ends_With_Stopped_Tail()
+    {
+        StringWriter stderr = new();
+        SearchSummary summary = SummaryWith(SessionOutcome.Cancelled, DeviceTarget(TargetState.Failed, candidates: 100, failure: "device lost"));
+
+        Program.RenderSummary(summary, multi: false, stderr);
+
+        string[] lines = stderr.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Single(lines);
+        Assert.EndsWith("(stopped: device lost)", lines[0].TrimEnd());
     }
 }
