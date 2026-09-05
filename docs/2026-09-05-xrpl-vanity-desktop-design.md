@@ -199,6 +199,26 @@ is its reciprocal.
 - `SearchRunner.BuildPatternSet` stays in the CLI (it reads CLI options and `--list`
   files). `MatchSink` moves to `XrplVanity.Search` with its namespace.
 
+### Measured (Plan F)
+
+- Windows suite: 240 tests, 0 skipped, 45.817 s (commit 3e53441).
+- Linux harness: gpu mode 1419.174 s (240 tests, 0 failed, 0 skipped), cpu-only mode
+  925.205 s (240 tests, 0 failed, 64 skipped — the CUDA-gated tests, expected in this
+  mode). Both grew from the Plan D figures (273 s / 207 s for 150 tests) because Plan F
+  put the CPU-saturating and timing-sensitive test classes (`DutyCycleTests`,
+  `MultiDeviceSearchTests`, `CpuSearchWorkersTests`, `SearchSessionTests`,
+  `CliProgramTests`) into one xUnit collection with `DisableParallelization = true`; on
+  pocl a single 2^20 launch takes about 18–25 s, so those classes now run one at a time.
+- `--backend cuda --case-sensitive --starts abcd --count 30` through `SearchSession`:
+  18,547,083/s and 18,269,885/s (two runs, average 18,408,484/s), versus 19,400,000/s
+  recorded in `docs/benchmarks.md` for the previous loop — the session adds ≈5%
+  overhead (both runs land 4–6% below the earlier figure, consistent enough not to
+  read as pure run-to-run noise).
+- CPU rate line, 12 threads, `--case-sensitive --starts abc --count 60`: 118,885/s and
+  111,576/s (the first measured CPU rate, now that the CPU target counts candidates
+  directly; `docs/benchmarks.md` had estimated 250,000–310,000/s from wall-clock timing
+  alone, well above what direct measurement shows).
+
 ## Plan G — the desktop application
 
 ### Projects

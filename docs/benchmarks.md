@@ -63,9 +63,12 @@ Windows, 12 worker threads (the default), commit 8b66560.
 | `nhartner/xrp-vanity-address` (Java, GraalVM native image) | ~39,000/s | measured 2026-09-02, recorded in `2026-09-03-xrpl-vanity-design.md` |
 | .NET prototype (throwaway spike) | ~138,000/s | same document |
 | `xrpl-vanity --case-sensitive --starts abc --count 60` | ≈250,000–310,000/s (estimated; two runs: 259,000/s and 306,000/s) | this page |
+| `xrpl-vanity --case-sensitive --starts abc --count 60` (CPU: line) | 118,885/s and 111,576/s (measured from the `CPU: searched … (R/s)` line, Plan F) | this page (Plan F) |
 
 The shipped CLI is faster than the spike because it uses span-based, allocation-free
 derivation and per-thread derivers; the estimate's spread is statistical, not thermal.
+The Plan F row is a direct measurement, not an estimate, now that the CPU path counts
+candidates itself — it comes in well below the earlier wall-clock estimate above it.
 
 ## Single GPU device
 
@@ -106,14 +109,19 @@ Measured inside the Docker container (commit 045da70 unless noted).
 | pocl CPU device, CLI `--backend opencl` | 58,115/s | same document |
 | CUDA through passthrough, kernel benchmark test | 19,079,033/s | same document |
 | CUDA through passthrough, CLI single launch (`--count 2`) | 2,555,684/s (one launch of 2^20 candidates; start-up dominated) | `2026-09-04-xrpl-vanity-multigpu-design.md` |
-| Test suite wall time, GPU mode (`cuda,opencl` required, 0 skipped) | 273 s (150 tests, Plan D) | `2026-09-03-xrpl-vanity-linux-design.md` |
-| Test suite wall time, CPU-only mode (pocl only) | 207 s (150 tests, Plan D) | same document |
-| Test suite wall time, Windows | ~25 s (165 tests) | this page |
+| Test suite wall time, GPU mode (`cuda,opencl` required, 0 skipped) | 1419.174 s (240 tests, Plan F) | this page (Plan F) |
+| Test suite wall time, CPU-only mode (pocl only) | 925.205 s (240 tests, 64 skipped — CUDA-gated, Plan F) | this page (Plan F) |
+| Test suite wall time, Windows | 45.817 s (240 tests, commit 3e53441) | this page (Plan F) |
 
 The Linux suite is slow because OpenCL device setup (enumeration, context creation,
 program build, kernel creation and teardown) is serialised process-wide; pocl crashed
 under concurrent setup from parallel test classes. The serialisation costs nothing at
-run time: the CLI opens one device per run, or one per selected device.
+run time: the CLI opens one device per run, or one per selected device. The GPU- and
+CPU-only mode times grew further under Plan F because the CPU-saturating and
+timing-sensitive test classes (`DutyCycleTests`, `MultiDeviceSearchTests`,
+`CpuSearchWorkersTests`, `SearchSessionTests`, `CliProgramTests`) now share one xUnit
+collection with `DisableParallelization = true`, and a single pocl 2^20 launch takes
+about 18–25 s, so those classes run one at a time instead of in parallel.
 
 ## Duty cycle
 
