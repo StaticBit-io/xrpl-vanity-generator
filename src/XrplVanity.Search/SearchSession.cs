@@ -41,6 +41,7 @@ public sealed class SearchSession : IDisposable
     private volatile SearchProgress _progress;
     private bool _started;
     private bool _disposed;
+    private string? _callbackFailure;
 
     public SearchSession(SearchRequest request, Action<Match> report, Action<string>? log = null)
     {
@@ -150,13 +151,19 @@ public sealed class SearchSession : IDisposable
 
         Stop();
         _disposed = true;
-        if (_started)
+        bool finished = !_started || Completion.Wait(TimeSpan.FromSeconds(30));
+        if (finished)
         {
-            Completion.Wait(TimeSpan.FromSeconds(30));
+            _stop.Dispose();
+            _tickerDone.Dispose();
         }
-
-        _stop.Dispose();
-        _tickerDone.Dispose();
+        else
+        {
+            // The worker threads are still running past the wait; disposing the primitives they
+            // are blocked on would throw ObjectDisposedException on a background thread and take
+            // the process down. Leaving them alive is a leak, not a crash.
+            SafeLog("warning: session disposed before its threads finished; resources left alive");
+        }
     }
 
     private void Coordinate()
@@ -193,7 +200,7 @@ public sealed class SearchSession : IDisposable
             _elapsed.Stop();
         }
 
-        SearchProgress final = Snapshot();
+        SearchProgress final = Snapshot(final: true);
         _progress = final;
         RaiseProgress(final);
 
@@ -277,53 +284,99 @@ public sealed class SearchSession : IDisposable
         _log(line);
     }
 
-    /// <summary>Runs inside the sink's lock: the caller's writer first, then the event.</summary>
+    /// <summary>
+    /// Runs inside the sink's lock: the caller's writer first, then the event. Both are
+    /// consumer-supplied and can throw; a throw here must not escape onto the reporting thread
+    /// (the CPU worker thread, or the device thread), which would take the whole process down.
+    /// The match stays counted by the sink either way — it was already accepted.
+    /// </summary>
     private void OnAccepted(Match match)
     {
-        _report(match);
-        MatchFound?.Invoke(match);
+        try
+        {
+            _report(match);
+            MatchFound?.Invoke(match);
+        }
+        catch (Exception ex)
+        {
+            string? failure = Volatile.Read(ref _callbackFailure);
+            if (failure is null)
+            {
+                failure = $"report callback failed: {ex.Message}";
+                Volatile.Write(ref _callbackFailure, failure);
+            }
+
+            SafeLog($"warning: {failure}");
+            Stop();
+        }
     }
 
-    private SearchProgress Snapshot()
+    /// <summary>
+    /// Builds a progress snapshot. When <paramref name="final"/> is true (only the coordinator's
+    /// last snapshot, taken once every worker thread has joined) and a report/MatchFound
+    /// callback has thrown, every target that isn't already <see cref="TargetState.Failed"/> is
+    /// forced to <see cref="TargetState.Failed"/> with that failure — intermediate ticks keep
+    /// showing each target's own state, since the callback failure only reflects the outcome of
+    /// the whole session once it has actually stopped.
+    /// </summary>
+    private SearchProgress Snapshot(bool final = false)
     {
         double seconds = _elapsed.Elapsed.TotalSeconds;
         List<TargetProgress> targets = new(_targetOrder.Count);
         long total = 0;
         double totalRate = 0;
         int deviceIndex = 0;
+        string? callbackFailure = final ? Volatile.Read(ref _callbackFailure) : null;
 
         foreach (string id in _targetOrder)
         {
+            string targetId;
+            string name;
+            TargetState state;
+            long candidates;
+            double rate;
+            string? failure;
+
             if (id == "cpu")
             {
-                long candidates = _cpu!.CandidatesSearched;
+                candidates = _cpu!.CandidatesSearched;
                 double cpuSeconds = _cpu.Elapsed.TotalSeconds;
-                double rate = cpuSeconds > 0 ? candidates / cpuSeconds : 0;
-                TargetState state = _cpuFailure is not null ? TargetState.Failed
+                rate = cpuSeconds > 0 ? candidates / cpuSeconds : 0;
+                failure = _cpuFailure;
+                state = failure is not null ? TargetState.Failed
                     : _cpuFinished ? TargetState.Finished
                     : _cpuOpening ? TargetState.Opening
                     : _started ? TargetState.Running
                     : TargetState.Pending;
-                targets.Add(new TargetProgress("cpu", $"CPU ({_cpuTarget!.Threads} threads)", state, candidates, rate, _cpuFailure));
-                total += candidates;
-                totalRate += rate;
+                targetId = "cpu";
+                name = $"CPU ({_cpuTarget!.Threads} threads)";
             }
             else
             {
                 DeviceSearchStats stats = _devices!.Devices[deviceIndex++];
-                TargetState state = stats.Failure is not null ? TargetState.Failed
+                failure = stats.Failure;
+                state = failure is not null ? TargetState.Failed
                     : stats.Seconds > 0 ? TargetState.Finished
                     : stats.Opened ? TargetState.Running
                     : _started ? TargetState.Opening
                     : TargetState.Pending;
-                double rate = stats.Opened && stats.Seconds > 0 ? stats.RatePerSecond
+                rate = stats.Opened && stats.Seconds > 0 ? stats.RatePerSecond
                     : stats.Opened && seconds > 0 ? stats.CandidatesSearched / seconds
                     : 0;
-                targets.Add(new TargetProgress(stats.Selector.ToString(), stats.DeviceName ?? stats.Selector.ToString(), state,
-                    stats.CandidatesSearched, rate, stats.Failure));
-                total += stats.CandidatesSearched;
-                totalRate += rate;
+                candidates = stats.CandidatesSearched;
+                targetId = stats.Selector.ToString();
+                name = stats.DeviceName ?? stats.Selector.ToString();
             }
+
+            if (callbackFailure is not null && state != TargetState.Failed)
+            {
+                state = TargetState.Failed;
+                failure = callbackFailure;
+            }
+
+            targets.Add(new TargetProgress(targetId, name, state, candidates, rate, failure));
+            total += candidates;
+            totalRate += rate;
         }
 
         return new SearchProgress(_elapsed.Elapsed, total, totalRate, _sink.Reported, targets);

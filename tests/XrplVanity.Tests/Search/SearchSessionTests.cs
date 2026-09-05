@@ -140,6 +140,66 @@ public class SearchSessionTests
         Assert.Equal(50, session.DutyPercent);
     }
 
+    [Fact]
+    public void A_Throwing_Report_Callback_Stops_The_Session_Without_Crashing_The_Process()
+    {
+        SearchRequest request = new(OneChar(), new SearchTarget[] { new SearchTarget.Cpu(1) }, count: 5);
+        using SearchSession session = new(request, _ => throw new InvalidOperationException("boom"));
+
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        Assert.Equal(SessionOutcome.Cancelled, summary.Outcome);
+        Assert.Equal(1, summary.Final.Reported);
+        TargetProgress cpu = Assert.Single(summary.Final.Targets);
+        Assert.Equal(TargetState.Failed, cpu.State);
+        Assert.NotNull(cpu.Failure);
+        Assert.Contains("report callback failed", cpu.Failure);
+    }
+
+    [Fact]
+    public void A_Throwing_MatchFound_Subscriber_Stops_The_Session_Without_Crashing_The_Process()
+    {
+        SearchRequest request = new(OneChar(), new SearchTarget[] { new SearchTarget.Cpu(1) }, count: 5);
+        using SearchSession session = new(request, _ => { });
+        session.MatchFound += _ => throw new InvalidOperationException("boom");
+
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        Assert.Equal(SessionOutcome.Cancelled, summary.Outcome);
+        Assert.Equal(1, summary.Final.Reported);
+        TargetProgress cpu = Assert.Single(summary.Final.Targets);
+        Assert.Equal(TargetState.Failed, cpu.State);
+        Assert.NotNull(cpu.Failure);
+        Assert.Contains("report callback failed", cpu.Failure);
+    }
+
+    [Fact]
+    public void Dispose_On_A_Never_Started_Session_Does_Not_Throw_And_Is_Idempotent()
+    {
+        SearchRequest request = new(OneChar(), new SearchTarget[] { new SearchTarget.Cpu(1) }, count: 1);
+        SearchSession session = new(request, _ => { });
+
+        session.Dispose();
+        Assert.False(session.Completion.IsCompleted);
+        session.Dispose();   // idempotent, no throw
+    }
+
+    [Fact]
+    public void Stop_Before_Start_Then_Start_Completes_Promptly_With_Cancelled()
+    {
+        // A pre-cancelled token makes every worker exit at once instead of ever running.
+        SearchRequest request = new(Never(), new SearchTarget[] { new SearchTarget.Cpu(2) }, count: null);
+        using SearchSession session = new(request, _ => { });
+
+        session.Stop();
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        Assert.Equal(SessionOutcome.Cancelled, summary.Outcome);
+    }
+
     [Theory]
     [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
     public void Mixed_Cpu_And_Gpu_Session_Stops_Exactly_At_The_Count(string backend)
