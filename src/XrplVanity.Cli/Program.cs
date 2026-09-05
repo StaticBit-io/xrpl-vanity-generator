@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading;
 using XrplVanity.Core;
 using XrplVanity.Gpu;
@@ -229,11 +227,68 @@ public static class SearchRunner
 
     public static bool ResolveDevices(CliOptions options, out List<DeviceSelector> selectors, out string reason) =>
         ParseDeviceSpec(options.GpuDevices ?? string.Empty, GpuBackends.All, out selectors, out reason);
+
+    /// <summary>
+    /// Maps an explicit <c>--backend</c>/<c>--device</c> pair to a selector without opening the
+    /// device: <c>--backend</c> with an optional index, or a bare <c>--device</c> indexing the
+    /// flat list printed by <c>--list-devices</c>.
+    /// </summary>
+    public static bool TryResolveSelector(CliOptions options, out DeviceSelector? selector, out string reason)
+    {
+        if (options.Backend is not null)
+        {
+            IGpuBackend? backend = FindBackend(GpuBackends.All, options.Backend);
+            int index = options.Device ?? 0;
+            if (backend is null)
+            {
+                selector = null;
+                reason = $"unknown backend '{options.Backend}' (known: cuda, opencl)";
+                return false;
+            }
+
+            if (index < 0 || index >= backend.EnumerateDevices().Count)
+            {
+                selector = null;
+                reason = $"device index {index} is out of range for backend '{backend.Name}'; run --list-devices";
+                return false;
+            }
+
+            selector = new DeviceSelector(backend.Name, index);
+            reason = string.Empty;
+            return true;
+        }
+
+        int remaining = options.Device!.Value;
+        foreach (IGpuBackend candidate in GpuBackends.All)
+        {
+            int count = candidate.EnumerateDevices().Count;
+            if (remaining < count)
+            {
+                selector = new DeviceSelector(candidate.Name, remaining);
+                reason = string.Empty;
+                return true;
+            }
+
+            remaining -= count;
+        }
+
+        selector = null;
+        reason = $"device index {options.Device} is out of range; run --list-devices";
+        return false;
+    }
 }
 
 public static class Program
 {
     public static int Main(string[] args)
+    {
+        using CancellationTokenSource cts = new();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        return Run(args, Console.Out, Console.Error, cts.Token);
+    }
+
+    /// <summary>The whole CLI with its streams injected, so tests can drive it without touching the console.</summary>
+    public static int Run(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken cancellation = default)
     {
         CliOptions options;
         try
@@ -242,18 +297,18 @@ public static class Program
         }
         catch (ArgumentException ex)
         {
-            Console.Error.WriteLine(ex.Message);
+            stderr.WriteLine(ex.Message);
             return 2;
         }
 
         if (options.ListDevices)
         {
-            return ListDevices();
+            return ListDevices(stdout, stderr);
         }
 
         if (options.Count is int c && c <= 0)
         {
-            Console.Error.WriteLine("Option '--count' must be a positive number.");
+            stderr.WriteLine("Option '--count' must be a positive number.");
             return 2;
         }
 
@@ -262,146 +317,167 @@ public static class Program
         {
             if (u.Value.Length == 0)
             {
-                Console.Error.WriteLine("warning: empty pattern ignored (it would match every address).");
+                stderr.WriteLine("warning: empty pattern ignored (it would match every address).");
             }
             else
             {
-                Console.Error.WriteLine(
-                    $"warning: pattern '{u.Original}' cannot occur in an XRPL address; skipped.");
+                stderr.WriteLine($"warning: pattern '{u.Original}' cannot occur in an XRPL address; skipped.");
             }
         }
 
         foreach (NormalizedPattern s in patterns.CaseFoldingSkipped)
         {
-            Console.Error.WriteLine(
+            stderr.WriteLine(
                 $"warning: pattern '{s.Original}' is longer than {PatternSet.MaxIgnoreCaseLength} " +
                 "characters; searching it case-sensitively instead of case-insensitively.");
         }
 
         if (!patterns.HasPatterns)
         {
-            Console.Error.WriteLine("error: no reachable patterns to search for.");
+            stderr.WriteLine("error: no reachable patterns to search for.");
             return 2;
         }
 
-        IGpuDevice? gpuDevice = null;
-        List<DeviceSelector>? gpuSelectors = null;
+        List<SearchTarget> targets = new();
+        bool multi = false;
         if (options.GpuDevices is not null)
         {
-            if (!SearchRunner.ResolveDevices(options, out gpuSelectors, out string reason))
+            if (!SearchRunner.ResolveDevices(options, out List<DeviceSelector> selectors, out string reason))
             {
-                Console.Error.WriteLine($"error: --gpu-devices: {reason}");
+                stderr.WriteLine($"error: --gpu-devices: {reason}");
                 return 2;
             }
+
+            foreach (DeviceSelector selector in selectors)
+            {
+                targets.Add(new SearchTarget.Device(selector));
+            }
+
+            multi = true;
         }
         else if (options.Gpu)
         {
-            Stopwatch resolveStopwatch = Stopwatch.StartNew();
-            bool resolved = SearchRunner.ResolveDevice(options, out gpuDevice, out string reason);
-            resolveStopwatch.Stop();
-
-            if (!resolved)
+            if (options.Backend is null && options.Device is null)
             {
-                Console.Error.WriteLine($"error: --gpu requested but no usable device: {reason}");
+                targets.Add(new SearchTarget.FirstAvailableDevice());
+            }
+            else if (!SearchRunner.TryResolveSelector(options, out DeviceSelector? selector, out string reason))
+            {
+                stderr.WriteLine($"error: --gpu requested but no usable device: {reason}");
                 return 2;
             }
-
-            if (gpuDevice!.Backend == "opencl" && resolveStopwatch.Elapsed.TotalSeconds > 1.0)
+            else
             {
-                Console.Error.WriteLine($"note: compiling the OpenCL program took {resolveStopwatch.Elapsed.TotalSeconds:F1} s");
-            }
-        }
-
-        if (options.Gpu && options.ThreadsSpecified)
-        {
-            Console.Error.WriteLine("note: --threads is ignored with --gpu (the search runs on the device).");
-        }
-
-        Console.Error.WriteLine(
-            "WARNING: a seed is a secret. Anyone who holds it controls the account. " +
-            "Keep matches offline and verify this tool before using generated keys for real funds.");
-
-        using CliMatchWriter writer = new(options.OutFile, Console.Out);
-        MatchSink sink = new(options.Count, writer.Write);
-        using CancellationTokenSource cts = new();
-        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-
-        if (gpuSelectors is not null)
-        {
-            int rc = RunMultiGpu(gpuSelectors, patterns, sink, cts, options.GpuDuty);
-            if (rc != 0) return rc;
-        }
-        else if (gpuDevice is not null)
-        {
-            try
-            {
-                using (gpuDevice)
-                {
-                    RunGpu(gpuDevice, patterns, sink, cts, options.GpuDuty);
-                }
-            }
-            catch (XrplVanity.Gpu.CudaException ex)
-            {
-                Console.Error.WriteLine($"error: GPU search failed: {ex.Message}");
-                return 2;
-            }
-            catch (XrplVanity.Gpu.OpenCl.OpenClException ex)
-            {
-                Console.Error.WriteLine($"error: GPU search failed: {ex.Message}");
-                return 2;
+                targets.Add(new SearchTarget.Device(selector!));
             }
         }
         else
         {
-            RunCpu(options, patterns, sink, cts);
+            targets.Add(new SearchTarget.Cpu(Math.Max(1, options.Threads)));
+        }
+
+        if (options.Gpu && options.ThreadsSpecified)
+        {
+            stderr.WriteLine("note: --threads is ignored with --gpu (the search runs on the device).");
+        }
+
+        if (options.Gpu && options.GpuDuty < DutyCycle.Full)
+        {
+            stderr.WriteLine(multi
+                ? $"GPU: duty cycle {options.GpuDuty}% on every device (pausing between launches)."
+                : $"GPU: duty cycle {options.GpuDuty}% (pausing between launches).");
+        }
+
+        stderr.WriteLine(
+            "WARNING: a seed is a secret. Anyone who holds it controls the account. " +
+            "Keep matches offline and verify this tool before using generated keys for real funds.");
+
+        using CliMatchWriter writer = new(options.OutFile, stdout);
+        SearchRequest request = new(patterns, targets, options.Count, options.GpuDuty);
+        using SearchSession session = new(request, writer.Write, line => stderr.WriteLine(line));
+
+        HashSet<string> announced = new(StringComparer.Ordinal);
+        session.ProgressChanged += progress =>
+        {
+            foreach (TargetProgress t in progress.Targets)
+            {
+                if (t.State == TargetState.Running && t.Id != "cpu" && announced.Add(t.Id))
+                {
+                    stderr.WriteLine(multi ? $"GPU[{t.Id}]: {t.Name}" : $"GPU: {t.Id[..t.Id.IndexOf(':')]}:{t.Name}");
+                }
+            }
+        };
+
+        using CancellationTokenRegistration registration = cancellation.Register(session.Stop);
+        session.Start();
+        SearchSummary summary = session.Completion.GetAwaiter().GetResult();
+
+        RenderSummary(summary, multi, stderr);
+
+        if (summary.Outcome == SessionOutcome.AllTargetsFailed)
+        {
+            string failure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no device could be opened";
+            stderr.WriteLine(multi ? "error: --gpu-devices: no device could be opened." : $"error: --gpu requested but no usable device: {failure}");
+            return 2;
         }
 
         // 0 only when a --count target was fully satisfied; otherwise the run ended
         // via Ctrl+C (or a --count-less search the user stopped), reported as 130.
-        return sink.CountSatisfied ? 0 : 130;
+        return summary.Outcome == SessionOutcome.CountReached ? 0 : 130;
     }
 
-    private static void RunCpu(CliOptions options, PatternSet patterns, MatchSink sink, CancellationTokenSource cts)
+    private static void RenderSummary(SearchSummary summary, bool multi, TextWriter stderr)
     {
-        void Worker()
-        {
-            CandidateEvaluator evaluator = new(new BouncyCastleDeriver(), patterns);
-            byte[] pool = new byte[16 * 512];
-            int poolPos = pool.Length;
+        SearchProgress final = summary.Final;
+        double seconds = Math.Max(final.Elapsed.TotalSeconds, 1e-9);
+        TargetProgress? cpu = final.Targets.FirstOrDefault(t => t.Id == "cpu");
+        List<TargetProgress> devices = final.Targets.Where(t => t.Id != "cpu").ToList();
 
-            while (!cts.IsCancellationRequested)
+        if (cpu is not null)
+        {
+            stderr.WriteLine($"CPU: searched {cpu.Candidates:N0} candidates in {seconds:F1} s ({cpu.Candidates / seconds:N0}/s).");
+        }
+
+        if (devices.Count == 0)
+        {
+            return;
+        }
+
+        if (!multi)
+        {
+            TargetProgress d = devices[0];
+            if (d.State == TargetState.Failed && d.Candidates == 0)
             {
-                if (poolPos >= pool.Length)
-                {
-                    RandomNumberGenerator.Fill(pool);
-                    poolPos = 0;
-                }
-
-                ReadOnlySpan<byte> entropy = pool.AsSpan(poolPos, 16);
-                poolPos += 16;
-
-                if (evaluator.TryEvaluate(entropy, out Match match) && !sink.TryReport(match))
-                {
-                    cts.Cancel();
-                    break;
-                }
+                return;   // the caller prints the error line
             }
+
+            stderr.WriteLine($"GPU: searched {d.Candidates:N0} candidates in {seconds:F1} s ({d.Candidates / seconds:N0}/s).");
+            return;
         }
 
-        Thread[] workers = new Thread[Math.Max(1, options.Threads)];
-        for (int t = 0; t < workers.Length; t++)
+        int opened = 0;
+        long total = 0;
+        foreach (TargetProgress d in devices)
         {
-            workers[t] = new Thread(Worker) { IsBackground = true };
-            workers[t].Start();
+            if (d.State == TargetState.Failed && d.Candidates == 0)
+            {
+                stderr.WriteLine($"GPU[{d.Id}]: failed: {d.Failure}");
+                continue;
+            }
+
+            opened++;
+            total += d.Candidates;
+            string tail = d.Failure is null ? string.Empty : $" (stopped: {d.Failure})";
+            stderr.WriteLine($"GPU[{d.Id}]: searched {d.Candidates:N0} candidates in {seconds:F1} s ({d.Candidates / seconds:N0}/s).{tail}");
         }
 
-        foreach (Thread worker in workers)
+        if (opened > 0)
         {
-            worker.Join();
+            stderr.WriteLine($"GPU: searched {total:N0} candidates on {opened} device(s) in {seconds:F1} s ({total / seconds:N0}/s).");
         }
     }
 
-    private static int ListDevices()
+    private static int ListDevices(TextWriter stdout, TextWriter stderr)
     {
         int flat = 0;
         bool any = false;
@@ -410,7 +486,7 @@ public static class Program
             foreach (GpuDeviceInfo info in backend.EnumerateDevices())
             {
                 string tag = info.IsCpuDevice ? " [cpu]" : string.Empty;
-                Console.WriteLine($"{flat,2}  {backend.Name}:{info.Index}  {info.Name}  ({info.Details}){tag}");
+                stdout.WriteLine($"{flat,2}  {backend.Name}:{info.Index}  {info.Name}  ({info.Details}){tag}");
                 flat++;
                 any = true;
             }
@@ -418,107 +494,10 @@ public static class Program
 
         if (!any)
         {
-            Console.Error.WriteLine("no GPU devices found (no CUDA driver and no OpenCL platform).");
+            stderr.WriteLine("no GPU devices found (no CUDA driver and no OpenCL platform).");
             return 2;
         }
 
-        return 0;
-    }
-
-    private static void RunGpu(IGpuDevice device, PatternSet patterns, MatchSink sink, CancellationTokenSource cts, int dutyPercent)
-    {
-        using GpuSearchEngine engine = new(device, patterns);
-        Console.Error.WriteLine($"GPU: {engine.DeviceName}");
-        if (dutyPercent < DutyCycle.Full)
-        {
-            Console.Error.WriteLine($"GPU: duty cycle {dutyPercent}% (pausing between launches).");
-        }
-
-        Stopwatch stopwatch = Stopwatch.StartNew();
-        long reportedOverflow = 0;
-        long reportedErrors = 0;
-
-        while (!cts.IsCancellationRequested)
-        {
-            Stopwatch launch = Stopwatch.StartNew();
-            foreach (Match match in engine.RunLaunch())
-            {
-                if (!sink.TryReport(match))
-                {
-                    cts.Cancel();
-                    break;
-                }
-            }
-
-            if (engine.OverflowDrops > reportedOverflow)
-            {
-                Console.Error.WriteLine(
-                    $"warning: {engine.OverflowDrops - reportedOverflow:N0} hits dropped this launch " +
-                    $"(hit buffer holds {GpuSearchEngine.HitCapacity}); use a more selective pattern.");
-                reportedOverflow = engine.OverflowDrops;
-            }
-
-            if (engine.ConsistencyErrors > reportedErrors)
-            {
-                Console.Error.WriteLine(
-                    $"GPU consistency error: {engine.ConsistencyErrors - reportedErrors} device hit(s) the CPU " +
-                    "reference could not reproduce were discarded.");
-                reportedErrors = engine.ConsistencyErrors;
-            }
-
-            DutyCycle.Pause(launch.Elapsed, dutyPercent, cts.Token);
-        }
-
-        double seconds = Math.Max(stopwatch.Elapsed.TotalSeconds, 1e-9);
-        Console.Error.WriteLine(
-            $"GPU: searched {engine.CandidatesSearched:N0} candidates in {seconds:F1} s " +
-            $"({engine.CandidatesSearched / seconds:N0}/s); consistency errors: {engine.ConsistencyErrors}.");
-    }
-
-    private static int RunMultiGpu(IReadOnlyList<DeviceSelector> selectors, PatternSet patterns, MatchSink sink, CancellationTokenSource cts, int dutyPercent)
-    {
-        if (dutyPercent < DutyCycle.Full)
-        {
-            Console.Error.WriteLine($"GPU: duty cycle {dutyPercent}% on every device (pausing between launches).");
-        }
-
-        MultiDeviceSearch search = new(selectors, patterns,
-            match =>
-            {
-                bool more = sink.TryReport(match);
-                if (!more) cts.Cancel();
-                return more;
-            },
-            line => Console.Error.WriteLine(line),
-            dutyPercent);
-
-        MultiDeviceSearchResult result = search.Run(cts.Token);
-
-        foreach (DeviceSearchStats d in result.Devices)
-        {
-            if (d.Failure is not null && !d.Opened)
-            {
-                Console.Error.WriteLine($"GPU[{d.Selector}]: failed: {d.Failure}");
-                continue;
-            }
-
-            double seconds = Math.Max(d.Seconds, 1e-9);
-            string tail = d.Failure is null ? string.Empty : $" (stopped: {d.Failure})";
-            Console.Error.WriteLine(
-                $"GPU[{d.Selector}]: searched {d.CandidatesSearched:N0} candidates in {seconds:F1} s " +
-                $"({d.CandidatesSearched / seconds:N0}/s); consistency errors: {d.ConsistencyErrors}.{tail}");
-        }
-
-        if (result.DevicesOpened == 0)
-        {
-            Console.Error.WriteLine("error: --gpu-devices: no device could be opened.");
-            return 2;
-        }
-
-        double total = Math.Max(result.Seconds, 1e-9);
-        Console.Error.WriteLine(
-            $"GPU: searched {result.TotalCandidates:N0} candidates on {result.DevicesOpened} device(s) in {total:F1} s " +
-            $"({result.TotalCandidates / total:N0}/s); consistency errors: {result.TotalConsistencyErrors}.");
         return 0;
     }
 }

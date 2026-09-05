@@ -103,7 +103,8 @@ generated key to hold real funds.
 The search runs on `Environment.ProcessorCount` threads by default (override
 with `--threads`), each with its own key deriver and CSPRNG-filled entropy
 buffer, so the hot loop has no shared mutable state beyond a lock-free match
-counter.
+counter. At the end of a CPU run the CLI prints `CPU: searched N candidates in
+T s (R/s).` on stderr, mirroring the GPU line.
 
 Measured throughput on the reference machine — CPU, CUDA, OpenCL, pocl and
 multi-device — is recorded with the commands that produced it in
