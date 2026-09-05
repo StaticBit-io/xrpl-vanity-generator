@@ -101,6 +101,10 @@ with `--threads`), each with its own key deriver and CSPRNG-filled entropy
 buffer, so the hot loop has no shared mutable state beyond a lock-free match
 counter.
 
+Measured throughput on the reference machine — CPU, CUDA, OpenCL, pocl and
+multi-device — is recorded with the commands that produced it in
+[`docs/benchmarks.md`](docs/benchmarks.md).
+
 The address-derivation core (`XrplVanity.Core`) is deliberately kept free of
 CLI and threading concerns so its semantics — `entropy -> address` — can be
 reproduced bit-for-bit by a GPU backend for much higher throughput. `--gpu`
