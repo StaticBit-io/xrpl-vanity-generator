@@ -59,8 +59,12 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--device N` | — | pick a device by index: within the chosen `--backend`, or (without `--backend`) into the flat list `--list-devices` prints (implies `--gpu`) |
 | `--list-devices` | — | list every device from every backend, one per line, and exit (`0` if any device was found, `2` otherwise) |
 | `--gpu-devices SPEC` | — | run on several devices at once: `all`, `cuda`, `opencl`, or a comma-separated list of `backend:index` / `--list-devices` indices (implies `--gpu`; not combinable with `--backend`/`--device`) |
+| `--gpu-duty N` | `100` | keep the GPU busy about N% of the time (1–100): after each launch the search pauses for `launch time × (100 − N) / N`, leaving the card to other applications in between; throughput scales with N |
 
-Patterns are normalized into the XRPL base58 alphabet (`l -> L`, `0 -> o`,
+XRPL addresses use the base58 alphabet
+`rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz` — 58 characters; `0`, `O`, `I` and `l`
+do not exist, so `o` and `i` occur only in lower case and `L` only in upper case.
+Patterns are normalized into this alphabet (`l -> L`, `0 -> o`,
 `O -> o`, `I -> i`). A pattern that still contains a character that cannot
 occur in an address (outside the base58 alphabet, even after normalization)
 is reported as unreachable and skipped instead of searching forever.
@@ -104,6 +108,21 @@ counter.
 Measured throughput on the reference machine — CPU, CUDA, OpenCL, pocl and
 multi-device — is recorded with the commands that produced it in
 [`docs/benchmarks.md`](docs/benchmarks.md).
+
+### Sharing the GPU
+
+A GPU search keeps the card fully busy. To leave room for other applications while
+a long search runs, pass `--gpu-duty N`: after every launch (about 50 ms on the
+reference card) the search sleeps for `launch time × (100 − N) / N`, so the device is
+busy about N% of wall time on average and idle otherwise. A launch is never
+interrupted, so the granularity is one launch; throughput drops roughly in
+proportion (`--gpu-duty 80` gave ~13.5 million candidates/s where 100% gives ~19.4).
+The flag applies to `--gpu`, `--backend`/`--device` and every device of
+`--gpu-devices`. Measured utilisation is in [`docs/benchmarks.md`](docs/benchmarks.md).
+
+```bash
+xrpl-vanity --gpu --gpu-duty 80 --contains fastconn --count 1 --out fastconn.tsv
+```
 
 The address-derivation core (`XrplVanity.Core`) is deliberately kept free of
 CLI and threading concerns so its semantics — `entropy -> address` — can be

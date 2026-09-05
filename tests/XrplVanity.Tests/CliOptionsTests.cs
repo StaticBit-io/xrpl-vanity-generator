@@ -96,4 +96,15 @@ public class CliOptionsTests
         Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-devices" }));
         Assert.Null(CliOptions.Parse(new[] { "abc" }).GpuDevices);
     }
+    [Fact]
+    public void Gpu_Duty_Defaults_To_100_And_Accepts_1_To_100()
+    {
+        Assert.Equal(100, CliOptions.Parse(new[] { "abc" }).GpuDuty);
+        Assert.Equal(80, CliOptions.Parse(new[] { "--gpu", "--gpu-duty", "80", "abc" }).GpuDuty);
+        Assert.Equal(1, CliOptions.Parse(new[] { "--gpu-duty", "1", "abc" }).GpuDuty);
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-duty", "0", "abc" }));
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-duty", "101", "abc" }));
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-duty", "x", "abc" }));
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-duty" }));
+    }
 }

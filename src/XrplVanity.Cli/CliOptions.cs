@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using XrplVanity.Core;
+using XrplVanity.Gpu;
 
 namespace XrplVanity.Cli;
 
@@ -20,6 +21,7 @@ public sealed class CliOptions
     public int? Device { get; init; }
     public bool ListDevices { get; init; }
     public string? GpuDevices { get; init; }
+    public int GpuDuty { get; init; } = DutyCycle.Full;
 
     public static CliOptions Parse(string[] args)
     {
@@ -36,6 +38,7 @@ public sealed class CliOptions
         int? device = null;
         bool listDevices = false;
         string? gpuDevices = null;
+        int gpuDuty = DutyCycle.Full;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -97,6 +100,14 @@ public sealed class CliOptions
                 case "--list-devices":
                     listDevices = true;
                     break;
+                case "--gpu-duty":
+                    gpuDuty = NextInt(args, ref i, arg);
+                    if (gpuDuty < 1 || gpuDuty > DutyCycle.Full)
+                    {
+                        throw new ArgumentException("Option '--gpu-duty' must be a whole number from 1 to 100.");
+                    }
+
+                    break;
                 case "--gpu-devices":
                     gpuDevices = Next(args, ref i, arg);
                     break;
@@ -140,6 +151,7 @@ public sealed class CliOptions
             Device = device,
             ListDevices = listDevices,
             GpuDevices = gpuDevices,
+            GpuDuty = gpuDuty,
         };
     }
 

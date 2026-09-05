@@ -326,7 +326,7 @@ public static class Program
 
         if (gpuSelectors is not null)
         {
-            int rc = RunMultiGpu(gpuSelectors, patterns, sink, cts);
+            int rc = RunMultiGpu(gpuSelectors, patterns, sink, cts, options.GpuDuty);
             if (rc != 0) return rc;
         }
         else if (gpuDevice is not null)
@@ -335,7 +335,7 @@ public static class Program
             {
                 using (gpuDevice)
                 {
-                    RunGpu(gpuDevice, patterns, sink, cts);
+                    RunGpu(gpuDevice, patterns, sink, cts, options.GpuDuty);
                 }
             }
             catch (XrplVanity.Gpu.CudaException ex)
@@ -423,16 +423,22 @@ public static class Program
         return 0;
     }
 
-    private static void RunGpu(IGpuDevice device, PatternSet patterns, MatchSink sink, CancellationTokenSource cts)
+    private static void RunGpu(IGpuDevice device, PatternSet patterns, MatchSink sink, CancellationTokenSource cts, int dutyPercent)
     {
         using GpuSearchEngine engine = new(device, patterns);
         Console.Error.WriteLine($"GPU: {engine.DeviceName}");
+        if (dutyPercent < DutyCycle.Full)
+        {
+            Console.Error.WriteLine($"GPU: duty cycle {dutyPercent}% (pausing between launches).");
+        }
+
         Stopwatch stopwatch = Stopwatch.StartNew();
         long reportedOverflow = 0;
         long reportedErrors = 0;
 
         while (!cts.IsCancellationRequested)
         {
+            Stopwatch launch = Stopwatch.StartNew();
             foreach (Match match in engine.RunLaunch())
             {
                 if (!sink.TryReport(match))
@@ -457,6 +463,8 @@ public static class Program
                     "reference could not reproduce were discarded.");
                 reportedErrors = engine.ConsistencyErrors;
             }
+
+            DutyCycle.Pause(launch.Elapsed, dutyPercent, cts.Token);
         }
 
         double seconds = Math.Max(stopwatch.Elapsed.TotalSeconds, 1e-9);
@@ -465,8 +473,13 @@ public static class Program
             $"({engine.CandidatesSearched / seconds:N0}/s); consistency errors: {engine.ConsistencyErrors}.");
     }
 
-    private static int RunMultiGpu(IReadOnlyList<DeviceSelector> selectors, PatternSet patterns, MatchSink sink, CancellationTokenSource cts)
+    private static int RunMultiGpu(IReadOnlyList<DeviceSelector> selectors, PatternSet patterns, MatchSink sink, CancellationTokenSource cts, int dutyPercent)
     {
+        if (dutyPercent < DutyCycle.Full)
+        {
+            Console.Error.WriteLine($"GPU: duty cycle {dutyPercent}% on every device (pausing between launches).");
+        }
+
         MultiDeviceSearch search = new(selectors, patterns,
             match =>
             {
@@ -474,7 +487,8 @@ public static class Program
                 if (!more) cts.Cancel();
                 return more;
             },
-            line => Console.Error.WriteLine(line));
+            line => Console.Error.WriteLine(line),
+            dutyPercent);
 
         MultiDeviceSearchResult result = search.Run(cts.Token);
 

@@ -52,14 +52,20 @@ public sealed class MultiDeviceSearch
     private readonly PatternSet _patterns;
     private readonly Func<Match, bool> _report;
     private readonly Action<string> _log;
+    private readonly int _dutyPercent;
 
-    public MultiDeviceSearch(IReadOnlyList<DeviceSelector> devices, PatternSet patterns, Func<Match, bool> report, Action<string>? log = null)
-        : this(GpuBackends.All, devices, patterns, report, log)
+    public MultiDeviceSearch(IReadOnlyList<DeviceSelector> devices, PatternSet patterns, Func<Match, bool> report, Action<string>? log = null, int dutyPercent = DutyCycle.Full)
+        : this(GpuBackends.All, devices, patterns, report, log, dutyPercent)
     {
     }
 
-    internal MultiDeviceSearch(IReadOnlyList<IGpuBackend> backends, IReadOnlyList<DeviceSelector> devices, PatternSet patterns, Func<Match, bool> report, Action<string>? log = null)
+    internal MultiDeviceSearch(IReadOnlyList<IGpuBackend> backends, IReadOnlyList<DeviceSelector> devices, PatternSet patterns, Func<Match, bool> report, Action<string>? log = null, int dutyPercent = DutyCycle.Full)
     {
+        if (dutyPercent < 1 || dutyPercent > DutyCycle.Full)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dutyPercent), dutyPercent, "The duty cycle must be a whole number from 1 to 100.");
+        }
+
         ArgumentNullException.ThrowIfNull(backends);
         ArgumentNullException.ThrowIfNull(devices);
         ArgumentNullException.ThrowIfNull(patterns);
@@ -74,6 +80,7 @@ public sealed class MultiDeviceSearch
         _patterns = patterns;
         _report = report;
         _log = log ?? (_ => { });
+        _dutyPercent = dutyPercent;
 
         DeviceSearchStats[] devicesStats = new DeviceSearchStats[_devices.Count];
         for (int i = 0; i < _devices.Count; i++)
@@ -195,6 +202,7 @@ public sealed class MultiDeviceSearch
                 long reportedErrors = 0;
                 while (!stop.IsCancellationRequested)
                 {
+                    Stopwatch launch = Stopwatch.StartNew();
                     foreach (Match match in engine.RunLaunch())
                     {
                         if (!TryReport(stats, match))
@@ -226,6 +234,8 @@ public sealed class MultiDeviceSearch
                              "the CPU reference could not reproduce were discarded.");
                         reportedErrors = engine.ConsistencyErrors;
                     }
+
+                    DutyCycle.Pause(launch.Elapsed, _dutyPercent, stop.Token);
                 }
             }
             finally
