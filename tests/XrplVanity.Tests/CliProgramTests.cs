@@ -104,6 +104,20 @@ public class CliProgramTests
     }
 
     [Fact]
+    public void ExitCodeFor_Cpu_Only_Failed_Writes_Search_Failed_Not_Gpu_And_Returns_2()
+    {
+        StringWriter stderr = new();
+        TargetProgress cpu = new("cpu", "CPU", TargetState.Failed, 100, 0, "report callback failed: disk full");
+        SearchSummary summary = SummaryWith(SessionOutcome.Cancelled, cpu);
+
+        int rc = Program.ExitCodeFor(summary, multi: false, stderr);
+
+        Assert.Equal(2, rc);
+        Assert.Contains("error: search failed: report callback failed: disk full", stderr.ToString());
+        Assert.DoesNotContain("GPU search failed", stderr.ToString());
+    }
+
+    [Fact]
     public void ExitCodeFor_Device_Finished_Writes_No_Error_And_Returns_130()
     {
         StringWriter stderr = new();

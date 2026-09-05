@@ -423,7 +423,8 @@ public static class Program
     /// pre-existing "no usable device" message), and every target opened but then died mid-run
     /// (outcome is <see cref="SessionOutcome.Cancelled"/> because it did open, yet every target's
     /// final <see cref="TargetState"/> is <see cref="TargetState.Failed"/> — reported as a GPU
-    /// search failure, not indistinguishable from a user Ctrl+C).
+    /// search failure when a non-CPU target is among the failures, or a plain search failure for
+    /// a CPU-only run; either way distinguished from a user Ctrl+C).
     /// </summary>
     internal static int ExitCodeFor(SearchSummary summary, bool multi, TextWriter stderr)
     {
@@ -438,7 +439,10 @@ public static class Program
             && summary.Final.Targets.All(t => t.State == TargetState.Failed))
         {
             string failure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "device lost";
-            stderr.WriteLine($"error: GPU search failed: {failure}");
+            // A CPU-only run never touched a GPU: the report/MatchFound callback can fail the
+            // CPU target alone (e.g. a broken --out write), with no device involved at all.
+            bool anyGpuFailed = summary.Final.Targets.Any(t => t.State == TargetState.Failed && t.Id != "cpu");
+            stderr.WriteLine(anyGpuFailed ? $"error: GPU search failed: {failure}" : $"error: search failed: {failure}");
             return 2;
         }
 
