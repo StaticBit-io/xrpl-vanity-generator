@@ -2566,7 +2566,32 @@ Expected: build errors — pages and `ClosePrompt` do not exist.
 </div>
 ```
 
-`SearchPage.razor.cs` subscribes to `Vm.Changed` → `InvokeAsync(StateHasChanged)`, unsubscribes in `Dispose`. `.search-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; } .col-bottom { grid-column: 1 / -1; } @media (max-width: 1000px) { .search-grid { grid-template-columns: 1fr; } }`.
+`SearchPage.razor.cs` subscribes to `Vm.Changed` → `InvokeAsync(StateHasChanged)`, unsubscribes in `Dispose`. The page is fluid (spec "Window and fluid layout"; mockup section 09): wrap everything under `.page-head` in `<div class="content-scroll">`. In `wwwroot/scss/components/_layout.scss`:
+
+```scss
+.shell { display: grid; grid-template-columns: 64px 1fr; height: 100vh; }
+.content { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px 20px; min-height: 0; }
+.page-head { flex: none; }                                   // pinned: title, pill, Start/Stop
+.content-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 12px; }
+.search-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; max-width: 1536px; }
+.col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.col-bottom { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.results { display: flex; flex-direction: column; min-height: 240px; }
+.results .list { flex: 1; min-height: 0; overflow-y: auto; }   // the Virtualize container
+@media (max-width: 1000px) {
+  .search-grid { grid-template-columns: 1fr; }
+  .pattern-entry { grid-template-columns: 1fr 1fr; }
+  .pattern-entry .pos { grid-column: 1 / -1; }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .row { grid-template-columns: minmax(230px, 1fr) 28px 120px 120px 28px 28px; }
+  .row .target, .row .time { display: none; }
+  .target { grid-template-columns: 24px 1fr auto; }
+  .target-row { grid-template-columns: 80px 1fr 80px 90px; }
+  .target-row .failure { grid-column: 1 / -1; }
+}
+```
+
+The `ResultsList` row grid in Task 5 uses `minmax(280px, 1.2fr)` for the address column and `minmax(120px, 0.8fr)` for the seed column so the row widens with the window; the `.target` and `.time` classes on the device and time cells are what the narrow rule hides (give `PatternEditor`'s entry grid the class `pattern-entry` and its select the class `pos`). Every cell has `min-width: 0` and `overflow-wrap: anywhere` so long text wraps instead of clipping. The host enforces the 900×600 minimum (Task 7).
 
 `Components/Banner.razor`: `[Parameter] string Kind` (`yellow` | `negative`), `[Parameter] string Text`; renders `<div class="banner-@Kind">@Text</div>`; the two classes are defined in `_layout.scss` (yellow as in `DevicePicker`, negative with `rgba(214,119,106,0.14)` / `--negative`).
 

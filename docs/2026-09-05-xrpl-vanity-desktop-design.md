@@ -323,8 +323,19 @@ row slides in from the top with a brief mint highlight; counters in `LiveStats` 
 it is disabled under `prefers-reduced-motion`. No layout shift when the state changes
 (fixed-height stat tiles, reserved space for warnings).
 
-Window: default 1100×720, minimum 900×600, remembered in settings. The layout collapses
-to a single column below 1000 px of width.
+Window and fluid layout: default 1100×720, minimum 900×600 (enforced by the host),
+remembered in settings. Columns are `fr` fractions, never pixel widths; cards take the
+height of their content. Between 1000 and 1600 px of window width the Search page is two
+columns (1.2fr / 1fr) with the live statistics and results spanning both; below 1000 px it
+collapses to one column (patterns, estimate, devices, duty, live, results), the pattern
+entry wraps to two rows, the live tiles go 2 × 2, and result rows hide the device and time
+columns but never the address or the seed; above 1600 px the working area stops growing and
+stays aligned to the rail. The page header (title, status pill, Start/Stop) stays pinned;
+the area under it scrolls vertically, and the results list takes the remaining height and
+scrolls inside itself (virtualised). Text that outgrows a cell wraps or scrolls in the cell;
+the page never scrolls sideways. Windows display scaling (125 %, 150 %) is left to
+WebView2: every size is in CSS pixels. Section 09 of the mockup shows the 900×600 and
+1500×860 renderings.
 
 ### Storage
 

@@ -136,7 +136,7 @@
   .target-row.failed .state, .target-row .failure { color: var(--negative); }
   .target-row.opening .state { color: var(--yellow); }
   .results .placeholder { color: var(--text-secondary); padding: 14px 0 6px; font-size: 13px; }
-  .rrow { display: grid; grid-template-columns: 300px 26px 1fr 80px 70px 150px 26px 26px; gap: 8px; align-items: center; height: 40px; border-top: 1px solid var(--dark-gray); font-size: 13px; }
+  .rrow { display: grid; grid-template-columns: minmax(300px, 1.2fr) 26px 1fr 80px 70px minmax(150px, 0.8fr) 26px 26px; gap: 8px; align-items: center; height: 40px; border-top: 1px solid var(--dark-gray); font-size: 13px; }
   .rrow .seed { color: var(--text-secondary); letter-spacing: 0.06em; }
   .rrow .seed.shown { color: var(--text); letter-spacing: 0; }
   @keyframes slide-in { from { opacity: 0; transform: translateY(-6px); background-color: rgba(100,207,149,0.18); } to { opacity: 1; transform: none; background-color: transparent; } }
@@ -192,6 +192,27 @@
   .kv { display: grid; grid-template-columns: 180px 1fr; gap: 6px 16px; font-size: 13px; }
   .kv dt { color: var(--text-secondary); }
   .kv dd { margin: 0; }
+  /* ---------- fluid layout: the same rules the app ships as media queries ---------- */
+  .content { container-type: inline-size; }
+  .content-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .search-grid { max-width: 1536px; }
+  @container (max-width: 936px) {
+    .search-grid { grid-template-columns: 1fr; }
+    .entry { grid-template-columns: 1fr 1fr; }
+    .entry .field:first-child { grid-column: 1 / -1; }
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .rrow { grid-template-columns: minmax(230px, 1fr) 26px 120px 120px 26px 26px; }
+    .rrow .target, .rrow .time { display: none; }
+    .target { grid-template-columns: 22px 1fr auto; }
+    .target .details { grid-column: 2; }
+    .target-row { grid-template-columns: 80px 1fr 80px 90px; }
+    .target-row .failure { grid-column: 1 / -1; }
+  }
+  .win.narrow { width: 900px; height: 600px; }
+  .scaled { transform: scale(0.72); transform-origin: top left; }
+  .scaled-wrap { height: calc(860px * 0.72 + 8px); overflow: hidden; }
+  .win.wide { width: 1500px; height: 860px; }
+  .pair { display: grid; grid-template-columns: 900px 1fr; gap: 24px; align-items: start; }
   @media (prefers-reduced-motion: reduce) { .breathe, .slide-in { animation: none; } }
 </style>
 
@@ -204,7 +225,7 @@
     <div class="doc-meta">
       <b>Palette</b> Wallet var-colors.scss<br>
       <b>Type</b> Inter · Cascadia Code<br>
-      <b>Window</b> 1100 × 720, min 900 × 600<br>
+      <b>Window</b> 1100 × 720 default, min 900 × 600, fluid up to 1600<br>
       <b>Theme</b> dark only
     </div>
   </div>
@@ -361,7 +382,7 @@
               <div class="rrow slide-in">
                 <span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span>
                 <button class="btn-icon" title="Copy address"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
-                <span>fast <span class="muted">(starts)</span></span><span class="muted mono" style="font-size:12px">cuda:0</span><span class="muted">14:02:51</span>
+                <span>fast <span class="muted">(starts)</span></span><span class="muted mono target" style="font-size:12px">cuda:0</span><span class="muted time">14:02:51</span>
                 <span class="mono seed">••••••••</span>
                 <button class="btn-icon" title="Reveal seed"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
                 <button class="btn-icon" title="Copy seed (clipboard clears after 30 s)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
@@ -369,7 +390,7 @@
               <div class="rrow">
                 <span class="mono">rDXconnzqB1GXn5b4wF5mdNq2mDHWAjpT</span>
                 <button class="btn-icon" title="Copy address"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
-                <span>conn <span class="muted">(contains)</span></span><span class="muted mono" style="font-size:12px">cpu</span><span class="muted">14:02:12</span>
+                <span>conn <span class="muted">(contains)</span></span><span class="muted mono target" style="font-size:12px">cpu</span><span class="muted time">14:02:12</span>
                 <span class="mono seed shown">sEdVfKxwAB6Y2sX6Z5Hqrvp1xJoAr4m</span>
                 <button class="btn-icon" title="Hide seed" style="color:var(--mint)"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
                 <button class="btn-icon" title="Copy seed (clipboard clears after 30 s)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
@@ -528,11 +549,11 @@
         <div class="card-box results" style="flex:1">
           <div class="filter-row"><div class="field mono placeholder focus" style="max-width:420px">filter by address or pattern</div><span class="muted" style="font-size:12px">showing 47 of 47</span><span></span></div>
           <div style="height:10px"></div>
-          <div class="rrow"><span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>fast <span class="muted">(starts)</span></span><span class="muted mono" style="font-size:12px">cuda:0</span><span class="muted">today 14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon" title="Delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
-          <div class="rrow"><span class="mono">rDXconnzqB1GXn5b4wF5mdNq2mDHWAjpT</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>conn <span class="muted">(contains)</span></span><span class="muted mono" style="font-size:12px">cpu</span><span class="muted">today 14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
-          <div class="rrow"><span class="mono">rStaticBitxK9pQ2wLm4nR8vT6yU1zA3b</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>staticbit <span class="muted">(starts)</span></span><span class="muted mono" style="font-size:12px">cuda:0</span><span class="muted">Sep 3, 22:41</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
-          <div class="rrow"><span class="mono">rabcdE7Hk2LmN9pQrS4tUvW6xYz8A1bC3</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono" style="font-size:12px">opencl:0</span><span class="muted">Sep 3, 21:07</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
-          <div class="rrow" style="border-bottom:1px solid var(--dark-gray)"><span class="mono">rabcdQ2mX8vB4nJ6kL9pR3sT5uW7yZ1aC</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono" style="font-size:12px">opencl:0</span><span class="muted">Sep 3, 21:06</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>fast <span class="muted">(starts)</span></span><span class="muted mono target" style="font-size:12px">cuda:0</span><span class="muted time">today 14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon" title="Delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="mono">rDXconnzqB1GXn5b4wF5mdNq2mDHWAjpT</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>conn <span class="muted">(contains)</span></span><span class="muted mono target" style="font-size:12px">cpu</span><span class="muted time">today 14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="mono">rStaticBitxK9pQ2wLm4nR8vT6yU1zA3b</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>staticbit <span class="muted">(starts)</span></span><span class="muted mono target" style="font-size:12px">cuda:0</span><span class="muted time">Sep 3, 22:41</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="mono">rabcdE7Hk2LmN9pQrS4tUvW6xYz8A1bC3</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono target" style="font-size:12px">opencl:0</span><span class="muted time">Sep 3, 21:07</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow" style="border-bottom:1px solid var(--dark-gray)"><span class="mono">rabcdQ2mX8vB4nJ6kL9pR3sT5uW7yZ1aC</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono target" style="font-size:12px">opencl:0</span><span class="muted time">Sep 3, 21:06</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
           <div class="muted" style="font-size:12px;padding:10px 0 0">Stored in <span class="mono">results.dat</span>, encrypted with Windows DPAPI for this user account. Nothing else on disk contains a seed.</div>
         </div>
       </div>
@@ -579,6 +600,116 @@
   </div>
   </div>
   <p class="caption"><b>Three groups, no Save button.</b> Every control writes to <span class="mono">settings.json</span> as it changes. The notifications toggle turns grey with "unavailable on this system" when Windows refuses registration.</p>
+
+  <!-- ======================= 9. RESIZING ======================= -->
+  <h2 class="sec">09 <span>The same page at the minimum window and on a wide monitor</span></h2>
+  <div class="frames-wrap">
+  <div class="pair">
+    <div class="win narrow">
+      <div class="titlebar"><div class="t-left"><span class="logo-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></svg></span>XRPL Vanity</div><div class="t-right"><span>—</span><span>☐</span><span>✕</span></div></div>
+      <div class="shell">
+        <aside class="rail">
+          <div class="mono-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><circle cx="128" cy="190" r="12" fill="#EBAF8E"/></svg></div>
+          <div class="nav active"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Search</div>
+          <div class="nav"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>History</div>
+          <div class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2"/></svg>Settings</div>
+        </aside>
+        <div class="content">
+          <div class="page-head"><h1>XRPL Vanity <span class="pill pill-active breathe">Searching</span></h1><div class="actions"><button class="btn-stop">Stop</button></div></div>
+          <div class="content-scroll">
+            <div class="search-grid">
+              <div class="col">
+                <div class="card-box">
+                  <div class="card-title">Patterns</div>
+                  <div class="chips"><span class="chip"><span class="chip-pos">starts</span><span class="mono">fast</span><button>×</button></span><span class="chip"><span class="chip-pos">contains</span><span class="mono">conn</span><span class="aa">Aa</span><button>×</button></span></div>
+                  <div class="entry"><div class="field mono placeholder">type a pattern and press Enter</div><div class="field">starts with ▾</div><label class="check"><span class="box on"></span> ignore case</label></div>
+                </div>
+                <div class="card-box"><div class="card-title">Estimate</div><div class="row-2"><div><div class="label">candidates per match</div><div class="num big">2.8 M</div></div><div><div class="label">expected time to a match</div><div class="num big">7 min</div></div></div><div class="note">from the live rate</div></div>
+              </div>
+              <div class="col">
+                <div class="card-box">
+                  <div class="card-title">Devices</div>
+                  <label class="target selected"><span class="box on"></span><span class="name">CPU</span><span class="threads"><span class="range dim" style="width:80px"><i style="width:100%"></i><b style="left:100%"></b></span><span class="num">12</span></span><span class="details">12 logical processors</span></label>
+                  <label class="target selected"><span class="box on"></span><span class="name">NVIDIA GeForce RTX 5070 Ti</span><span class="mono muted" style="font-size:12px">cuda:0</span><span class="details">cuda · sm_120, 16 GB</span></label>
+                </div>
+              </div>
+              <div class="col-bottom">
+                <div class="card-box">
+                  <div class="card-title">Live</div>
+                  <div class="tiles"><div class="tile"><div class="label">rate</div><div class="num big">13.8 M/s</div></div><div class="tile"><div class="label">candidates</div><div class="num big">1.1 G</div></div><div class="tile"><div class="label">elapsed</div><div class="num big">1 min</div></div><div class="tile"><div class="label">found</div><div class="num big">2</div></div></div>
+                  <div class="target-row running"><span class="mono">cuda:0</span><span>RTX 5070 Ti</span><span class="state">running</span><span class="num" style="font-weight:500">13.5 M/s</span></div>
+                </div>
+                <div class="card-box results">
+                  <div class="head"><div class="card-title">Results <span class="count">2</span></div><button class="btn-secondary-dark">Export TSV…</button></div>
+                  <div class="rrow"><span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>fast <span class="muted">(starts)</span></span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="caption" style="margin-top:0"><b>900 × 600 — the minimum the host allows.</b> Below 1000 px of window width the two columns stack into one; the pattern entry wraps to two rows; live tiles go 2 × 2; result rows drop the device and time columns but never the address or the seed. The header with Start/Stop stays pinned; everything under it scrolls.</p>
+      <p class="caption"><b>Rules, in short.</b> Columns are <span class="mono">fr</span> fractions, never pixel widths. Cards take the height of their content. The results list fills the remaining height and scrolls inside itself (virtualised). Text that outgrows a cell wraps or scrolls in the cell; nothing is clipped. The page never scrolls sideways.</p>
+      <p class="caption"><b>Windows display scaling</b> (125 %, 150 %) is handled by WebView2: every size is in CSS pixels, so type, radii and spacing scale together with the system.</p>
+    </div>
+  </div>
+  </div>
+  <div style="height:24px"></div>
+  <div class="scaled-wrap">
+  <div class="scaled">
+  <div class="win wide">
+    <div class="titlebar"><div class="t-left"><span class="logo-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></svg></span>XRPL Vanity</div><div class="t-right"><span>—</span><span>☐</span><span>✕</span></div></div>
+    <div class="shell">
+      <aside class="rail">
+        <div class="mono-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><circle cx="128" cy="190" r="12" fill="#EBAF8E"/></svg></div>
+        <div class="nav active"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Search</div>
+        <div class="nav"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>History</div>
+        <div class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2"/></svg>Settings</div>
+      </aside>
+      <div class="content">
+        <div class="page-head"><h1>XRPL Vanity <span class="pill pill-active breathe">Searching</span></h1><div class="actions"><button class="btn-stop">Stop</button></div></div>
+        <div class="content-scroll">
+          <div class="search-grid">
+            <div class="col">
+              <div class="card-box">
+                <div class="card-title">Patterns</div>
+                <div class="chips"><span class="chip"><span class="chip-pos">starts</span><span class="mono">fast</span><button>×</button></span><span class="chip"><span class="chip-pos">contains</span><span class="mono">conn</span><span class="aa">Aa</span><button>×</button></span></div>
+                <div class="entry"><div class="field">starts with ▾</div><div class="field mono placeholder">type a pattern and press Enter</div><label class="check"><span class="box on"></span> ignore case</label><button class="btn-secondary-dark">load list…</button></div>
+              </div>
+              <div class="card-box"><div class="card-title">Estimate</div><div class="row-2"><div><div class="label">candidates per match</div><div class="num big">2.8 M</div></div><div><div class="label">expected time to a match</div><div class="num big">7 min</div></div></div><div class="note">from the live rate · assumes a 34-character address; case-insensitive letters count every variant · <a href="#">reference rates</a></div></div>
+            </div>
+            <div class="col">
+              <div class="card-box">
+                <div class="card-title">Devices</div>
+                <label class="target selected"><span class="box on"></span><span><span class="name">CPU</span></span><span class="details">12 logical processors</span><span class="threads"><span class="range dim"><i style="width:100%"></i><b style="left:100%"></b></span><span class="num">12</span> threads</span></label>
+                <label class="target selected"><span class="box on"></span><span><span class="name">NVIDIA GeForce RTX 5070 Ti</span></span><span class="details">cuda · sm_120, 16 GB</span><span class="mono muted" style="font-size:12px">cuda:0</span></label>
+                <label class="target"><span class="box"></span><span><span class="name">NVIDIA GeForce RTX 5070 Ti</span></span><span class="details">opencl · OpenCL 3.0 CUDA</span><span class="mono muted" style="font-size:12px">opencl:0</span></label>
+              </div>
+              <div class="card-box duty"><div class="head"><div class="card-title">GPU duty</div><span class="num" style="font-size:16px">80%</span></div><div class="range"><i style="width:73%"></i><b style="left:73%"></b></div><div class="note" style="margin-top:0">Pauses between launches so the card stays free for other applications about 20% of the time. Changes apply immediately.</div></div>
+            </div>
+            <div class="col-bottom">
+              <div class="card-box">
+                <div class="card-title">Live</div>
+                <div class="tiles"><div class="tile"><div class="label">rate</div><div class="num big">13.8 M/s</div></div><div class="tile"><div class="label">candidates</div><div class="num big">1.1 G</div></div><div class="tile"><div class="label">elapsed</div><div class="num big">1 min</div></div><div class="tile"><div class="label">found</div><div class="num big">2</div></div></div>
+                <div class="target-row running"><span class="mono">cpu</span><span>CPU (12 threads)</span><span class="state">running</span><span class="num" style="font-weight:500">287 k/s</span><span></span></div>
+                <div class="target-row running"><span class="mono">cuda:0</span><span>NVIDIA GeForce RTX 5070 Ti</span><span class="state">running</span><span class="num" style="font-weight:500">13.5 M/s</span><span></span></div>
+              </div>
+              <div class="card-box results">
+                <div class="head"><div class="card-title">Results <span class="count">2</span></div><button class="btn-secondary-dark">Export TSV…</button></div>
+                <div class="rrow"><span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>fast <span class="muted">(starts)</span></span><span class="muted mono target" style="font-size:12px">cuda:0</span><span class="muted time">14:02:51</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+                <div class="rrow"><span class="mono">rDXconnzqB1GXn5b4wF5mdNq2mDHWAjpT</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>conn <span class="muted">(contains)</span></span><span class="muted mono target" style="font-size:12px">cpu</span><span class="muted time">14:02:12</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  </div>
+  <p class="caption"><b>1500 × 860, shown at 72 %.</b> The columns widen with the window; above 1600 px of window width the working area stops growing and sits left-aligned with the rail, so rows never stretch across a 4K monitor. Extra height goes to the results list.</p>
 
   <!-- ======================= 8. TOKENS ======================= -->
   <h2 class="sec">08 <span>Tokens and type, straight from the Wallet</span></h2>
