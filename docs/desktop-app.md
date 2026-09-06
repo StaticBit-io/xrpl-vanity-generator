@@ -19,9 +19,22 @@ The application has three pages:
   hits. Every hit lands in the results list with its address, pattern, target and time.
 - **History** — every result the application has ever stored, with a filter over the
   address and the pattern, per-row delete and a two-step "Clear history".
-- **Settings** — what the window close button does, notifications, the default GPU duty,
-  how long a copied seed stays on the clipboard, how long a revealed seed stays visible,
-  the stored rate hints, and the data folder.
+- **Settings** — everything in the table below. There is no Save button: each control
+  writes to `settings.json` as it changes.
+
+### Settings
+
+| Setting | Meaning | Default |
+| --- | --- | --- |
+| Close button | What the × in the title bar does: ask every time, minimise to tray, or exit. | Ask every time |
+| Notifications | A toast on a match and when a search finishes. Disabled, with a note, when the platform refuses registration (an unpackaged build has no package identity). | On |
+| GPU duty (applies immediately) | Share of the time the GPU runs, 25–100 %. The same value as the Search page's slider and the tray menu; a change reaches a running search at once. | 100 |
+| Stop after N matches | The session ends by itself once it has found this many. Blank or 0 searches until you press Stop. | blank |
+| Clear clipboard after copying a seed | Seconds before a copied seed is wiped, and only if the clipboard still holds it. Copying anything else in the meantime keeps the newer content. | 30 |
+| Hide a revealed seed after | Seconds before a revealed seed masks itself again. It is also masked when you leave the page. | 15 |
+| Rate hints | The last measured speed per device, used for the estimate before a run. **Forget rate hints** clears them. | — |
+| Data folder | Where `settings.json` and `results.dat` live, with **Open folder**. | — |
+| About | Version, search engines and font licences. | — |
 
 Seeds are masked everywhere by default. A row reveals its seed only on request and hides
 it again after the configured timeout or when the page is left. Copying a seed puts it on
@@ -215,6 +228,23 @@ storage layer. Each step names what you should see.
 12. **Export.** Press **Export TSV…**, save the file and open it in a text editor: one
     line per result, address and seed separated by a tab, in the same format the command
     line tool's `--out` writes.
+13. **Every control is dark.** Open History and Settings and check each form control: the
+    filter box, the close-behaviour select, the four number inputs, the notifications
+    checkbox and both scrollbars. Nothing may render on a white background, and no
+    checkbox may show a white or blue box.
+14. **A read-only data folder produces banners, not crashes.** Deny your account write
+    access to the data folder (`icacls "<folder>" /deny "%USERNAME%":(W)`), then: on
+    History, press **Clear history** twice and delete a row — each shows a red banner with
+    the reason and leaves the list intact; on Search, run a short pattern and confirm the
+    same banner appears above the results list while the hits still accumulate on screen;
+    and confirm the window still closes normally. Restore access with
+    `icacls "<folder>" /remove:d "%USERNAME%"`.
+15. **The reference-rates link opens in a browser.** On the Search page, click
+    **reference rates** in the estimate note: the benchmarks page opens in the default
+    browser and the application window is unchanged — no blank frame inside the app.
+
+Exiting stops the search first and gives the teardown 10 s before the process ends; the
+session's own dispose cap is 30 s, so a session that refuses to settle costs 10 s, not 30.
 
 ## Troubleshooting
 

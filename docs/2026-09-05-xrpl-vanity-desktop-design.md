@@ -280,7 +280,9 @@ public interface IFileDialogService { Task<string?> PickSaveTsvAsync(string sugg
   close and hides to the tray when the setting says so; with the default `Ask`, a modal in
   the page asks once ("Minimise to tray" / "Exit") with a "remember my choice" checkbox and
   stores `CloseBehavior` (`Ask`, `MinimizeToTray`, `Exit`). Exit stops a running session
-  and waits for `Completion` with a 10 s cap before the process ends.
+  and unwinds it off the UI thread: the host waits 10 s for the session to unwind, and the
+  session's own dispose cap is 30 s (Plan F's contract), so a session that refuses to settle
+  costs the user 10 s, not 30. The pending clipboard secret is cleared inside the same budget.
 
 ### View model
 
@@ -323,9 +325,11 @@ One main page, two secondary pages, navigation in a slim left rail as in the Wal
 - **History**. All persisted results with search by address or pattern, a reveal/copy per
   row, delete per row, "Clear history" with confirmation, "Export TSV…" for the visible
   rows.
-- **Settings**. Close behaviour, notifications on/off, clipboard clear delay (default 30 s),
-  seed reveal timeout (default 15 s), default duty, "Forget rate hints", data folder path
-  (read-only, with "Open folder").
+- **Settings**. Close behaviour, notifications on/off, GPU duty (25–100 %, applied
+  immediately), "stop after N matches" (blank or 0 = unbounded), clipboard clear delay
+  (default 30 s), seed reveal timeout (default 15 s), "Forget rate hints", data folder path
+  (read-only, with "Open folder") and an About row with the version, the engines and the
+  font licences.
 
 `ResultsList` rows show the address (monospace, copy button), the pattern that matched, the
 device, the time, and the seed masked as `••••••••` with a reveal button; a revealed seed
@@ -539,9 +543,15 @@ Both plans run through subagent-driven development on feature branches and merge
   is `H.NotifyIcon.WinUI` used directly from the Windows platform folder.
 - Blazor Hybrid renders inside WebView2; the search threads never touch the UI thread, so
   a slow WebView repaint cannot slow the search, but a very high hit rate (short patterns)
-  can flood `MatchFound`; the view model batches appends per progress tick.
+  floods `MatchFound`, and that callback runs inside `MatchSink`'s lock — the one every CPU
+  worker and GPU engine contends for. The view model therefore **must** batch: `OnMatch`
+  only inserts into the session list and appends to a pending batch, and the flush — one
+  store write for the whole batch and at most one notification — happens on the progress
+  tick (`OnProgress`) and once more in `OnCompleted`/`OnFailed` before the state transition.
+  Persisting, notifying or raising `Changed` per hit is a defect, not a tuning choice.
 - A GPU driver reset (TDR) surfaces as a failed target, not a crash; a driver-level
   process kill would take the application and its unsaved session results with it — the
-  results are persisted on every hit, so only the in-memory session list is lost.
+  results are persisted on every progress tick (see the batching point above), so at most
+  the hits of the last quarter-second are lost along with the in-memory session list.
 - The `Contains` estimate assumes a 34-character address; classic addresses are 25–35
   characters, so the estimate is approximate and is labelled as such.
