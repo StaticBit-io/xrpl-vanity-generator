@@ -195,18 +195,31 @@ public sealed class SearchViewModel : IDisposable
 
     public bool CanStart => State == SearchState.Idle && StartBlockedReason is null;
 
-    public string? StartBlockedReason
+    /// <summary>Non-null when the pattern set has no reachable pattern; rendered inside the Patterns card.</summary>
+    public string? PatternProblem
     {
         get
         {
             lock (_gate)
             {
-                if (_patternSet is null || !_patternSet.HasPatterns) return "Add at least one reachable pattern.";
-                if (!_targets.Any(t => t.Selected)) return "Select the CPU or at least one device.";
-                return null;
+                return _patternSet is null || !_patternSet.HasPatterns ? "Add at least one reachable pattern." : null;
             }
         }
     }
+
+    /// <summary>Non-null when no target is selected; rendered beside the Start button.</summary>
+    public string? TargetProblem
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _targets.Any(t => t.Selected) ? null : "Select the CPU or at least one device.";
+            }
+        }
+    }
+
+    public string? StartBlockedReason => PatternProblem ?? TargetProblem;
 
     public void AddPattern(string text, MatchPosition position, bool ignoreCase)
     {

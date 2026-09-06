@@ -11,7 +11,9 @@
 // content; .results .list is the only element that actually scrolls (overflow-y: auto). Both
 // .content-scroll and .results .list keep overflow-y: auto, so the page still scrolls as a whole
 // at the 900x600 minimum window size even if .results ever shrinks below its 240px floor.
-.search-grid { display: grid; grid-template-columns: 1.2fr 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 12px; max-width: 1536px; flex: 1; min-height: 0; }
+// No max-width here: the Search page fills the window at any size, keeping the 1.2fr / 1fr ratio
+// (collapsing to a single column below 1000px, see the media query further down).
+.search-grid { display: grid; grid-template-columns: 1.2fr 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 12px; flex: 1; min-height: 0; }
 .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .col-bottom { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
 .results { flex: 1; min-height: 240px; display: flex; flex-direction: column; }
@@ -31,8 +33,19 @@
 .storage-note { font-size: 12px; padding-top: 2px; }
 
 // Settings page
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+// align-items: stretch (spelled out, though it is grid's own default) plus height: 100% on each
+// row item is what keeps WINDOW and SECRETS the same height instead of each shrinking to its own
+// content and staggering like a staircase; margin-top: 0 overrides the general .card-box + .card-box
+// stacking margin (_cards.scss), which would otherwise push SECRETS 12px below WINDOW's top even
+// though the two sit side by side. DATA still spans both columns below, unaffected by the reset.
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
+.settings-grid > .card-box { height: 100%; margin-top: 0; }
 .settings-grid .full { grid-column: 1 / -1; }
 .srow { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--dark-gray); font-size: 13px; }
 .srow:first-of-type { border-top: 0; }
 .srow .desc { color: var(--text-secondary); font-size: 12px; margin-top: 2px; }
+// Plain <a href> (no target="_blank"): BlazorWebView routes external navigation through its own
+// UrlLoading handler to the system browser, where a target="_blank" would be inert.
+.about-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; }
+.about-links a { color: var(--text-secondary); text-decoration: none; }
+.about-links a:hover { color: var(--mint); }

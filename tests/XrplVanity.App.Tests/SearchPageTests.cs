@@ -21,14 +21,30 @@ public class SearchPageTests : BunitContext
     }
 
     [Fact]
-    public void Start_Is_Disabled_With_A_Reason_Until_A_Pattern_Exists()
+    public void Start_Is_Disabled_Until_A_Pattern_Exists_And_The_Reason_Is_In_The_Patterns_Card_Not_Beside_Start()
     {
         SearchViewModel vm = Register();
         IRenderedComponent<SearchPage> cut = Render<SearchPage>();
         Assert.True(cut.Find("button.start").HasAttribute("disabled"));
-        Assert.Contains("Add at least one reachable pattern.", cut.Find(".start-hint").TextContent);
+        Assert.Contains("Add at least one reachable pattern.", cut.Find(".pattern-problem").TextContent);
+        Assert.Empty(cut.FindAll(".start-hint"));
 
         vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+        cut.WaitForAssertion(() => Assert.False(cut.Find("button.start").HasAttribute("disabled")));
+    }
+
+    [Fact]
+    public void Start_Is_Disabled_With_A_Reason_Beside_Start_Until_A_Target_Is_Selected()
+    {
+        SearchViewModel vm = Register();
+        vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+        vm.SetTargetSelected("cpu", false);
+        IRenderedComponent<SearchPage> cut = Render<SearchPage>();
+        Assert.True(cut.Find("button.start").HasAttribute("disabled"));
+        Assert.Contains("Select the CPU or at least one device.", cut.Find(".start-hint").TextContent);
+        Assert.Empty(cut.FindAll(".pattern-problem"));
+
+        vm.SetTargetSelected("cpu", true);
         cut.WaitForAssertion(() => Assert.False(cut.Find("button.start").HasAttribute("disabled")));
     }
 

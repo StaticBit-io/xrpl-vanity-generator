@@ -74,6 +74,25 @@ public class SettingsPageTests : BunitContext
         Assert.Null(vm.Count);
     }
 
+    [Fact]
+    public void The_About_Area_Links_To_The_Project_And_StaticBit()
+    {
+        MemorySettingsStore settings = new();
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
+        Services.AddSingleton(vm);
+        Services.AddSingleton<INotificationService>(new FakeNotifications());
+        Services.AddSingleton<IWindowService>(new NullWindowService());
+        IRenderedComponent<SettingsPage> cut = Render<SettingsPage>();
+
+        IReadOnlyDictionary<string, string> hrefsByText = cut.FindAll(".about-links a")
+            .ToDictionary(a => a.TextContent.Trim(), a => a.GetAttribute("href") ?? string.Empty);
+
+        Assert.Equal("https://github.com/StaticBit-io/xrpl-vanity-generator", hrefsByText["Project on GitHub"]);
+        Assert.Equal("https://github.com/StaticBit-io", hrefsByText["StaticBit on GitHub"]);
+        Assert.Equal("https://x.com/StaticBit_io", hrefsByText["X"]);
+        Assert.Equal("https://staticbit.io/", hrefsByText["staticbit.io"]);
+    }
+
     private sealed class NullWindowService : IWindowService
     {
 #pragma warning disable CS0067 // Required by IWindowService; this fake never raises it.

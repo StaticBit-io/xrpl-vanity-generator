@@ -34,7 +34,7 @@ The application has three pages:
 | Hide a revealed seed after | Seconds before a revealed seed masks itself again. It is also masked when you leave the page. | 15 |
 | Rate hints | The last measured speed per device, used for the estimate before a run. **Forget rate hints** clears them. | — |
 | Data folder | Where `settings.json` and `results.dat` live, with **Open folder**. | — |
-| About | Version, search engines and font licences. | — |
+| About | Version, search engines, font licences, and links to the project on GitHub, StaticBit on GitHub, X and staticbit.io. | — |
 
 Seeds are masked everywhere by default. A row reveals its seed only on request and hides
 it again after the configured timeout or when the page is left. Copying a seed puts it on

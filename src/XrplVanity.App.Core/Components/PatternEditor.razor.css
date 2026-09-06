@@ -4,6 +4,7 @@
    (wwwroot/scss/common/_forms.scss); only this component's own layout stays here. */
 .case-label { color: var(--text-secondary); white-space: nowrap; display: flex; gap: 6px; align-items: center; }
 .list-error { color: var(--negative); font-size: 12px; margin-top: 6px; }
+.pattern-problem { color: var(--yellow); font-size: 12px; margin-top: 6px; }
 @media (max-width: 1000px) {
   .pattern-entry { grid-template-columns: 1fr 1fr; }
   .pattern-entry .pos { grid-column: 1 / -1; }

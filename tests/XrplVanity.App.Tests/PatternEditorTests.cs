@@ -31,6 +31,17 @@ public class PatternEditorTests : BunitContext
     }
 
     [Fact]
+    public void No_Reachable_Pattern_Shows_The_Problem_Under_The_Entry_Row()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+        Assert.Equal("Add at least one reachable pattern.", cut.Find(".pattern-problem").TextContent.Trim());
+
+        vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".pattern-problem")));
+    }
+
+    [Fact]
     public void An_Unreachable_Chip_Shows_Its_Warning()
     {
         SearchViewModel vm = Vm();
