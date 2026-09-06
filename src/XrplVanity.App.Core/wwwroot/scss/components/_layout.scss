@@ -19,7 +19,8 @@
 .banner-yellow { background: rgba(211, 231, 171, 0.12); color: var(--yellow); border-radius: var(--radius-chip); padding: 8px 12px; }
 .banner-negative { background: rgba(214, 119, 106, 0.14); color: var(--negative); border-radius: var(--radius-chip); padding: 8px 12px; }
 @media (max-width: 1000px) {
-  .search-grid { grid-template-columns: 1fr; }
+  // Single column: expand rows so .col-bottom (results list) lands in the bounded third row.
+  .search-grid { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); }
 }
 
 // Shared "pill" badge outside StatusPill's own scoped style (e.g. the History page's row count).
