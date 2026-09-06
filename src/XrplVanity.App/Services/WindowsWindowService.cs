@@ -23,6 +23,9 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
     private const uint WmGetMinMaxInfo = 0x0024;
     private static readonly TimeSpan SaveSizeDebounce = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>The host's own cap on the exit teardown; the session's dispose cap is 30 s (Plan F).</summary>
+    private static readonly TimeSpan ExitTimeout = TimeSpan.FromSeconds(10);
+
     private readonly IServiceProvider _services;
     private readonly ISettingsStore _settingsStore;
     private readonly Timer _saveSizeTimer;
@@ -35,7 +38,10 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
     private WndProc? _wndProc;
     private SizeInt32? _pendingSize;
     private bool _disposed;
-    private bool _exiting;
+
+    // Read from OnAppWindowClosing on the UI thread and written under _gate from Exit(), which the
+    // tray can call from its own thread.
+    private volatile bool _exiting;
 
     public WindowsWindowService(IServiceProvider services, ISettingsStore settingsStore)
     {
@@ -135,10 +141,35 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
         FlushPendingSize();
 
         // Stop the search before anything tears the process down: the session owns worker threads
-        // and GPU contexts, and Quit() does not unwind them.
-        _services.GetService<SearchViewModel>()?.Dispose();
-        _services.GetService<ITrayService>()?.Hide();
-        _services.GetService<WindowsNotificationService>()?.Shutdown();
+        // and GPU contexts, and Quit() does not unwind them. Stop() returns at once, so the window
+        // and the tray icon can go now instead of leaving a frozen frame on screen while the
+        // session unwinds; both are XAML-owned, so both are touched on the UI thread only.
+        _services.GetService<SearchViewModel>()?.Stop();
+        HideToTray();
+        MainThread.BeginInvokeOnMainThread(() => _services.GetService<ITrayService>()?.Hide());
+
+        _ = TearDownAndQuitAsync();
+    }
+
+    /// <summary>
+    /// The blocking part of the teardown — <see cref="SearchViewModel.Dispose"/>, which waits on
+    /// the session's own 30 s dispose cap — runs off the UI thread, and the host gives the whole
+    /// teardown <see cref="ExitTimeout"/> before quitting regardless (the spec's cap). Nothing
+    /// here blocks the UI thread: the awaits return to the message pump, which the clipboard
+    /// clear has to marshal through to make progress.
+    /// </summary>
+    private async Task TearDownAndQuitAsync()
+    {
+        Task teardown = Task.Run(() =>
+        {
+            _services.GetService<SearchViewModel>()?.Dispose();
+            _services.GetService<WindowsNotificationService>()?.Shutdown();
+        });
+
+        // A seed copied within the clear delay must not outlive the process on the clipboard.
+        Task clipboard = _services.GetService<IClipboardService>()?.ClearPendingSecretAsync() ?? Task.CompletedTask;
+
+        await Task.WhenAny(Task.WhenAll(teardown, clipboard), Task.Delay(ExitTimeout));
 
         MainThread.BeginInvokeOnMainThread(() => Application.Current?.Quit());
     }

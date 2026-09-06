@@ -16,8 +16,10 @@ public sealed class TrayCoordinator : IDisposable
     private readonly IWindowService _window;
     private readonly WindowsNotificationService _notifications;
 
-    private TrayMenu _current;
-    private bool _disposed;
+    // Written from OnViewModelChanged, which runs on the search's worker threads, and read from
+    // the UI thread; volatile keeps the compare-and-publish from working off a stale cached value.
+    private volatile TrayMenu _current;
+    private volatile bool _disposed;
 
     public TrayCoordinator(SearchViewModel viewModel, ITrayService tray, IWindowService window, WindowsNotificationService notifications)
     {

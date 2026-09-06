@@ -70,8 +70,8 @@ public sealed class MemoryResultStore : IResultStore
     public bool IsReadOnly { get; init; }
     public string? ReadOnlyReason { get; init; }
 
-    /// <summary>When set, every write fails the way a read-only <c>results.dat</c> would.</summary>
-    public bool ThrowOnWrite { get; init; }
+    /// <summary>When set, every write fails the way a read-only <c>results.dat</c> would. Settable so a test can seed rows first.</summary>
+    public bool ThrowOnWrite { get; set; }
 
     /// <summary>Single-result appends: a batched search must not perform any.</summary>
     public int Appends => Volatile.Read(ref _appends);

@@ -105,15 +105,18 @@ public partial class ResultsList : IDisposable
     private async Task Export()
     {
         _exportError = null;
-        string? path = await Dialog.PickSaveTsvAsync("xrpl-vanity.tsv");
-        if (path is null) return;
         try
         {
+            // The picker itself can fail (no owner window yet, a shell extension refusing the
+            // dialog), so it belongs inside the same guard as the write.
+            string? path = await Dialog.PickSaveTsvAsync("xrpl-vanity.tsv");
+            if (path is null) return;
+
             // Items is newest-first in the app; export chronologically (oldest-first), matching
             // the order the CLI's --out would have written.
             TsvExport.Write(path, Items.OrderBy(i => i.FoundAt).Select(i => (i.Address, i.Seed)));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             _exportError = $"Export failed: {ex.Message}";
         }

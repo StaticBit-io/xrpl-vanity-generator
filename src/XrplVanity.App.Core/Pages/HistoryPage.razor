@@ -16,6 +16,10 @@
 {
   <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
 }
+@if (_storeError is not null)
+{
+  <Banner Kind="negative" Text="@_storeError" />
+}
 <div class="filter-row">
   <input class="filter form-control mono" placeholder="filter by address or pattern" @bind="_filter" @bind:event="oninput" />
 </div>

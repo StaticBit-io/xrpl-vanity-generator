@@ -11,7 +11,8 @@ public static class Formatting
         return Math.Round(value).ToString("N0", CultureInfo.InvariantCulture);
     }
 
-    public static string Rate(double perSecond) => Candidates(perSecond) + "/s";
+    /// <summary>A first tick with zero elapsed time divides into infinity — show a dash, not "∞ G/s".</summary>
+    public static string Rate(double perSecond) => double.IsFinite(perSecond) ? Candidates(perSecond) + "/s" : "—";
 
     public static string Duration(TimeSpan? value)
     {

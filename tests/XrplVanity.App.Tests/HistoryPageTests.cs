@@ -57,6 +57,30 @@ public class HistoryPageTests : BunitContext
     }
 
     [Fact]
+    public void A_Store_That_Throws_On_Delete_Or_Clear_Shows_A_Banner_Instead_Of_Crashing()
+    {
+        MemoryResultStore store = new() { ReadOnlyReason = "results.dat could not be written" };
+        store.Append(new StoredResult("rFast1", "s1", "fast", "Starts", DateTimeOffset.UtcNow, "cpu"));
+        Services.AddSingleton<IResultStore>(store);
+        Services.AddSingleton(new SearchViewModel(new MemorySettingsStore(), store, new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>()));
+        Services.AddSingleton<IClipboardService>(new FakeClipboard());
+        Services.AddSingleton<IFileDialogService>(new FakeFileDialog());
+        Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        IRenderedComponent<HistoryPage> cut = Render<HistoryPage>();
+
+        store.ThrowOnWrite = true;   // DPAPI stops being able to write while the page is open
+
+        cut.FindAll("button.delete")[0].Click();
+        Assert.Contains("results.dat could not be written", cut.Find(".banner-negative").TextContent);
+        Assert.Single(cut.FindAll(".row"));   // nothing was deleted, and the list reloaded
+
+        cut.Find("button.clear").Click();
+        cut.Find("button.clear").Click();
+        Assert.Contains("results.dat could not be written", cut.Find(".banner-negative").TextContent);
+        Assert.Single(store.LoadAll());
+    }
+
+    [Fact]
     public void A_Read_Only_Store_Shows_The_Reason_And_Hides_Destructive_Buttons()
     {
         MemoryResultStore store = new() { IsReadOnly = true, ReadOnlyReason = "results.dat could not be read" };
