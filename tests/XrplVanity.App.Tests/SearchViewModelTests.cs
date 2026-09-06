@@ -162,4 +162,118 @@ public class SearchViewModelTests
         Assert.Single(vm.Results);
         Assert.Equal("corrupt", vm.HistoryReadOnlyReason);
     }
+
+    [Fact]
+    public void Setting_CpuThreads_To_Zero_Clamps_To_One_And_Persists()
+    {
+        (SearchViewModel vm, _, _, MemorySettingsStore settings) = Create();
+        int changes = 0;
+        vm.Changed += () => Interlocked.Increment(ref changes);
+
+        vm.CpuThreads = 0;
+
+        Assert.Equal(1, vm.CpuThreads);
+        Assert.Equal(1, settings.Current.CpuThreads);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Setting_Count_To_Zero_Clamps_To_Unbounded_And_Persists()
+    {
+        (SearchViewModel vm, _, _, MemorySettingsStore settings) = Create();
+        vm.Count = 5;   // a non-null baseline so the assignment below is an observable change
+        int changes = 0;
+        vm.Changed += () => Interlocked.Increment(ref changes);
+
+        vm.Count = 0;
+
+        Assert.Null(vm.Count);
+        Assert.Null(settings.Current.Count);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void A_Corrupt_Saved_Duty_Percent_Is_Clamped_On_Construction()
+    {
+        MemorySettingsStore settings = new();
+        settings.Save(settings.Current with { DutyPercent = 500 });
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<DeviceCatalogEntry>());
+
+        Assert.Equal(100, vm.DutyPercent);
+    }
+
+    [Fact]
+    public void A_Faulted_Session_Completion_Returns_To_Idle_With_The_Failure_Message()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("zzzzzzzz", MatchPosition.Starts, false);
+        vm.Start();
+        WaitUntil(() => vm.State == SearchState.Searching, "searching");
+
+        vm.OnSessionCompleted(Task.FromException<SearchSummary>(new InvalidOperationException("boom")));
+
+        Assert.Equal(SearchState.Idle, vm.State);
+        Assert.Contains("boom", vm.LastFailure);
+
+        vm.Dispose();   // in case the real (stopped) session had not settled yet
+    }
+
+    [Fact]
+    public void A_Cancelled_Session_Completion_Returns_To_Idle_With_A_Cancelled_Message()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("zzzzzzzz", MatchPosition.Starts, false);
+        vm.Start();
+        WaitUntil(() => vm.State == SearchState.Searching, "searching");
+
+        TaskCompletionSource<SearchSummary> tcs = new();
+        tcs.SetCanceled(TestContext.Current.CancellationToken);
+        vm.OnSessionCompleted(tcs.Task);
+
+        Assert.Equal(SearchState.Idle, vm.State);
+        Assert.Equal("search cancelled", vm.LastFailure);
+
+        vm.Dispose();
+    }
+
+    [Fact]
+    public void Live_Lists_Can_Be_Read_Concurrently_With_A_Running_Search()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("zzzzzzzz", MatchPosition.Starts, false);
+        vm.Start();
+        WaitUntil(() => vm.State == SearchState.Searching, "searching");
+
+        Exception? failure = null;
+        Stopwatch sw = Stopwatch.StartNew();
+        Thread reader = new(() =>
+        {
+            try
+            {
+                while (sw.Elapsed < TimeSpan.FromMilliseconds(300))
+                {
+                    _ = vm.Results.Count;
+                    _ = vm.Targets.Count;
+                    _ = vm.Patterns.Count;
+                }
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+        reader.Start();
+
+        while (sw.Elapsed < TimeSpan.FromMilliseconds(300))
+        {
+            vm.SetTargetSelected("cpu", true);
+            vm.RefreshDevices();
+        }
+
+        reader.Join();
+        vm.Stop();
+        WaitUntil(() => vm.State == SearchState.Idle, "idle");
+
+        Assert.Null(failure);
+    }
 }

@@ -30,6 +30,8 @@ public sealed class SearchViewModel : IDisposable
     private SearchSession? _session;
     private SearchProgress? _progress;
     private int _dutyPercent;
+    private int _cpuThreads;
+    private int? _count;
 
     public SearchViewModel(ISettingsStore settingsStore, IResultStore resultStore, INotificationService notifications, Func<IReadOnlyList<DeviceCatalogEntry>> deviceSource)
     {
@@ -38,9 +40,12 @@ public sealed class SearchViewModel : IDisposable
         _notifications = notifications;
         _deviceSource = deviceSource;
         _settings = settingsStore.Load();
-        _dutyPercent = _settings.DutyPercent;
-        CpuThreads = Math.Clamp(_settings.CpuThreads, 1, Math.Max(1, Environment.ProcessorCount));
-        Count = _settings.Count;
+        // Settings are loaded from disk (or DPAPI storage) and can carry stale or corrupted
+        // values from an older build; clamp/normalize here so a bad value never reaches the
+        // throwing constructors in Start() (SearchRequest, SearchTarget.Cpu).
+        _dutyPercent = Math.Clamp(_settings.DutyPercent, 1, DutyCycle.Full);
+        _cpuThreads = Math.Clamp(_settings.CpuThreads, 1, Math.Max(1, Environment.ProcessorCount));
+        _count = _settings.Count is int loadedCount && loadedCount < 1 ? null : _settings.Count;
         foreach (PatternDraft draft in _settings.Patterns)
         {
             if (Enum.TryParse(draft.Position, out MatchPosition position))
@@ -56,15 +61,60 @@ public sealed class SearchViewModel : IDisposable
     public event Action? Changed;
 
     public SearchState State { get; private set; } = SearchState.Idle;
-    public IReadOnlyList<PatternChip> Patterns => _patterns;
-    public IReadOnlyList<TargetChoice> Targets => _targets;
-    public IReadOnlyList<SessionResult> Results => _results;
+
+    /// <summary>A snapshot taken under <c>_gate</c>: safe to enumerate while a search is running on another thread.</summary>
+    public IReadOnlyList<PatternChip> Patterns { get { lock (_gate) return _patterns.ToArray(); } }
+
+    /// <summary>A snapshot taken under <c>_gate</c>: safe to enumerate while a search is running on another thread.</summary>
+    public IReadOnlyList<TargetChoice> Targets { get { lock (_gate) return _targets.ToArray(); } }
+
+    /// <summary>A snapshot taken under <c>_gate</c>: safe to enumerate while a search is running on another thread.</summary>
+    public IReadOnlyList<SessionResult> Results { get { lock (_gate) return _results.ToArray(); } }
+
     public SearchProgress? Progress => _progress;
     public SearchSummary? LastSummary { get; private set; }
     public string? LastFailure { get; private set; }
     public bool NoGpuFound { get; private set; }
-    public int CpuThreads { get; set; }
-    public int? Count { get; set; }
+
+    public int CpuThreads
+    {
+        get => _cpuThreads;
+        set
+        {
+            int clamped = Math.Clamp(value, 1, Math.Max(1, Environment.ProcessorCount));
+            bool changed;
+            lock (_gate)
+            {
+                changed = clamped != _cpuThreads;
+                _cpuThreads = clamped;
+            }
+
+            if (!changed) return;
+            PersistDraft();
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Any value below 1 means unbounded (searches until stopped).</summary>
+    public int? Count
+    {
+        get => _count;
+        set
+        {
+            int? normalized = value is int v && v < 1 ? null : value;
+            bool changed;
+            lock (_gate)
+            {
+                changed = normalized != _count;
+                _count = normalized;
+            }
+
+            if (!changed) return;
+            PersistDraft();
+            Changed?.Invoke();
+        }
+    }
+
     public string? HistoryReadOnlyReason => _resultStore.IsReadOnly ? _resultStore.ReadOnlyReason ?? "history is read-only" : null;
     public AppSettings Settings => _settings;
 
@@ -112,9 +162,12 @@ public sealed class SearchViewModel : IDisposable
     {
         get
         {
-            if (_patternSet is null || !_patternSet.HasPatterns) return "Add at least one reachable pattern.";
-            if (!_targets.Any(t => t.Selected)) return "Select the CPU or at least one device.";
-            return null;
+            lock (_gate)
+            {
+                if (_patternSet is null || !_patternSet.HasPatterns) return "Add at least one reachable pattern.";
+                if (!_targets.Any(t => t.Selected)) return "Select the CPU or at least one device.";
+                return null;
+            }
         }
     }
 
@@ -202,9 +255,8 @@ public sealed class SearchViewModel : IDisposable
 
         lock (_gate)
         {
-            // A target is selected when the saved draft (first call) or the current draft (refresh)
-            // selected it. Nothing is auto-selected beyond the CPU on a fresh install, and OpenCL
-            // CPU implementations ([cpu]) are never selected unless the user picked them.
+            // A target is selected only if the saved draft or the current draft selected it;
+            // nothing is auto-selected on a fresh install except the CPU.
             HashSet<string> selected = new(_targets.Count == 0 ? _settings.Targets : _targets.Where(t => t.Selected).Select(t => t.Id), StringComparer.Ordinal);
             _targets.Clear();
             _targets.Add(new TargetChoice("cpu", "CPU", $"{Environment.ProcessorCount} logical processors", false, selected.Contains("cpu")));
@@ -219,29 +271,55 @@ public sealed class SearchViewModel : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Builds the request and starts the session while holding <c>_gate</c>. Nothing here should
+    /// throw once loaded settings are normalized (see the constructor) and <see cref="CpuThreads"/>/
+    /// <see cref="Count"/> stay clamped by their own setters, but the construction path still calls
+    /// into <c>XrplVanity.Search</c> types with their own throwing constructors — a failure there
+    /// must not leave the view model wedged in <see cref="SearchState.Starting"/>, so it is caught
+    /// and reported through <see cref="LastFailure"/> instead of escaping <see cref="Start"/>.
+    /// </summary>
     public void Start()
     {
-        SearchRequest request;
-        lock (_gate)
+        SearchSession? session = null;
+        try
         {
-            if (!CanStart) return;
-            List<SearchTarget> targets = new();
-            foreach (TargetChoice t in _targets.Where(t => t.Selected))
+            lock (_gate)
             {
-                targets.Add(t.IsCpu
-                    ? new SearchTarget.Cpu(CpuThreads)
-                    : new SearchTarget.Device(ParseSelector(t.Id)));
+                if (!CanStart) return;
+                List<SearchTarget> targets = new();
+                foreach (TargetChoice t in _targets.Where(t => t.Selected))
+                {
+                    targets.Add(t.IsCpu
+                        ? new SearchTarget.Cpu(_cpuThreads)
+                        : new SearchTarget.Device(ParseSelector(t.Id)));
+                }
+
+                SearchRequest request = new(_patternSet!, targets, _count, _dutyPercent);
+                _results.Clear();
+                LastSummary = null;
+                LastFailure = null;
+                _progress = null;
+                State = SearchState.Starting;
+                session = new SearchSession(request, OnMatch, OnLog);
+                _session = session;
+                session.ProgressChanged += OnProgress;
+                session.Completion.ContinueWith(OnSessionCompleted);
+                session.Start();
+            }
+        }
+        catch (Exception ex)
+        {
+            lock (_gate)
+            {
+                LastFailure = ex.Message;
+                State = SearchState.Idle;
+                _session = null;
             }
 
-            request = new SearchRequest(_patternSet!, targets, Count, _dutyPercent);
-            _results.Clear();
-            LastSummary = null;
-            LastFailure = null;
-            State = SearchState.Starting;
-            _session = new SearchSession(request, OnMatch, OnLog);
-            _session.ProgressChanged += OnProgress;
-            _session.Completion.ContinueWith(t => OnCompleted(t.Result), TaskContinuationOptions.OnlyOnRanToCompletion);
-            _session.Start();
+            session?.Dispose();
+            Changed?.Invoke();
+            return;
         }
 
         PersistDraft();
@@ -284,6 +362,11 @@ public sealed class SearchViewModel : IDisposable
     private static DeviceSelector ParseSelector(string id)
     {
         int colon = id.IndexOf(':');
+        if (colon < 0)
+        {
+            throw new ArgumentException($"'{id}' is not a device id", nameof(id));
+        }
+
         return new DeviceSelector(id[..colon], int.Parse(id[(colon + 1)..]));
     }
 
@@ -295,13 +378,16 @@ public sealed class SearchViewModel : IDisposable
             return progress.TotalRatePerSecond;
         }
 
-        double sum = 0;
-        foreach (TargetChoice t in _targets.Where(t => t.Selected))
+        lock (_gate)
         {
-            if (_settings.RateHints.TryGetValue(t.Id, out double hint)) sum += hint;
-        }
+            double sum = 0;
+            foreach (TargetChoice t in _targets.Where(t => t.Selected))
+            {
+                if (_settings.RateHints.TryGetValue(t.Id, out double hint)) sum += hint;
+            }
 
-        return sum;
+            return sum;
+        }
     }
 
     private void RebuildPatternSet()
@@ -327,13 +413,19 @@ public sealed class SearchViewModel : IDisposable
 
     private void PersistDraft()
     {
-        SaveSettings(s => s with
+        // _gate is re-entrant: SaveSettings takes it again to write _settings, which is fine on
+        // the same thread and keeps the read of _patterns/_targets and the write of _settings
+        // as one atomic step with respect to a concurrent RefreshDevices/SetTargetSelected call.
+        lock (_gate)
         {
-            Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase)).ToArray(),
-            Targets = _targets.Where(t => t.Selected).Select(t => t.Id).ToArray(),
-            CpuThreads = CpuThreads,
-            Count = Count,
-        });
+            SaveSettings(s => s with
+            {
+                Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase)).ToArray(),
+                Targets = _targets.Where(t => t.Selected).Select(t => t.Id).ToArray(),
+                CpuThreads = _cpuThreads,
+                Count = _count,
+            });
+        }
     }
 
     private void OnProgress(SearchProgress progress)
@@ -414,6 +506,48 @@ public sealed class SearchViewModel : IDisposable
         if (_settings.NotificationsEnabled)
         {
             _notifications.Notify("Search finished", $"{summary.Final.Reported} found · {summary.Outcome}");
+        }
+
+        Changed?.Invoke();
+        finished?.Dispose();
+    }
+
+    /// <summary>
+    /// The body of the continuation attached to <see cref="SearchSession.Completion"/> in
+    /// <see cref="Start"/>, extracted so a test can drive it directly with a faulted or
+    /// cancelled task — <see cref="SearchSession"/> has no seam to make its own completion fail,
+    /// so pinning the wiring this way is the only way to cover the failure branch. Unlike the
+    /// previous <c>ContinueWith(..., OnlyOnRanToCompletion)</c>, this runs for every completion
+    /// state: a faulted or cancelled session must still bring the view model back to
+    /// <see cref="SearchState.Idle"/> instead of leaving it stuck in <see cref="SearchState.Starting"/>
+    /// or <see cref="SearchState.Searching"/> forever.
+    /// </summary>
+    internal void OnSessionCompleted(Task<SearchSummary> task)
+    {
+        if (task.IsFaulted)
+        {
+            Exception inner = task.Exception!.GetBaseException();
+            OnFailed(inner.Message);
+        }
+        else if (task.IsCanceled)
+        {
+            OnFailed("search cancelled");
+        }
+        else
+        {
+            OnCompleted(task.Result);
+        }
+    }
+
+    private void OnFailed(string message)
+    {
+        SearchSession? finished;
+        lock (_gate)
+        {
+            LastFailure = message;
+            State = SearchState.Idle;
+            finished = _session;
+            _session = null;
         }
 
         Changed?.Invoke();
