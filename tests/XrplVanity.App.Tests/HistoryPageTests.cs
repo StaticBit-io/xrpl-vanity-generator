@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using XrplVanity.App.Core.Pages;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
@@ -31,6 +32,28 @@ public class HistoryPageTests : BunitContext
         cut.FindAll("button.delete")[0].Click();
         Assert.Single(store.LoadAll());
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".row")));
+    }
+
+    [Fact]
+    public void Clear_Confirmation_Reverts_To_Clear_History_After_The_Confirm_Window_Elapses()
+    {
+        MemoryResultStore store = new();
+        store.Append(new StoredResult("rFast1", "s1", "fast", "Starts", DateTimeOffset.UtcNow, "cpu"));
+        Services.AddSingleton<IResultStore>(store);
+        Services.AddSingleton(new SearchViewModel(new MemorySettingsStore(), store, new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>()));
+        Services.AddSingleton<IClipboardService>(new FakeClipboard());
+        Services.AddSingleton<IFileDialogService>(new FakeFileDialog());
+        FakeTimeProvider time = new();
+        Services.AddSingleton<TimeProvider>(time);
+        IRenderedComponent<HistoryPage> cut = Render<HistoryPage>();
+
+        cut.Find("button.clear").Click();
+        Assert.Equal("Click again to confirm", cut.Find("button.clear").TextContent.Trim());
+
+        time.Advance(TimeSpan.FromSeconds(6));
+
+        cut.WaitForAssertion(() => Assert.Equal("Clear history", cut.Find("button.clear").TextContent.Trim()));
+        Assert.Single(store.LoadAll());   // reverted, not cleared
     }
 
     [Fact]

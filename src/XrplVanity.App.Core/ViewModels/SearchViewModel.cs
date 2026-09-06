@@ -25,6 +25,7 @@ public sealed class SearchViewModel : IDisposable
     private readonly List<PatternChip> _patterns = new();
     private readonly List<TargetChoice> _targets = new();
     private readonly List<SessionResult> _results = new();
+    private IReadOnlyList<SessionResult> _resultsSnapshot = Array.Empty<SessionResult>();
     private AppSettings _settings;
     private PatternSet? _patternSet;
     private SearchSession? _session;
@@ -68,8 +69,14 @@ public sealed class SearchViewModel : IDisposable
     /// <summary>A snapshot taken under <c>_gate</c>: safe to enumerate while a search is running on another thread.</summary>
     public IReadOnlyList<TargetChoice> Targets { get { lock (_gate) return _targets.ToArray(); } }
 
-    /// <summary>A snapshot taken under <c>_gate</c>: safe to enumerate while a search is running on another thread.</summary>
-    public IReadOnlyList<SessionResult> Results { get { lock (_gate) return _results.ToArray(); } }
+    /// <summary>
+    /// A cached snapshot rebuilt under <c>_gate</c> only where the underlying result list actually
+    /// changes (<see cref="Start"/> clearing it, <see cref="OnMatch"/> inserting into it) — the
+    /// same instance is returned between changes, so a consumer that keys state off a "did the
+    /// list change" reference comparison (e.g. <c>ResultsList</c>) does not see a false positive on
+    /// every unrelated re-render (a progress tick, for instance).
+    /// </summary>
+    public IReadOnlyList<SessionResult> Results { get { lock (_gate) return _resultsSnapshot; } }
 
     public SearchProgress? Progress => _progress;
     public SearchSummary? LastSummary { get; private set; }
@@ -297,6 +304,7 @@ public sealed class SearchViewModel : IDisposable
 
                 SearchRequest request = new(_patternSet!, targets, _count, _dutyPercent);
                 _results.Clear();
+                _resultsSnapshot = Array.Empty<SessionResult>();
                 LastSummary = null;
                 LastFailure = null;
                 _progress = null;
@@ -449,6 +457,7 @@ public sealed class SearchViewModel : IDisposable
         lock (_gate)
         {
             _results.Insert(0, result);
+            _resultsSnapshot = _results.ToArray();
         }
 
         if (!_resultStore.IsReadOnly)

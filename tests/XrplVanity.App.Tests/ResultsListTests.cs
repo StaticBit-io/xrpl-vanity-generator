@@ -143,6 +143,35 @@ public class ResultsListTests : BunitContext
     }
 
     [Fact]
+    public void A_Revealed_Seed_Survives_A_Re_Render_With_A_New_List_Instance_Of_The_Same_Item()
+    {
+        // SearchViewModel.Results/HistoryPage.Filtered() hand back a fresh collection instance on
+        // every access, even when nothing actually changed (e.g. an unrelated progress tick), so
+        // ResultsList must key its per-address state off the addresses present in Items, not off
+        // whether the Items reference itself changed.
+        IRenderedComponent<ResultsList> cut = RenderList(R(1));
+        cut.Find("button.reveal").Click();
+        Assert.Equal("sEdSeed1", cut.Find(".seed").TextContent.Trim());
+
+        cut.Render(p => p.Add(x => x.Items, new[] { R(1) }));
+
+        Assert.Equal("sEdSeed1", cut.Find(".seed").TextContent.Trim());
+    }
+
+    [Fact]
+    public void A_Revealed_Seed_Is_Pruned_When_Its_Row_Leaves_The_List()
+    {
+        IRenderedComponent<ResultsList> cut = RenderList(R(1));
+        cut.Find("button.reveal").Click();
+        Assert.Equal("sEdSeed1", cut.Find(".seed").TextContent.Trim());
+
+        cut.Render(p => p.Add(x => x.Items, Array.Empty<SessionResult>()));
+
+        Assert.Empty(cut.FindAll(".seed"));
+        Assert.Contains("No matches yet", cut.Markup);
+    }
+
+    [Fact]
     public void Disposing_After_Reveal_Does_Not_Throw_When_The_Timer_Fires()
     {
         IRenderedComponent<ResultsList> cut = RenderList(R(1));

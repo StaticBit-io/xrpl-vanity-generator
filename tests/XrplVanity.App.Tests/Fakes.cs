@@ -42,3 +42,21 @@ public sealed class FakeFileDialog : IFileDialogService
     public string? PathToReturn { get; set; }
     public Task<string?> PickSaveTsvAsync(string suggestedName) => Task.FromResult(PathToReturn);
 }
+
+public sealed class FakeWindowService : IWindowService
+{
+    public bool HideToTrayCalled { get; private set; }
+    public bool ExitCalled { get; private set; }
+    public string DataFolder => "C:\\data";
+
+    public event Action? CloseRequested;
+
+    /// <summary>Number of live subscribers on <see cref="CloseRequested"/> — used to confirm a disposed subscriber unhooked.</summary>
+    public int SubscriberCount => CloseRequested?.GetInvocationList().Length ?? 0;
+
+    public void ShowWindow() { }
+    public void HideToTray() => HideToTrayCalled = true;
+    public void Exit() => ExitCalled = true;
+    public void OpenDataFolder() { }
+    public void RaiseCloseRequested() => CloseRequested?.Invoke();
+}

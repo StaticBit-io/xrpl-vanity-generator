@@ -29,6 +29,29 @@ public class SettingsPageTests : BunitContext
         Assert.Empty(settings.Current.RateHints);
     }
 
+    [Fact]
+    public void Clipboard_And_Reveal_Seconds_Are_Clamped_To_A_Sane_Range()
+    {
+        MemorySettingsStore settings = new();
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
+        Services.AddSingleton(vm);
+        Services.AddSingleton<INotificationService>(new FakeNotifications());
+        Services.AddSingleton<IWindowService>(new NullWindowService());
+        IRenderedComponent<SettingsPage> cut = Render<SettingsPage>();
+
+        cut.Find("input.clipboard-seconds").Change(-5);
+        Assert.Equal(1, settings.Current.ClipboardClearSeconds);
+
+        cut.Find("input.clipboard-seconds").Change(999999);
+        Assert.Equal(3600, settings.Current.ClipboardClearSeconds);
+
+        cut.Find("input.reveal-seconds").Change(-5);
+        Assert.Equal(1, settings.Current.SeedRevealSeconds);
+
+        cut.Find("input.reveal-seconds").Change(999999);
+        Assert.Equal(3600, settings.Current.SeedRevealSeconds);
+    }
+
     private sealed class NullWindowService : IWindowService
     {
 #pragma warning disable CS0067 // Required by IWindowService; this fake never raises it.

@@ -5,6 +5,9 @@ namespace XrplVanity.App.Core.Pages;
 
 public partial class SettingsPage
 {
+    private const int MinSeconds = 1;
+    private const int MaxSeconds = 3600;
+
     private void OnCloseBehaviorChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse((string?)e.Value, out CloseBehavior parsed))
@@ -28,7 +31,7 @@ public partial class SettingsPage
     {
         if (int.TryParse((string?)e.Value, out int value))
         {
-            Vm.SaveSettings(s => s with { ClipboardClearSeconds = value });
+            Vm.SaveSettings(s => s with { ClipboardClearSeconds = Math.Clamp(value, MinSeconds, MaxSeconds) });
         }
     }
 
@@ -36,7 +39,7 @@ public partial class SettingsPage
     {
         if (int.TryParse((string?)e.Value, out int value))
         {
-            Vm.SaveSettings(s => s with { SeedRevealSeconds = value });
+            Vm.SaveSettings(s => s with { SeedRevealSeconds = Math.Clamp(value, MinSeconds, MaxSeconds) });
         }
     }
 

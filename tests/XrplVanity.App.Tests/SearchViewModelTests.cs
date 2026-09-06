@@ -237,6 +237,25 @@ public class SearchViewModelTests
     }
 
     [Fact]
+    public void Results_Returns_The_Same_Instance_Until_A_Match_Changes_It()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("a", MatchPosition.Starts, false);
+        vm.Count = 1;
+
+        IReadOnlyList<SessionResult> before = vm.Results;
+        Assert.Same(before, vm.Results);   // no match yet: repeated reads return the same instance
+
+        vm.Start();
+        WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+
+        IReadOnlyList<SessionResult> after = vm.Results;
+        Assert.NotSame(before, after);     // OnMatch rebuilt the snapshot
+        Assert.Single(after);
+        Assert.Same(after, vm.Results);    // stable again until the next change
+    }
+
+    [Fact]
     public void Live_Lists_Can_Be_Read_Concurrently_With_A_Running_Search()
     {
         (SearchViewModel vm, _, _, _) = Create();

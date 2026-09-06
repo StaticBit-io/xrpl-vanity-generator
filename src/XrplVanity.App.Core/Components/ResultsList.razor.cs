@@ -8,7 +8,6 @@ public partial class ResultsList : IDisposable
     private readonly HashSet<string> _revealed = new(StringComparer.Ordinal);
     private readonly HashSet<string> _animated = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ITimer> _hideTimers = new(StringComparer.Ordinal);
-    private IReadOnlyList<SessionResult>? _lastItems;
     private List<SessionResult> _items = new();
     private string? _exportError;
     private volatile bool _disposed;
@@ -23,20 +22,34 @@ public partial class ResultsList : IDisposable
     {
         _items = Items.ToList();
 
-        // A new session replaces the Items instance (SearchViewModel.Start clears _results); a
-        // revealed seed from a previous session must not leak into the new one's rendering.
-        if (!ReferenceEquals(Items, _lastItems))
-        {
-            _lastItems = Items;
-            if (_revealed.Count > 0 || _hideTimers.Count > 0)
-            {
-                foreach (ITimer timer in _hideTimers.Values) timer.Dispose();
-                _hideTimers.Clear();
-                _revealed.Clear();
-            }
+        // SearchViewModel.Results/HistoryPage.Filtered() hand back a fresh collection instance on
+        // every access (including one with the exact same rows, e.g. an unrelated progress tick),
+        // so reference equality on Items is not a reliable "new session" signal. Instead, prune
+        // per-address state to whatever addresses are still present: an address that stays in
+        // Items keeps its revealed/hide-timer/animated state across re-renders (no re-masking, no
+        // replayed slide-in), while one that dropped out (deleted row, or a genuinely new session
+        // that cleared the list) is cleaned up, including disposing its now-orphaned hide timer.
+        HashSet<string> present = new(_items.Select(i => i.Address), StringComparer.Ordinal);
 
-            _animated.Clear();
+        List<string>? stale = null;
+        foreach (string address in _revealed)
+        {
+            if (!present.Contains(address))
+            {
+                (stale ??= new List<string>()).Add(address);
+            }
         }
+
+        if (stale is not null)
+        {
+            foreach (string address in stale)
+            {
+                _revealed.Remove(address);
+                StopTimer(address);
+            }
+        }
+
+        _animated.IntersectWith(present);
     }
 
     private void ToggleReveal(string address)

@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject SearchViewModel Vm
 @inject IWindowService Window
 
@@ -12,6 +13,8 @@
     private bool _askClose;
 
     protected override void OnInitialized() => Window.CloseRequested += OnCloseRequested;
+
+    public void Dispose() => Window.CloseRequested -= OnCloseRequested;
 
     private void OnCloseRequested()
     {

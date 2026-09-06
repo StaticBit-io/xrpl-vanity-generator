@@ -4,10 +4,17 @@
 .page-head h1 { font-size: 20px; margin: 0; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 12px; }
 .actions { text-align: right; }
 .content-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 12px; }
-.search-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; max-width: 1536px; }
+// The results list must scroll inside itself, not drag the whole page down with it:
+// .search-grid takes the height .content-scroll has left (flex: 1; min-height: 0) and splits it
+// into two rows — an auto row for col/col-right, and a bounded 1fr row for col-bottom; col-bottom
+// passes that bound down (min-height: 0) so .results can flex to fill it instead of growing to its
+// content; .results .list is the only element that actually scrolls (overflow-y: auto). Both
+// .content-scroll and .results .list keep overflow-y: auto, so the page still scrolls as a whole
+// at the 900x600 minimum window size even if .results ever shrinks below its 240px floor.
+.search-grid { display: grid; grid-template-columns: 1.2fr 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 12px; max-width: 1536px; flex: 1; min-height: 0; }
 .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.col-bottom { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.results { display: flex; flex-direction: column; min-height: 240px; }
+.col-bottom { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+.results { flex: 1; min-height: 240px; display: flex; flex-direction: column; }
 .results .list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; } // the Virtualize container
 .banner-yellow { background: rgba(211, 231, 171, 0.12); color: var(--yellow); border-radius: var(--radius-chip); padding: 8px 12px; }
 .banner-negative { background: rgba(214, 119, 106, 0.14); color: var(--negative); border-radius: var(--radius-chip); padding: 8px 12px; }
