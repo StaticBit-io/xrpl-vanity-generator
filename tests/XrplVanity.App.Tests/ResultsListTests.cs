@@ -101,7 +101,7 @@ public class ResultsListTests : BunitContext
             .Add(x => x.Items, new[] { R(1) })
             .Add(x => x.ShowTarget, true));
 
-        Assert.Contains("has-target", cut.Find(".row").ClassName);
+        Assert.Contains("has-target", cut.Find(".result-row").ClassName);
         Assert.Equal("cpu", cut.Find(".target").TextContent.Trim());
     }
 
@@ -113,7 +113,7 @@ public class ResultsListTests : BunitContext
             .Add(x => x.Items, new[] { R(1) })
             .Add(x => x.ShowTarget, false));
 
-        Assert.DoesNotContain("has-target", cut.Find(".row").ClassName);
+        Assert.DoesNotContain("has-target", cut.Find(".result-row").ClassName);
         Assert.Empty(cut.FindAll(".target"));
     }
 
@@ -127,7 +127,7 @@ public class ResultsListTests : BunitContext
             .Add(x => x.Items, new[] { item })
             .Add(x => x.OnDelete, EventCallback.Factory.Create<SessionResult>(this, r => deleted = r)));
 
-        Assert.Contains("has-delete", cut.Find(".row").ClassName);
+        Assert.Contains("has-delete", cut.Find(".result-row").ClassName);
         cut.Find("button.delete").Click();
         Assert.Equal(item, deleted);
     }
@@ -138,7 +138,7 @@ public class ResultsListTests : BunitContext
         RegisterServices();
         IRenderedComponent<ResultsList> cut = Render<ResultsList>(p => p.Add(x => x.Items, new[] { R(1) }));
 
-        Assert.DoesNotContain("has-delete", cut.Find(".row").ClassName);
+        Assert.DoesNotContain("has-delete", cut.Find(".result-row").ClassName);
         Assert.Empty(cut.FindAll("button.delete"));
     }
 

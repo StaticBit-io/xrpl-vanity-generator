@@ -1,17 +1,17 @@
 .head { display: flex; justify-content: space-between; align-items: center; }
 .count { color: var(--beige); margin-left: 6px; }
-.placeholder { color: var(--text-secondary); padding: 18px 0; }
+.empty-note { color: var(--text-secondary); padding: 18px 0; }
 .list { overflow-y: auto; }
-.row { display: grid; grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px; gap: 8px; align-items: center; height: 44px; border-top: 1px solid var(--dark-gray); }
-.row.has-target { grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px; }
-.row.has-delete { grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px 28px; }
-.row.has-target.has-delete { grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px 28px; }
-.row > * { min-width: 0; overflow-wrap: anywhere; }
+.result-row { display: grid; grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px; gap: 8px; align-items: center; height: 44px; border-top: 1px solid var(--dark-gray); }
+.result-row.has-target { grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px; }
+.result-row.has-delete { grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px 28px; }
+.result-row.has-target.has-delete { grid-template-columns: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px 28px; }
+.result-row > * { min-width: 0; overflow-wrap: anywhere; }
 .address { color: var(--text); }
 .seed { color: var(--text-secondary); letter-spacing: 0.05em; }
 .export-error { color: var(--negative); font-size: 12px; margin-bottom: 8px; }
 @media (max-width: 1000px) {
-  .row, .row.has-target { grid-template-columns: minmax(230px, 1fr) 28px 120px 120px 28px 28px; }
-  .row.has-delete, .row.has-target.has-delete { grid-template-columns: minmax(230px, 1fr) 28px 120px 120px 28px 28px 28px; }
-  .row .target, .row .time { display: none; }
+  .result-row, .result-row.has-target { grid-template-columns: minmax(230px, 1fr) 28px 120px 120px 28px 28px; }
+  .result-row.has-delete, .result-row.has-target.has-delete { grid-template-columns: minmax(230px, 1fr) 28px 120px 120px 28px 28px 28px; }
+  .result-row .target, .result-row .time { display: none; }
 }

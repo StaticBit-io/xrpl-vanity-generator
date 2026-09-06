@@ -10,14 +10,14 @@
   @if (_exportError is not null) { <div class="export-error">@_exportError</div> }
   @if (Items.Count == 0)
   {
-    <div class="placeholder">No matches yet — start a search and hits appear here as they are verified.</div>
+    <div class="empty-note">No matches yet — start a search and hits appear here as they are verified.</div>
   }
   else
   {
     <div class="list">
       <Virtualize TItem="SessionResult" Items="_items" Context="item" ItemSize="44" OverscanCount="8">
         @* _animated.Add returns true only the first time a row is seen, so a re-render (e.g. a seed reveal) does not replay the slide-in. *@
-        <div class="row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
+        <div class="result-row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
           <span class="mono address">@item.Address</span>
           <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
           <span class="pattern">@item.Pattern <span class="muted">(@item.Position.ToLowerInvariant())</span></span>

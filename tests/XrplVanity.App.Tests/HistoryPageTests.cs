@@ -24,14 +24,14 @@ public class HistoryPageTests : BunitContext
         Services.AddSingleton<TimeProvider>(TimeProvider.System);
         IRenderedComponent<HistoryPage> cut = Render<HistoryPage>();
 
-        Assert.Equal(2, cut.FindAll(".row").Count);
+        Assert.Equal(2, cut.FindAll(".result-row").Count);
         cut.Find("input.filter").Input("fast");
-        Assert.Single(cut.FindAll(".row"));
+        Assert.Single(cut.FindAll(".result-row"));
 
         cut.Find("input.filter").Input("");
         cut.FindAll("button.delete")[0].Click();
         Assert.Single(store.LoadAll());
-        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".row")));
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".result-row")));
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class HistoryPageTests : BunitContext
 
         cut.FindAll("button.delete")[0].Click();
         Assert.Contains("results.dat could not be written", cut.Find(".banner-negative").TextContent);
-        Assert.Single(cut.FindAll(".row"));   // nothing was deleted, and the list reloaded
+        Assert.Single(cut.FindAll(".result-row"));   // nothing was deleted, and the list reloaded
 
         cut.Find("button.clear").Click();
         cut.Find("button.clear").Click();
