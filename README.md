@@ -327,7 +327,7 @@ GPU 0: NVIDIA GeForce RTX 5070 Ti (UUID: ...)
 
 == tests (required backends: cuda,opencl)
 [... suite output ...]
-   XrplVanity.Tests  Total: 254, Errors: 0, Failed: 0, Skipped: 0, Time: ...s
+   XrplVanity.Tests  Total: 254, Errors: 0, Failed: 0, Skipped: 0, Time: 958.5s
 ok   no skipped rows
 
 == smoke: --list-devices

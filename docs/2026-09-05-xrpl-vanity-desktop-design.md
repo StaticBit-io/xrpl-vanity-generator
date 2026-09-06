@@ -212,7 +212,7 @@ reciprocal.
 
 - Windows suite: 254 tests, 0 skipped, 51.061 s (commit dd0366f; 240 tests in 45.817 s at
   commit 3e53441, before the review-fix wave added tests).
-- Linux harness: gpu mode 1419.174 s (240 tests, 0 failed, 0 skipped), cpu-only mode
+- Linux harness: gpu mode 958.5 s (254 tests, 0 failed, 0 skipped, Plan F final, commit 8917a9a), cpu-only mode
   925.205 s (240 tests, 0 failed, 64 skipped — the CUDA-gated tests, expected in this
   mode). Both grew from the Plan D figures (273 s / 207 s for 150 tests) because Plan F
   put the CPU-saturating and timing-sensitive test classes (`DutyCycleTests`,

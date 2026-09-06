@@ -135,8 +135,8 @@ Measured inside the Docker container (commit 045da70 unless noted).
 | pocl CPU device, CLI `--backend opencl` | 58,115/s | same document |
 | CUDA through passthrough, kernel benchmark test | 19,079,033/s | same document |
 | CUDA through passthrough, CLI single launch (`--count 2`) | 2,555,684/s (one launch of 2^20 candidates; start-up dominated) | `2026-09-04-xrpl-vanity-multigpu-design.md` |
-| Test suite wall time, GPU mode (`cuda,opencl` required, 0 skipped) | 1419.174 s (240 tests, Plan F) | this page (Plan F) |
-| Test suite wall time, CPU-only mode (pocl only) | 925.205 s (240 tests, 64 skipped — CUDA-gated, Plan F) | this page (Plan F) |
+| Test suite wall time, GPU mode (`cuda,opencl` required, 0 skipped) | 959 s (254 tests, Plan F final, commit 8917a9a) | this page (Plan F) |
+| Test suite wall time, CPU-only mode (pocl only) | 925.205 s (240 tests, 64 skipped — CUDA-gated, Plan F) — measured before the final fix wave | this page (Plan F) |
 | Test suite wall time, Windows | 45.817 s (240 tests, commit 3e53441) | this page (Plan F) |
 
 The Linux suite is slow because OpenCL device setup (enumeration, context creation,
