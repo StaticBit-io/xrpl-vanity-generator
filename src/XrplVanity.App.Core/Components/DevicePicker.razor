@@ -7,10 +7,16 @@
     <label class="target t @(t.Selected ? "selected" : "")" @key="t.Id">
       <input class="select" type="checkbox" checked="@t.Selected" disabled="@Busy" @onchange="e => Vm.SetTargetSelected(t.Id, (bool)e.Value!)" />
       <span class="name">@t.Name @if (t.IsCpuDevice) { <span class="tag">[cpu]</span> }</span>
-      <span class="details text-secondary">@t.Details</span>
+      <span class="details muted">@t.Details</span>
       @if (t.IsCpu)
       {
         <span class="threads-wrap"><input class="threads" type="range" min="1" max="@Environment.ProcessorCount" value="@Vm.CpuThreads" disabled="@Busy" @onchange="e => Vm.CpuThreads = int.Parse((string)e.Value!)" /> <span class="num small">@Vm.CpuThreads</span> threads</span>
+      }
+      else
+      {
+        @* Two OpenCL devices of the same platform carry the same name; the selector id is the
+           only thing that tells them apart. *@
+        <span class="device-id mono muted">@t.Id</span>
       }
     </label>
   }

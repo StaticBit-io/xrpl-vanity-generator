@@ -1,4 +1,4 @@
 .head { display: flex; justify-content: space-between; align-items: center; }
 .duty-value { font-size: 16px; }
 input[type=range] { width: 100%; accent-color: var(--mint); background: var(--dark-gray); margin-top: 10px; }
-.note { margin-top: 10px; }
+.note { margin-top: 10px; font-size: 12px; }

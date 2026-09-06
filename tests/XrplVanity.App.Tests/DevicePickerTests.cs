@@ -27,6 +27,10 @@ public class DevicePickerTests : BunitContext
         Assert.Contains("[cpu]", rows[2].TextContent);
         Assert.Single(cut.FindAll("input.threads"));   // only the CPU row has the thread slider
 
+        // Two OpenCL devices of one platform share a name, so every non-CPU row carries its id.
+        IReadOnlyList<IElement> ids = cut.FindAll(".device-id");
+        Assert.Equal(new[] { "cuda:0", "opencl:1" }, ids.Select(i => i.TextContent.Trim()));
+
         cut.FindAll("input.select")[1].Change(true);
         Assert.True(vm.Targets[1].Selected);
     }

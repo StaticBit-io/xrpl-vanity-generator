@@ -20,9 +20,9 @@
         <div class="row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
           <span class="mono address">@item.Address</span>
           <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
-          <span class="pattern">@item.Pattern <span class="text-secondary">(@item.Position.ToLowerInvariant())</span></span>
-          @if (ShowTarget) { <span class="target text-secondary">@item.Target</span> }
-          <span class="time text-secondary">@item.FoundAt.ToLocalTime().ToString("HH:mm:ss")</span>
+          <span class="pattern">@item.Pattern <span class="muted">(@item.Position.ToLowerInvariant())</span></span>
+          @if (ShowTarget) { <span class="target muted">@item.Target</span> }
+          <span class="time muted">@item.FoundAt.ToLocalTime().ToString("HH:mm:ss")</span>
           <span class="mono seed">@(_revealed.Contains(item.Address) ? item.Seed : "••••••••")</span>
           <button class="btn-icon reveal" title="@(_revealed.Contains(item.Address) ? "Hide seed" : "Reveal seed")" @onclick="() => ToggleReveal(item.Address)">👁</button>
           <button class="btn-icon copy-seed" title="Copy seed (clipboard clears after @ClipboardClearSeconds s)" @onclick="() => Clipboard.CopySecretAsync(item.Seed, TimeSpan.FromSeconds(ClipboardClearSeconds))">⧉</button>

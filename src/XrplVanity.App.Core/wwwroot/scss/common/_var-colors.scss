@@ -1,4 +1,8 @@
 :root {
+  // Every surface the user agent paints itself — scrollbars, unchecked checkboxes, number-input
+  // spinners, the select popup — is out of CSS's reach and defaults to light without this.
+  color-scheme: dark;
+
   --bg: #0D0D0D;
   --box-bg: #1A1A1A;
   --chips: #2D2D2D;

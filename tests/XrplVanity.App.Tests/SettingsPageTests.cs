@@ -52,6 +52,28 @@ public class SettingsPageTests : BunitContext
         Assert.Equal(3600, settings.Current.SeedRevealSeconds);
     }
 
+    [Fact]
+    public void The_Match_Count_Input_Sets_A_Limit_And_Blank_Means_Unbounded()
+    {
+        MemorySettingsStore settings = new();
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
+        Services.AddSingleton(vm);
+        Services.AddSingleton<INotificationService>(new FakeNotifications());
+        Services.AddSingleton<IWindowService>(new NullWindowService());
+        IRenderedComponent<SettingsPage> cut = Render<SettingsPage>();
+
+        cut.Find("input.match-count").Change(25);
+        Assert.Equal(25, vm.Count);
+        Assert.Equal(25, settings.Current.Count);
+
+        cut.Find("input.match-count").Change(string.Empty);
+        Assert.Null(vm.Count);
+        Assert.Null(settings.Current.Count);
+
+        cut.Find("input.match-count").Change(0);
+        Assert.Null(vm.Count);
+    }
+
     private sealed class NullWindowService : IWindowService
     {
 #pragma warning disable CS0067 // Required by IWindowService; this fake never raises it.

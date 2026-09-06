@@ -2,5 +2,5 @@
 <div class="card-box">
   <div class="head"><div class="card-title">GPU duty</div><span class="num duty-value">@Vm.DutyPercent%</span></div>
   <input type="range" min="25" max="100" step="5" value="@Vm.DutyPercent" @onchange="e => Vm.DutyPercent = int.Parse((string)e.Value!)" />
-  <div class="note text-secondary">Pauses between launches so the card stays free for other applications about @(100 - Vm.DutyPercent)% of the time. Changes apply immediately.</div>
+  <div class="note muted">Pauses between launches so the card stays free for other applications about @(100 - Vm.DutyPercent)% of the time. Changes apply immediately.</div>
 </div>

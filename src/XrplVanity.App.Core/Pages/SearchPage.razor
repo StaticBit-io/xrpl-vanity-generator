@@ -9,7 +9,7 @@
       <button class="btn-primary-mint start t" disabled="@(!Vm.CanStart)" @onclick="Vm.Start">Start</button>
       @if (Vm.StartBlockedReason is not null)
       {
-        <div class="start-hint text-secondary">@Vm.StartBlockedReason</div>
+        <div class="start-hint muted">@Vm.StartBlockedReason</div>
       }
     }
     else

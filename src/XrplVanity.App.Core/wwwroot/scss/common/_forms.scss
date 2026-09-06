@@ -1,3 +1,49 @@
+// Every control in the application is dark. Bootstrap paints .form-control/.form-select from
+// --bs-body-bg (light) and a bare input[type=number] or select gets the platform default, so
+// both are repainted here once instead of per component.
+.form-control,
+.form-select,
+input[type="number"],
+input[type="text"],
+select {
+  background: var(--chips);
+  color: var(--text);
+  border: 1px solid var(--dark-gray);
+  border-radius: var(--radius-chip);
+}
+
+.form-control,
+input[type="number"],
+input[type="text"] {
+  padding: 6px 10px;
+}
+
+.form-select,
+select {
+  // Bootstrap's chevron is a dark SVG that vanishes on --chips, and its appearance: none removed
+  // the native one, so the arrow is repainted in --text and given room on the right.
+  padding: 6px 30px 6px 10px;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23F9F9F9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 9px;
+}
+
+.form-control:focus,
+.form-select:focus,
+input[type="number"]:focus,
+input[type="text"]:focus,
+select:focus {
+  border-color: var(--mint);
+  box-shadow: none;
+  outline: none;
+}
+
+::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
 // Native checkboxes and range inputs default to the browser's accent (blue in WebView2),
 // which is the one place the platform overrides the palette. Repaint them mint.
 input[type="checkbox"],

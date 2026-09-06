@@ -12,15 +12,22 @@
     }
   </div>
 </header>
-@if (Store.IsReadOnly)
-{
-  <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
-}
-@if (_storeError is not null)
-{
-  <Banner Kind="negative" Text="@_storeError" />
-}
-<div class="filter-row">
-  <input class="filter form-control mono" placeholder="filter by address or pattern" @bind="_filter" @bind:event="oninput" />
+<div class="content-scroll">
+  @if (Store.IsReadOnly)
+  {
+    <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
+  }
+  @if (_storeError is not null)
+  {
+    <Banner Kind="negative" Text="@_storeError" />
+  }
+  <div class="filter-row">
+    <input class="filter form-control mono" placeholder="filter by address or pattern" @bind="_filter" @bind:event="oninput" />
+  </div>
+  <ResultsList Items="Filtered()" ShowTarget="true" OnDelete="Delete" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
+  @* The mockup replaces this footer with the red banner when results.dat cannot be read. *@
+  @if (!Store.IsReadOnly && _storeError is null)
+  {
+    <div class="storage-note muted">Stored in <span class="mono">results.dat</span>, encrypted with Windows DPAPI for this user account. Nothing else on disk contains a seed.</div>
+  }
 </div>
-<ResultsList Items="Filtered()" ShowTarget="true" OnDelete="Delete" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />

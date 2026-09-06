@@ -8,6 +8,10 @@ public partial class SettingsPage
     private const int MinSeconds = 1;
     private const int MaxSeconds = 3600;
 
+    /// <summary>The same range the Search page's duty slider offers.</summary>
+    private const int MinDuty = 25;
+    private const int MaxDuty = 100;
+
     private void OnCloseBehaviorChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse((string?)e.Value, out CloseBehavior parsed))
@@ -23,7 +27,23 @@ public partial class SettingsPage
     {
         if (int.TryParse((string?)e.Value, out int value))
         {
-            Vm.DutyPercent = value;
+            Vm.DutyPercent = Math.Clamp(value, MinDuty, MaxDuty);
+        }
+    }
+
+    /// <summary>Blank or 0 means unbounded; the view model's Count setter maps anything below 1 to null.</summary>
+    private void OnCountChanged(ChangeEventArgs e)
+    {
+        string? raw = (string?)e.Value;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            Vm.Count = null;
+            return;
+        }
+
+        if (int.TryParse(raw, out int value))
+        {
+            Vm.Count = value;
         }
     }
 

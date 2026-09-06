@@ -4,7 +4,9 @@
 @font-face { font-family: "Cascadia Code"; font-style: normal; font-weight: 400; src: url("../fonts/CascadiaCode.woff2") format("woff2"); }
 
 html, body { background: var(--bg); color: var(--text); font-family: var(--font-text); font-size: 14px; margin: 0; height: 100%; }
-p, label, .text-secondary { color: var(--text-secondary); }
+// .muted (the mockup's own name), not Bootstrap's .text-secondary: that one carries !important
+// and paints #6C757D, roughly 2.9:1 on --box-bg and not the mandated secondary colour.
+p, label, .muted { color: var(--text-secondary); }
 .mono { font-family: var(--font-mono); }
 .num { font-family: var(--font-text); font-variant-numeric: tabular-nums; color: var(--beige); font-weight: 600; }
 h1, h2, h3 { color: var(--text); font-weight: 600; letter-spacing: -0.01em; }
