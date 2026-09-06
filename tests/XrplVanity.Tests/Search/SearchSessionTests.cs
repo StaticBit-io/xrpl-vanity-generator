@@ -176,14 +176,60 @@ public class SearchSessionTests
     }
 
     [Fact]
-    public void Dispose_On_A_Never_Started_Session_Does_Not_Throw_And_Is_Idempotent()
+    public void Dispose_On_A_Never_Started_Session_Completes_With_Cancelled_And_Is_Idempotent()
     {
         SearchRequest request = new(OneChar(), new SearchTarget[] { new SearchTarget.Cpu(1) }, count: 1);
         SearchSession session = new(request, _ => { });
 
         session.Dispose();
-        Assert.False(session.Completion.IsCompleted);
+
+        // A front end may await Completion unconditionally: disposing a session that was never
+        // started must settle it rather than leave it pending forever.
+        Assert.True(session.Completion.IsCompleted);
+        SearchSummary summary = Await(session.Completion);
+        Assert.Equal(SessionOutcome.Cancelled, summary.Outcome);
+        Assert.Equal(0, summary.Final.TotalCandidates);
+        Assert.Equal(TargetState.Pending, Assert.Single(summary.Final.Targets).State);
         session.Dispose();   // idempotent, no throw
+    }
+
+    private sealed class ThrowingBackend : IGpuBackend
+    {
+        public string Name => "broken";
+        public IReadOnlyList<GpuDeviceInfo> EnumerateDevices() => throw new InvalidOperationException("broken backend cannot enumerate");
+        public IGpuDevice Open(int index) => throw new InvalidOperationException("broken backend cannot open");
+    }
+
+    [Fact]
+    public void A_Device_Target_On_A_Broken_Backend_Still_Completes_The_Session()
+    {
+        SearchRequest request = new(OneChar(), new SearchTarget[] { new SearchTarget.Device(new DeviceSelector("broken", 0)) }, count: 1);
+        using SearchSession session = new(request, _ => { }, null, new IGpuBackend[] { new ThrowingBackend() });
+
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        Assert.Equal(SessionOutcome.AllTargetsFailed, summary.Outcome);
+        TargetProgress device = Assert.Single(summary.Final.Targets);
+        Assert.Equal(TargetState.Failed, device.State);
+        Assert.NotNull(device.Failure);
+        Assert.Equal(0, device.Candidates);
+    }
+
+    [Fact]
+    public void Target_Seconds_And_Rate_Are_Target_Local()
+    {
+        SearchRequest request = new(OneChar(), new SearchTarget[] { new SearchTarget.Cpu(1) }, count: 3);
+        using SearchSession session = new(request, _ => { });
+
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        TargetProgress cpu = Assert.Single(summary.Final.Targets);
+        Assert.True(cpu.Seconds > 0, "the CPU target reported no time of its own");
+        Assert.True(cpu.Seconds <= summary.Final.Elapsed.TotalSeconds + 0.5, $"CPU seconds {cpu.Seconds} exceeds the session elapsed time");
+        Assert.Equal(cpu.Candidates / cpu.Seconds, cpu.RatePerSecond, precision: 3);
+        Assert.Equal(0, cpu.ConsistencyErrors);
     }
 
     [Fact]
@@ -221,6 +267,10 @@ public class SearchSessionTests
         TargetProgress device = summary.Final.Targets.Single(t => t.Id == $"{backend}:0");
         Assert.Equal(TargetState.Finished, device.State);
         Assert.False(string.IsNullOrEmpty(device.Name));
+        // Device-local clock: the worker's own measurement, which excludes opening the device
+        // (context creation, and on OpenCL the program compile), so it never exceeds the session.
+        Assert.True(device.Seconds > 0, "the device reported no search time of its own");
+        Assert.True(device.Seconds <= summary.Final.Elapsed.TotalSeconds + 0.5, $"device seconds {device.Seconds} exceeds the session elapsed time");
     }
 
     [Fact]

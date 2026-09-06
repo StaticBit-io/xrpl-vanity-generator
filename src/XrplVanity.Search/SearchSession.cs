@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using XrplVanity.Core;
@@ -19,7 +18,6 @@ public sealed class SearchSession : IDisposable
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(250);
 
-    private readonly SearchRequest _request;
     private readonly Action<Match> _report;
     private readonly Action<string> _log;
     private readonly MatchSink _sink;
@@ -35,6 +33,15 @@ public sealed class SearchSession : IDisposable
     private readonly MultiDeviceSearch? _devices;
     private readonly ManualResetEventSlim _tickerDone = new();
 
+    /// <summary>
+    /// Session-elapsed seconds at which each device was first seen opened, or a negative value
+    /// while it has not opened yet. A running device reports no <c>Seconds</c> of its own (the
+    /// worker sets that only when it finishes), so this is what makes the running-time-since-open
+    /// — and with it a device-local rate — available on every tick. Written only from the ticker
+    /// and coordinator threads, which never run <see cref="Snapshot"/> concurrently.
+    /// </summary>
+    private readonly double[] _deviceOpenedAt;
+
     private volatile bool _cpuOpening;
     private volatile bool _cpuFinished;
     private string? _cpuFailure;
@@ -42,10 +49,24 @@ public sealed class SearchSession : IDisposable
     private bool _started;
     private bool _disposed;
     private string? _callbackFailure;
+    private string? _deviceThreadFailure;
+    private int _requestedDuty;
 
     public SearchSession(SearchRequest request, Action<Match> report, Action<string>? log = null)
+        : this(request, report, log, GpuBackends.All)
     {
-        _request = request ?? throw new ArgumentNullException(nameof(request));
+    }
+
+    /// <summary>
+    /// Takes the backend list as a parameter so tests can substitute a fake backend that fails
+    /// deterministically, the same seam <see cref="MultiDeviceSearch"/> and
+    /// <see cref="DeviceCatalog"/> expose.
+    /// </summary>
+    internal SearchSession(SearchRequest request, Action<Match> report, Action<string>? log, IReadOnlyList<IGpuBackend> backends)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(backends);
+        Request = request;
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _log = log ?? (_ => { });
         _sink = new MatchSink(request.Count, OnAccepted);
@@ -72,12 +93,18 @@ public sealed class SearchSession : IDisposable
 
         if (_deviceSelectors.Count > 0)
         {
-            _devices = new MultiDeviceSearch(_deviceSelectors, request.Patterns, ReportFromDevice, FilterDeviceAnnouncement, request.DutyPercent);
+            _devices = new MultiDeviceSearch(backends, _deviceSelectors, request.Patterns, ReportFromDevice, FilterDeviceAnnouncement, request.DutyPercent);
         }
+
+        _deviceOpenedAt = new double[_deviceSelectors.Count];
+        Array.Fill(_deviceOpenedAt, -1.0);
 
         _requestedDuty = request.DutyPercent;
         _progress = Snapshot();
     }
+
+    /// <summary>The request this session was built from.</summary>
+    public SearchRequest Request { get; }
 
     public int DutyPercent
     {
@@ -98,12 +125,25 @@ public sealed class SearchSession : IDisposable
         }
     }
 
-    private int _requestedDuty;
-
     public SearchProgress Progress => _progress;
+
+    /// <summary>
+    /// Completes exactly once, when every worker thread has joined and the final snapshot is
+    /// available — including when the session is disposed before it was ever started (outcome
+    /// <see cref="SessionOutcome.Cancelled"/> with the initial snapshot), so a front end can
+    /// always await it. It faults only if the coordinator itself failed before it could produce
+    /// a summary.
+    /// </summary>
     public Task<SearchSummary> Completion => _completion.Task;
 
     public event Action<SearchProgress>? ProgressChanged;
+
+    /// <summary>
+    /// Raised for every accepted match. Runs on a worker thread (the CPU pool's or a device's)
+    /// inside the sink's lock, after the caller's <c>report</c> writer: it must not block, and it
+    /// must marshal to a UI thread rather than touch UI state directly. A throwing subscriber
+    /// stops the session instead of taking the process down.
+    /// </summary>
     public event Action<Match>? MatchFound;
 
     /// <summary>The device search, exposed for tests that check duty propagation.</summary>
@@ -144,14 +184,27 @@ public sealed class SearchSession : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        bool started;
+        lock (_startGate)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            started = _started;
         }
 
         Stop();
-        _disposed = true;
-        bool finished = !_started || Completion.Wait(TimeSpan.FromSeconds(30));
+        bool finished = !started || Completion.Wait(TimeSpan.FromSeconds(30));
+        if (!started)
+        {
+            // No coordinator ever ran, so nothing else will ever complete the task; a consumer
+            // that awaits Completion unconditionally must not hang on a session it disposed.
+            _completion.TrySetResult(new SearchSummary(SessionOutcome.Cancelled, _progress));
+        }
+
         if (finished)
         {
             _stop.Dispose();
@@ -166,7 +219,39 @@ public sealed class SearchSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// The coordinator thread's entry point. Everything it does is wrapped so that
+    /// <see cref="Completion"/> is settled exactly once, whatever happens: a body that throws
+    /// before it produced a summary faults the task instead of leaving every awaiter hanging
+    /// forever.
+    /// </summary>
     private void Coordinate()
+    {
+        SearchSummary? summary = null;
+        Exception? fatal = null;
+        try
+        {
+            summary = RunToCompletion();
+        }
+        catch (Exception ex)
+        {
+            fatal = ex;
+            SafeLog($"warning: search session failed: {ex.Message}");
+        }
+        finally
+        {
+            if (summary is not null)
+            {
+                _completion.TrySetResult(summary);
+            }
+            else
+            {
+                _completion.TrySetException(fatal ?? new InvalidOperationException("The search session ended without a summary."));
+            }
+        }
+    }
+
+    private SearchSummary RunToCompletion()
     {
         Thread? cpuThread = null;
         Thread? deviceThread = null;
@@ -184,7 +269,7 @@ public sealed class SearchSession : IDisposable
 
             if (_devices is not null)
             {
-                deviceThread = new Thread(() => deviceResult = _devices.Run(_stop.Token)) { IsBackground = true, Name = "device-pool" };
+                deviceThread = new Thread(() => deviceResult = RunDevices()) { IsBackground = true, Name = "device-pool" };
                 deviceThread.Start();
             }
 
@@ -208,7 +293,29 @@ public sealed class SearchSession : IDisposable
         SessionOutcome outcome = _sink.CountSatisfied ? SessionOutcome.CountReached
             : anyOpened ? SessionOutcome.Cancelled
             : SessionOutcome.AllTargetsFailed;
-        _completion.TrySetResult(new SearchSummary(outcome, final));
+        return new SearchSummary(outcome, final);
+    }
+
+    /// <summary>
+    /// <see cref="MultiDeviceSearch"/> nets exceptions per worker, so nothing normally escapes
+    /// <see cref="MultiDeviceSearch.Run"/>; but a thread that cannot be started at all would,
+    /// and an exception leaving this delegate would kill the device thread, its
+    /// <see cref="Thread.Join"/> notwithstanding, and take the process down with it. Record it as
+    /// the session's failure and let the coordinator finish normally.
+    /// </summary>
+    private MultiDeviceSearchResult? RunDevices()
+    {
+        try
+        {
+            return _devices!.Run(_stop.Token);
+        }
+        catch (Exception ex)
+        {
+            Volatile.Write(ref _deviceThreadFailure, $"device search failed: {ex.Message}");
+            SafeLog($"warning: device search failed: {ex.Message}");
+            Stop();
+            return null;
+        }
     }
 
     private void RunCpu()
@@ -313,11 +420,11 @@ public sealed class SearchSession : IDisposable
 
     /// <summary>
     /// Builds a progress snapshot. When <paramref name="final"/> is true (only the coordinator's
-    /// last snapshot, taken once every worker thread has joined) and a report/MatchFound
-    /// callback has thrown, every target that isn't already <see cref="TargetState.Failed"/> is
-    /// forced to <see cref="TargetState.Failed"/> with that failure — intermediate ticks keep
-    /// showing each target's own state, since the callback failure only reflects the outcome of
-    /// the whole session once it has actually stopped.
+    /// last snapshot, taken once every worker thread has joined) and a report/MatchFound callback
+    /// or the device thread has thrown, every target that isn't already
+    /// <see cref="TargetState.Failed"/> is forced to <see cref="TargetState.Failed"/> with that
+    /// failure — intermediate ticks keep showing each target's own state, since a session-wide
+    /// failure only reflects the outcome of the whole session once it has actually stopped.
     /// </summary>
     private SearchProgress Snapshot(bool final = false)
     {
@@ -326,7 +433,9 @@ public sealed class SearchSession : IDisposable
         long total = 0;
         double totalRate = 0;
         int deviceIndex = 0;
-        string? callbackFailure = final ? Volatile.Read(ref _callbackFailure) : null;
+        string? sessionFailure = final
+            ? Volatile.Read(ref _callbackFailure) ?? Volatile.Read(ref _deviceThreadFailure)
+            : null;
 
         foreach (string id in _targetOrder)
         {
@@ -334,14 +443,15 @@ public sealed class SearchSession : IDisposable
             string name;
             TargetState state;
             long candidates;
-            double rate;
+            double targetSeconds;
             string? failure;
+            long consistencyErrors;
 
             if (id == "cpu")
             {
                 candidates = _cpu!.CandidatesSearched;
-                double cpuSeconds = _cpu.Elapsed.TotalSeconds;
-                rate = cpuSeconds > 0 ? candidates / cpuSeconds : 0;
+                targetSeconds = _cpu.Elapsed.TotalSeconds;
+                consistencyErrors = 0;
                 failure = _cpuFailure;
                 state = failure is not null ? TargetState.Failed
                     : _cpuFinished ? TargetState.Finished
@@ -353,33 +463,60 @@ public sealed class SearchSession : IDisposable
             }
             else
             {
-                DeviceSearchStats stats = _devices!.Devices[deviceIndex++];
+                int index = deviceIndex++;
+                DeviceSearchStats stats = _devices!.Devices[index];
                 failure = stats.Failure;
                 state = failure is not null ? TargetState.Failed
                     : stats.Seconds > 0 ? TargetState.Finished
                     : stats.Opened ? TargetState.Running
                     : _started ? TargetState.Opening
                     : TargetState.Pending;
-                rate = stats.Opened && stats.Seconds > 0 ? stats.RatePerSecond
-                    : stats.Opened && seconds > 0 ? stats.CandidatesSearched / seconds
-                    : 0;
+                targetSeconds = DeviceSeconds(stats, index, seconds);
                 candidates = stats.CandidatesSearched;
+                consistencyErrors = stats.ConsistencyErrors;
                 targetId = stats.Selector.ToString();
                 name = stats.DeviceName ?? stats.Selector.ToString();
             }
 
-            if (callbackFailure is not null && state != TargetState.Failed)
+            if (sessionFailure is not null && state != TargetState.Failed)
             {
                 state = TargetState.Failed;
-                failure = callbackFailure;
+                failure = sessionFailure;
             }
 
-            targets.Add(new TargetProgress(targetId, name, state, candidates, rate, failure));
+            double rate = targetSeconds > 0 ? candidates / targetSeconds : 0;
+            targets.Add(new TargetProgress(targetId, name, state, candidates, rate, failure, targetSeconds, consistencyErrors));
             total += candidates;
             totalRate += rate;
         }
 
         return new SearchProgress(_elapsed.Elapsed, total, totalRate, _sink.Reported, targets);
+    }
+
+    /// <summary>
+    /// A device's own search time: the worker's measurement once it has finished, otherwise the
+    /// time since this session first saw the device opened — the worker only publishes
+    /// <see cref="DeviceSearchStats.Seconds"/> at the end, and the session clock would wrongly
+    /// fold context creation and program compilation into the rate.
+    /// </summary>
+    private double DeviceSeconds(DeviceSearchStats stats, int index, double sessionSeconds)
+    {
+        if (stats.Seconds > 0)
+        {
+            return stats.Seconds;
+        }
+
+        if (!stats.Opened)
+        {
+            return 0;
+        }
+
+        if (_deviceOpenedAt[index] < 0)
+        {
+            _deviceOpenedAt[index] = sessionSeconds;
+        }
+
+        return Math.Max(sessionSeconds - _deviceOpenedAt[index], 0);
     }
 
     private void SafeLog(string message)

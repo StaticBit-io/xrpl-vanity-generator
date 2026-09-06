@@ -12,6 +12,13 @@ public sealed record DeviceCatalogEntry(DeviceSelector Selector, string Name, st
 /// <summary>Every device of every backend, in backend preference order, for front ends to offer.</summary>
 public static class DeviceCatalog
 {
+    /// <summary>
+    /// Enumerates every device of every backend. This can take seconds: the first call
+    /// initialises the CUDA driver and every installed OpenCL platform, and an ICD loader that
+    /// probes hardware — or a backend that is installed but broken — blocks until its driver
+    /// gives up. Never call it on a UI thread; run it on a background thread and bind the result
+    /// when it arrives.
+    /// </summary>
     public static IReadOnlyList<DeviceCatalogEntry> Enumerate() => Enumerate(GpuBackends.All);
 
     internal static IReadOnlyList<DeviceCatalogEntry> Enumerate(IReadOnlyList<IGpuBackend> backends)
