@@ -39,7 +39,14 @@ select:focus {
   outline: none;
 }
 
-::placeholder {
+// A bare ::placeholder (specificity 0,0,0) loses to the vendored bootstrap.min.css rule
+// .form-control::placeholder (0,1,0), which paints a near-black --bs-secondary-color. Match
+// Bootstrap's own selectors (plus input/textarea for controls it doesn't style) so this rule
+// cannot be outranked.
+.form-control::placeholder,
+.form-select::placeholder,
+input::placeholder,
+textarea::placeholder {
   color: var(--text-secondary);
   opacity: 1;
 }

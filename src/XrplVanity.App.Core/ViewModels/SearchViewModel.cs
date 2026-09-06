@@ -27,6 +27,7 @@ public sealed class SearchViewModel : IDisposable
     private readonly List<SessionResult> _results = new();
     private readonly List<StoredResult> _pendingPersist = new();
     private IReadOnlyList<SessionResult> _resultsSnapshot = Array.Empty<SessionResult>();
+    private bool _resultsDirty;
     private SessionResult? _lastMatch;
     private string? _historyWriteError;
     private int _unnotifiedMatches;
@@ -74,13 +75,31 @@ public sealed class SearchViewModel : IDisposable
     public IReadOnlyList<TargetChoice> Targets { get { lock (_gate) return _targets.ToArray(); } }
 
     /// <summary>
-    /// A cached snapshot rebuilt under <c>_gate</c> only where the underlying result list actually
-    /// changes (<see cref="Start"/> clearing it, <see cref="OnMatch"/> inserting into it) — the
-    /// same instance is returned between changes, so a consumer that keys state off a "did the
-    /// list change" reference comparison (e.g. <c>ResultsList</c>) does not see a false positive on
-    /// every unrelated re-render (a progress tick, for instance).
+    /// A cached snapshot rebuilt lazily on read, under <c>_gate</c>, only when the underlying
+    /// result list actually changed since the last read (<see cref="Start"/> clearing it,
+    /// <see cref="OnMatch"/> inserting into it just flag <see cref="_resultsDirty"/> instead of
+    /// rebuilding) — the same instance is returned between changes, so a consumer that keys state
+    /// off a "did the list change" reference comparison (e.g. <c>ResultsList</c>) does not see a
+    /// false positive on every unrelated re-render (a progress tick, for instance). Deferring the
+    /// O(n) copy out of <see cref="OnMatch"/> keeps that lock — shared by every CPU worker and GPU
+    /// engine — held for O(1) work per match.
     /// </summary>
-    public IReadOnlyList<SessionResult> Results { get { lock (_gate) return _resultsSnapshot; } }
+    public IReadOnlyList<SessionResult> Results
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_resultsDirty)
+                {
+                    _resultsSnapshot = _results.ToArray();
+                    _resultsDirty = false;
+                }
+
+                return _resultsSnapshot;
+            }
+        }
+    }
 
     public SearchProgress? Progress => _progress;
     public SearchSummary? LastSummary { get; private set; }
@@ -316,6 +335,7 @@ public sealed class SearchViewModel : IDisposable
                 SearchRequest request = new(_patternSet!, targets, _count, _dutyPercent);
                 _results.Clear();
                 _resultsSnapshot = Array.Empty<SessionResult>();
+                _resultsDirty = false;
                 _pendingPersist.Clear();
                 _unnotifiedMatches = 0;
                 _lastMatch = null;
@@ -488,7 +508,7 @@ public sealed class SearchViewModel : IDisposable
         lock (_gate)
         {
             _results.Insert(0, result);
-            _resultsSnapshot = _results.ToArray();
+            _resultsDirty = true;
             _pendingPersist.Add(new StoredResult(result.Address, result.Seed, result.Pattern, result.Position, result.FoundAt, result.Target));
             _unnotifiedMatches++;
             _lastMatch = result;
