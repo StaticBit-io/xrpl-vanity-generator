@@ -210,7 +210,8 @@ reciprocal.
 
 ### Measured (Plan F)
 
-- Windows suite: 240 tests, 0 skipped, 45.817 s (commit 3e53441).
+- Windows suite: 254 tests, 0 skipped, 51.061 s (commit dd0366f; 240 tests in 45.817 s at
+  commit 3e53441, before the review-fix wave added tests).
 - Linux harness: gpu mode 1419.174 s (240 tests, 0 failed, 0 skipped), cpu-only mode
   925.205 s (240 tests, 0 failed, 64 skipped — the CUDA-gated tests, expected in this
   mode). Both grew from the Plan D figures (273 s / 207 s for 150 tests) because Plan F
@@ -219,10 +220,17 @@ reciprocal.
   `CliProgramTests`) into one xUnit collection with `DisableParallelization = true`; on
   pocl a single 2^20 launch takes about 18–25 s, so those classes now run one at a time.
 - `--backend cuda --case-sensitive --starts abcd --count 30` through `SearchSession`:
-  18,547,083/s and 18,269,885/s (two runs, average 18,408,484/s), versus 19,400,000/s
-  recorded in `docs/benchmarks.md` for the previous loop — the session adds ≈5%
-  overhead (both runs land 4–6% below the earlier figure, consistent enough not to
-  read as pure run-to-run noise).
+  19,323,026/s and 19,491,178/s (two runs at commit dd0366f, average 19,407,102/s),
+  versus 19,400,000/s recorded in `docs/benchmarks.md` for the previous loop — −0.4%
+  and +0.5%, average +0.04%, so the session adds no measurable overhead. The earlier
+  Plan F reading of ≈18,400,000/s ("≈5% overhead") was a measurement artefact, not a
+  cost: `RenderSummary` divided the candidate count by the session clock, which charges
+  CUDA context creation and the PTX load to the search loop. Each target now reports its
+  own `Seconds`, and the per-device line is back on the device's own clock.
+- `--gpu-devices all --case-sensitive --starts abcd --count 30` at the same commit:
+  `cuda:0` 10,246,649/s over 8.8 s, `opencl:0` 9,594,758/s over 8.7 s, aggregate
+  19,326,747/s (174,063,616 candidates in 9.0 s of session wall time). The two rows now
+  differ, as they must — under the session clock both read the same fabricated figure.
 - CPU rate line, 12 threads, `--case-sensitive --starts abc --count 60`: 118,885/s and
   111,576/s (the first measured CPU rate, now that the CPU target counts candidates
   directly; `docs/benchmarks.md` had estimated 250,000–310,000/s from wall-clock timing
@@ -400,8 +408,10 @@ implementations beside them; tests use the real implementations on a temp folder
 
 `tests/XrplVanity.Tests` (existing project) gains:
 
-- `SearchEstimatorTests` — table cases: `Starts` length 1–4 (58, 3364, 195 112, 11 316 496),
-  `Ends`, `Contains` at `NominalAddressLength`, case-insensitive expansion (a letter with
+- `SearchEstimatorTests` — table cases: `Starts` length 1–4 under the base58 leading-digit
+  model, `23.338 × 58^(n−1)` for a prefix starting with one of `pshnaf39wBUDNEGHJKLM4P`
+  (23.3, 1354, 78 500, 4.55 M — not `58^n`, which the leading `r` and the 192-bit payload
+  rule out); `Ends`, `Contains` at `NominalAddressLength`, case-insensitive expansion (a letter with
   both cases doubles the targets; `o`, `i`, `L` do not), several patterns summed, empty set
   → null, ETA arithmetic and null propagation.
 - `SearchSessionTests` — CPU-only session with a one-character `Starts` pattern reaches

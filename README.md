@@ -137,8 +137,11 @@ path uses and uploads it; the kernel derives and matches candidates on the
 GPU; every reported hit is re-derived by the CPU reference and printed only
 if it agrees — this gate applies to every backend, so a device the CPU
 reference disagrees with only costs throughput (reported as a consistency
-error), never a wrong key. Without a usable GPU device `--gpu` exits with
-code 2 rather than silently using the CPU.
+error), never a wrong key. At the end of a device run the CLI prints
+`GPU: searched N candidates in T s (rate/s); consistency errors: E` on stderr,
+where `T` is the device's own search time — opening the device and compiling its
+program are outside it. Without a usable GPU device `--gpu` exits with code 2
+rather than silently using the CPU.
 
 ## GPU backends (CUDA and OpenCL)
 
@@ -177,11 +180,12 @@ devices is not guaranteed (each device's own hits stay in order relative to
 each other). Several OpenCL devices opened together compile their programs
 one after another at start-up, not in parallel, so `--gpu-devices all` or
 `--gpu-devices opencl:0,opencl:1` on OpenCL-heavy specs can take a while
-before the first launch starts. Each device prints its own
+before the first launch starts. At the end of the run each device gets its own
 `GPU[backend:index]: searched N candidates in T s (rate/s); consistency
-errors: E` line as it finishes, followed by one aggregate `GPU: searched N
-candidates on D device(s) in T s (rate/s); consistency errors: E` line for
-the whole run.
+errors: E` line, where `T` is that device's own search time (opening it and
+compiling its program are outside it), followed by one aggregate
+`GPU: searched N candidates on D device(s) in T s (rate/s); consistency
+errors: E` line whose `T` is the wall time of the whole run.
 
 ### Kernel single-source discipline
 
@@ -323,7 +327,7 @@ GPU 0: NVIDIA GeForce RTX 5070 Ti (UUID: ...)
 
 == tests (required backends: cuda,opencl)
 [... suite output ...]
-   XrplVanity.Tests  Total: 165, Errors: 0, Failed: 0, Skipped: 0, Time: 353.451s
+   XrplVanity.Tests  Total: 254, Errors: 0, Failed: 0, Skipped: 0, Time: ...s
 ok   no skipped rows
 
 == smoke: --list-devices
@@ -336,6 +340,7 @@ ok   list shows cuda:0
 ok   multi-device search (exit 0)
 ok   opencl worker ran
 ok   no consistency errors
+ok   no consistency warning
 ok   cuda worker ran
 ok   two devices
 

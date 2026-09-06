@@ -26,11 +26,16 @@ Linux container. Scaling across two or more NVIDIA cards was not measured.
 
 ## How the figures were obtained
 
-**GPU paths.** The CLI prints `GPU: searched N candidates in T s (R/s)` at the end of a
-run. `T` covers the search loop only: device open and OpenCL program compilation are
-excluded. Every device hit is re-derived by the CPU reference before it is printed, and
-that verification is inside `T`, so the CLI rate falls when the pattern matches often
-(each hit costs one CPU derivation on the launching thread). The figures below use
+**GPU paths.** The CLI prints
+`GPU: searched N candidates in T s (R/s); consistency errors: E` at the end of a run, and
+one such line per device plus an aggregate under `--gpu-devices`. On every per-device line
+`T` covers the search loop only: device open, CUDA context creation and OpenCL program
+compilation are excluded. The multi-device aggregate line is the exception — its `T` is the
+session's wall time, which is what the devices actually overlapped in, so it includes the
+slowest device's start-up and reads slightly below the sum of the per-device rates. Every
+device hit is re-derived by the CPU reference before it is printed, and that verification is
+inside `T`, so the CLI rate falls when the pattern matches often (each hit costs one CPU
+derivation on the launching thread). The figures below use
 `--case-sensitive --starts abcd` (one match per ≈4.6 million candidates on average — `a` is
 one of the 22 alphabet characters that lead the leading-character distribution below, so the
 expectation is `23.34 × 58^3`, not `58^4`) and `--count 30`, so hits are rare and the rate
@@ -90,8 +95,15 @@ Windows, commit 8b66560, 2026-09-04.
 
 | Backend | Kernel benchmark test | CLI end-to-end, rare hits (`--case-sensitive --starts abcd --count 30`) | CLI end-to-end, frequent hits (`--starts abc`, case-insensitive; Plan C record) |
 | --- | --- | --- | --- |
-| `cuda` | 19,300,000/s | 19,400,000/s (148,897,792 candidates in 7.7 s) | 10,700,000/s |
+| `cuda` | 19,300,000/s | 19,323,026/s and 19,491,178/s (157,286,400 candidates in 8.1 s; 170,917,888 in 8.8 s) | 10,700,000/s |
 | `opencl` (NVIDIA) | 21,000,000/s | 21,100,000/s (105,906,176 candidates in 5.0 s) | 12,100,000/s |
+
+The `cuda` CLI figures were re-measured on 2026-09-06 at commit dd0366f, after the search
+moved behind `SearchSession` and the per-device line went back to the device's own clock.
+They bracket the 19,400,000/s recorded for the pre-session loop on commit 8b66560 (−0.4%
+and +0.5%, average 19,407,102/s, +0.04%), so the session layer adds no measurable
+overhead. The earlier Plan F figures of ≈18,400,000/s were an artefact of dividing by the
+session clock, which charged CUDA context creation and PTX load to the search loop.
 
 Reading the table: with rare hits the CLI reaches the kernel rate; with frequent hits
 (case-insensitive `abc` matches once per ~24,000 candidates, about 400 hits per launch)
@@ -109,7 +121,7 @@ starts in under a second.
 
 | Configuration | Result | Source |
 | --- | --- | --- |
-| Windows, `--gpu-devices all --case-sensitive --starts abcd --count 30` (`cuda:0` + `opencl:0`, the same card through two APIs) | 19,100,000/s aggregate (`cuda:0` 10,117,426/s + `opencl:0` 9,527,687/s; 136,314,880 candidates in 7.1 s) — no gain over one engine, because both engines share one GPU | this page |
+| Windows, `--gpu-devices all --case-sensitive --starts abcd --count 30` (`cuda:0` + `opencl:0`, the same card through two APIs) | 19,326,747/s aggregate on the session clock (`cuda:0` 10,246,649/s over 8.8 s + `opencl:0` 9,594,758/s over 8.7 s; 174,063,616 candidates in 9.0 s) — no gain over one engine, because both engines share one GPU | this page (commit dd0366f, 2026-09-06) |
 | Linux container, `--gpu-devices all --starts ab` (RTX through CUDA + pocl on 12 vCPU) | pocl's first launch satisfied `--count` before the CUDA worker finished opening; CUDA reported 0 candidates. Observation, not a defect: pocl saturates all vCPUs during its 25 s launch and starves the host-side CUDA driver calls | `2026-09-04-xrpl-vanity-multigpu-design.md` |
 | Two engines on `cuda:0` (test `Two_Engines_On_The_Same_Cuda_Device_Stop_Exactly_At_The_Limit`) | limit reached exactly; both engines searched | test suite |
 
