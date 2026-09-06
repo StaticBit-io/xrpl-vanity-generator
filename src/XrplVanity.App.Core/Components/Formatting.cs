@@ -20,6 +20,8 @@ public static class Formatting
         if (t.TotalDays >= 1) return t.TotalDays.ToString("0.#", CultureInfo.InvariantCulture) + " days";
         if (t.TotalHours >= 1) return $"{(int)t.TotalHours} h {t.Minutes} min";
         if (t.TotalMinutes >= 1) return $"{(int)Math.Round(t.TotalMinutes)} min";
-        return $"{(int)Math.Round(t.TotalSeconds)} s";
+        double seconds = Math.Round(t.TotalSeconds);
+        if (t > TimeSpan.Zero && seconds < 1) return "< 1 s";
+        return $"{(int)seconds} s";
     }
 }

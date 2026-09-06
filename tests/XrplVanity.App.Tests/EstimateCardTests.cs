@@ -64,6 +64,8 @@ public class EstimateCardTests : BunitContext
         Assert.Equal("3 h 20 min", Formatting.Duration(TimeSpan.FromMinutes(200)));
         Assert.Equal("2.5 days", Formatting.Duration(TimeSpan.FromHours(60)));
         Assert.Equal("> 1 year", Formatting.Duration(TimeSpan.FromDays(400)));
+        Assert.Equal("0 s", Formatting.Duration(TimeSpan.Zero));
+        Assert.Equal("< 1 s", Formatting.Duration(TimeSpan.FromMilliseconds(235)));
     }
 
     private static double ExpectedCandidatesFor(MatchPosition position, string pattern)

@@ -495,11 +495,17 @@ Windows 11, 120 dpi.
   seconds after start: 211 MB for the application process plus 349 MB across the six WebView2
   children it owns, ≈560 MB in total, which is what Task Manager groups under the app.
 - CPU search from the GUI, 12 threads, `--starts abc` equivalent (case-sensitive): 137,256/s in
-  LiveStats over 73.5 M candidates in 9 minutes, versus 102,249/s from the CLI's `CPU:` line
-  (`--count 60`, 4,947,712 candidates in 48.4 s) and 91,458/s over a longer CLI run
-  (`--count 250`, 16,866,054 candidates in 184.4 s). The GUI reads 34–50 % higher; the runs were
-  sequential rather than simultaneous, so the gap is unexplained rather than attributable, and it
-  is the one figure here that should be re-taken as a controlled A/B before being quoted.
+  LiveStats over 73.5 M candidates in 9 minutes, versus 102,249/s and 91,458/s from two earlier
+  CLI runs. A controlled A/B was taken to check whether that gap was a Debug-vs-Release artefact:
+  the first pair of CLI figures came from a `dotnet run` that defaults to Debug, while the GUI
+  figure is a Release build. `dotnet build XrplVanity.sln -c Release` followed by two runs of
+  `dotnet run --project src/XrplVanity.Cli -c Release --no-build -- --case-sensitive --starts abc
+  --count 60 --threads 12` (same machine, same pattern, same thread count, nothing else CPU-heavy
+  running) gave 93,189/s (3,969,995 candidates in 42.6 s) and 93,457/s (4,808,989 candidates in
+  51.5 s) — in the same range as the earlier Debug-CLI figures, not closer to the GUI's 137,256/s.
+  The gap is therefore not a Debug/Release difference; it persists between a Release CLI and the
+  Release-built GUI on the same formula, the same target-local clock and the same default thread
+  count, and stays recorded as unexplained rather than attributable.
 - GPU search from the GUI (`cuda:0`, `abcd` case-sensitive): 18.1 M/s in LiveStats over 489.7 M
   candidates in 27 s, and 17,997,356/s in the rate hint the run persisted, versus 19,400,000/s
   from the CLI — −7.2 %. The run was stopped by hand rather than by `--count 30`, since the Search

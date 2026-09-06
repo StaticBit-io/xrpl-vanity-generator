@@ -36,7 +36,7 @@ page prints the resolved path, and **Open folder** opens it):
 
 | File | Contents |
 | --- | --- |
-| `settings.json` | Pattern and target drafts, thread count, duty, window size, close behaviour, notification flag, clipboard and reveal timeouts, and the last measured rate per device. Plain JSON, no secrets. |
+| `settings.json` | Pattern and target drafts, thread count, duty, match count limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, and the last measured rate per device. Plain JSON, no secrets. |
 | `results.dat` | The stored results, including seeds. Encrypted with DPAPI (`ProtectedData.Protect`, `DataProtectionScope.CurrentUser`), so only the Windows account that wrote the file can read it. |
 
 `results.dat` is the only file the application writes that contains a seed. Nothing else
@@ -111,14 +111,17 @@ dotnet publish src/XrplVanity.App/XrplVanity.App.csproj -c Release -f net10.0-wi
 ```
 
 The package lands in `src/XrplVanity.App/bin/msix/XrplVanity.App_1.0.0.0_x64_Test/` as
-`XrplVanity.App_1.0.0.0_x64.msix`, roughly 77 MB because the build is self-contained.
+`XrplVanity.App_1.0.0.0_x64.msix`, about 73.3 MB because the build is self-contained.
 
 The publish profile signs from the certificate store rather than from the `.pfx`. The
 Windows App SDK packaging targets cannot import a password-protected key file — they
 fail with `APPX0105: Cannot import the key file` and `APPX0107: The certificate specified
 is not valid for signing` even when `PackageCertificatePassword` is supplied — while the
-same certificate resolves cleanly by thumbprint. The `.pfx` is still exported so the
-certificate can be moved to another build machine.
+same certificate resolves cleanly by thumbprint. That is why
+`MSIX-win-x64.pubxml` carries an empty `PackageCertificateKeyFile`, a deliberate deviation
+from a straight `.pfx` reference: the `.pfx` still exists and is still exported by
+`make-cert.ps1`, but only so the certificate can be moved to another build machine — it is
+never read by the publish itself, which always signs by thumbprint from the local store.
 
 ### 3. Trust the certificate and install
 
@@ -163,8 +166,8 @@ registration first (`Remove-AppxPackage -Package io.staticbit.vanity_1.0.0.0_x64
 
 | Asset | Version | Licence |
 | --- | --- | --- |
-| [Inter](https://github.com/rsms/inter) (`Inter-Regular`, `Inter-Medium`, `Inter-SemiBold`) | v4.1 | SIL Open Font License 1.1 — `src/XrplVanity.App.Core/wwwroot/fonts/LICENSE-Inter.txt` |
-| [Cascadia Code](https://github.com/microsoft/cascadia-code) | v2407.24 | SIL Open Font License 1.1 — `src/XrplVanity.App.Core/wwwroot/fonts/LICENSE-CascadiaCode.txt` |
+| [Inter](https://github.com/rsms/inter/releases/tag/v4.1) (`Inter-Regular`, `Inter-Medium`, `Inter-SemiBold`) | v4.1 | SIL Open Font License 1.1 — `src/XrplVanity.App.Core/wwwroot/fonts/LICENSE-Inter.txt` |
+| [Cascadia Code](https://github.com/microsoft/cascadia-code/releases/tag/v2407.24) | v2407.24 | SIL Open Font License 1.1 — `src/XrplVanity.App.Core/wwwroot/fonts/LICENSE-CascadiaCode.txt` |
 | [Bootstrap](https://getbootstrap.com/) (`bootstrap.min.css` only) | 5.3.3 | MIT — `src/XrplVanity.App.Core/wwwroot/lib/bootstrap/LICENSE` |
 | [H.NotifyIcon.Maui](https://github.com/HavenDV/H.NotifyIcon) (tray icon and menu) | 2.4.1 | MIT |
 

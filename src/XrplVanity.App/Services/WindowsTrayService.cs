@@ -17,6 +17,8 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
     private TaskbarIcon? _icon;
     private Icon? _iconImage;
     private bool _disposed;
+    private bool _searchRunning;
+    private Command? _stopCommand;
 
     public event Action<TrayAction>? Activated;
 
@@ -80,6 +82,12 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
 
     private void ApplyMenu(TrayMenu menu)
     {
+        if (_searchRunning != menu.SearchRunning)
+        {
+            _searchRunning = menu.SearchRunning;
+            _stopCommand?.ChangeCanExecute();
+        }
+
         MenuFlyout flyout = new();
 
         // Every item is wired through Command, not Clicked: H.NotifyIcon renders the flyout as a
@@ -95,8 +103,14 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
 
         flyout.Add(duty);
 
-        MenuFlyoutItem stop = Item("Stop search", TrayAction.StopSearch);
-        stop.IsEnabled = menu.SearchRunning;
+        // The stop item's Command needs a real CanExecute, not just IsEnabled: H.NotifyIcon's
+        // native popup reflects the ICommand's CanExecute state, so a Command that always returns
+        // true (the Item() default) shows the item enabled even while idle, regardless of
+        // IsEnabled. _stopCommand is created once and reused so ChangeCanExecute above can
+        // notify a menu instance the popup already has open.
+        _stopCommand ??= new Command(() => Raise(TrayAction.StopSearch), () => _searchRunning);
+        MenuFlyoutItem stop = new() { Text = "Stop search", Command = _stopCommand };
+        stop.IsEnabled = _searchRunning;
         flyout.Add(stop);
 
         flyout.Add(new MenuFlyoutSeparator());

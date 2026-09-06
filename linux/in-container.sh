@@ -31,7 +31,11 @@ if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi -L || true; else echo 
 dotnet --version
 
 step "build"
-dotnet build XrplVanity.Portable.slnf -c Release
+# DOTNET_ROLL_FORWARD is scoped to this command only (see linux/Dockerfile): DartSassBuilder,
+# which compiles XrplVanity.App.Core's SCSS here, ships a net8.0 tool and this image carries only
+# the .NET 10 runtime. Everything downstream (the test executables themselves) runs without it, so
+# a real runtime mismatch there still fails loudly instead of being rolled forward too.
+DOTNET_ROLL_FORWARD=LatestMajor dotnet build XrplVanity.Portable.slnf -c Release
 
 if [ "$MODE" = gpu ]; then export XRPL_VANITY_REQUIRE_BACKENDS=cuda,opencl; else export XRPL_VANITY_REQUIRE_BACKENDS=opencl; fi
 step "tests (required backends: $XRPL_VANITY_REQUIRE_BACKENDS)"
