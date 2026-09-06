@@ -82,33 +82,31 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
     {
         MenuFlyout flyout = new();
 
-        MenuFlyoutItem show = new() { Text = "Show" };
-        show.Clicked += (_, _) => Raise(TrayAction.Show);
-        flyout.Add(show);
+        // Every item is wired through Command, not Clicked: H.NotifyIcon renders the flyout as a
+        // native popup outside the page tree, where the MAUI item never gets a handler, so Clicked
+        // is not raised and the menu silently does nothing. Command is invoked directly.
+        flyout.Add(Item("Show", TrayAction.Show));
 
         MenuFlyoutSubItem duty = new() { Text = "Duty" };
         foreach (int step in DutySteps)
         {
-            int value = step;
-            MenuFlyoutItem item = new() { Text = $"{(menu.DutyPercent == value ? "✓ " : "    ")}{value} %" };
-            item.Clicked += (_, _) => Raise(DutyAction(value));
-            duty.Add(item);
+            duty.Add(Item($"{(menu.DutyPercent == step ? "✓ " : "    ")}{step} %", DutyAction(step)));
         }
 
         flyout.Add(duty);
 
-        MenuFlyoutItem stop = new() { Text = "Stop search", IsEnabled = menu.SearchRunning };
-        stop.Clicked += (_, _) => Raise(TrayAction.StopSearch);
+        MenuFlyoutItem stop = Item("Stop search", TrayAction.StopSearch);
+        stop.IsEnabled = menu.SearchRunning;
         flyout.Add(stop);
 
         flyout.Add(new MenuFlyoutSeparator());
-
-        MenuFlyoutItem exit = new() { Text = "Exit" };
-        exit.Clicked += (_, _) => Raise(TrayAction.Exit);
-        flyout.Add(exit);
+        flyout.Add(Item("Exit", TrayAction.Exit));
 
         FlyoutBase.SetContextFlyout(_icon, flyout);
     }
+
+    private MenuFlyoutItem Item(string text, TrayAction action) =>
+        new() { Text = text, Command = new Command(() => Raise(action)) };
 
     private static TrayAction DutyAction(int percent) => percent switch
     {

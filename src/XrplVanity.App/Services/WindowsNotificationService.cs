@@ -21,8 +21,10 @@ public sealed class WindowsNotificationService : INotificationService
         }
         catch (Exception)
         {
-            // Unpackaged runs without a registered identity cannot show toasts; the UI already
-            // shows every match, so the app stays fully usable without them.
+            // Unpackaged runs without a registered identity cannot show toasts, and a packaged run
+            // whose manifest declares no toast activator is refused with "No COM servers are
+            // registered for this app"; the UI already shows every match, so the app stays fully
+            // usable without them.
             IsAvailable = false;
         }
     }

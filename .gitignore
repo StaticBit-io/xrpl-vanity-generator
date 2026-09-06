@@ -10,3 +10,7 @@ matches*.txt
 
 # Compiled by DartSassBuilder at build time.
 src/XrplVanity.App.Core/wwwroot/scss/*.css
+
+# Sideload signing material: created locally by app/make-cert.ps1, never committed.
+app/*.pfx
+app/*.cer

@@ -351,6 +351,20 @@ The `[cpu]` tag marks CPU devices in `--list-devices`. The suite on pocl
 (a CPU implementation) runs to completion on any machine Docker runs, even
 without a GPU — making CPU-only CI practical.
 
+## Desktop application
+
+Windows also has a graphical front end over the same search engine — a .NET MAUI
+host with a Blazor Hybrid UI, shipped as an MSIX package. It searches on the CPU
+and on every CUDA or OpenCL device it finds, keeps a searchable history of the
+results, and stores the seeds under DPAPI so that only the Windows account that
+found them can read them back.
+
+![The Search page of the XRPL Vanity desktop application](docs/images/desktop-search.png)
+
+See [docs/desktop-app.md](docs/desktop-app.md) for the requirements, how to build
+and run it from source, how to sign and install the MSIX, and the manual smoke
+checklist.
+
 ## Acknowledgements
 
 This tool is inspired by, and its CLI surface and matching semantics are

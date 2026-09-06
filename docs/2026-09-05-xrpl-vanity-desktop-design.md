@@ -272,7 +272,10 @@ public interface IFileDialogService { Task<string?> PickSaveTsvAsync(string sugg
   toast shows the window. Toast bodies carry the address, the pattern and the device — never
   the seed.
 - Tray: `H.NotifyIcon.Maui` (MIT). Menu: **Show**, **Duty** (25 / 50 / 80 / 100 %), **Stop
-  search**, **Exit**. Double-click shows the window.
+  search**, **Exit**. Double-click shows the window. Every item carries a `Command`, not a
+  `Clicked` handler: the flyout is rendered as a native popup outside the page tree, where the
+  MAUI item never gets a handler and `Clicked` is never raised, so a `Clicked`-based menu opens,
+  closes and does nothing.
 - Window close: the WinUI `AppWindow.Closing` handler on the Windows platform cancels the
   close and hides to the tray when the setting says so; with the default `Ask`, a modal in
   the page asks once ("Minimise to tray" / "Exit") with a "remember my choice" checkbox and
@@ -457,13 +460,58 @@ opens in a text editor with two tab-separated columns.
   solution.
 - `Properties/PublishProfiles/MSIX-win-x64.pubxml` (self-contained, `win-x64`,
   `GenerateAppxPackageOnBuild`), the manifest at `Platforms/Windows/Package.appxmanifest`
-  with `Identity Name="io.staticbit.vanity"`, `runFullTrust`.
+  with `Identity Name="io.staticbit.vanity"`, `runFullTrust`, and — required for toasts — a
+  `com:Extension` (`windows.comServer`) plus a `desktop:Extension`
+  (`windows.toastNotificationActivation`) sharing one CLSID; without them
+  `AppNotificationManager.Register()` fails with "No COM servers are registered for this app"
+  and `INotificationService.IsAvailable` stays false.
 - `app/make-cert.ps1` creates a self-signed code-signing certificate for the manifest's
   publisher and exports the `.pfx`/`.cer`; `docs/desktop-app.md` documents creating it,
   trusting the `.cer` (Local Machine, Trusted People), publishing and installing.
 - No CI for the application in this repository yet; the Linux harness and the unit suite
   remain the gates. The App tests run with `dotnet run --project tests/XrplVanity.App.Tests -c Release`
   like the existing suite.
+
+### Measured (Plan G)
+
+Taken on the tree the Task 8 commit records (parent `820e53e`); RTX 5070 Ti, 12 logical cores,
+Windows 11, 120 dpi.
+
+- App test suite: 71 tests, 0 failed, 0 skipped, 2.973 s; the search suite beside it is unchanged
+  at 254 tests, 0 failed, 0 skipped, 49.764 s. Portable solution filter builds in the Linux
+  harness: gpu mode 1330.659 s (254 tests, 0 failed, 0 skipped) plus 2.759 s for the App suite
+  (71 tests, 4 skipped — the DPAPI tests are Windows-only), cpu-only mode 1067.453 s (254 tests,
+  0 failed, 64 skipped — the CUDA rows) plus 2.624 s for the App suite. Both modes report "all
+  expectations met". The build step itself is 14.5 s. Two caveats: the harness could not build
+  `XrplVanity.App.Core` at all until `DOTNET_ROLL_FORWARD=LatestMajor` was added to
+  `linux/Dockerfile` (DartSassBuilder ships a `net8.0` tool and the SDK image carries only the
+  .NET 10 runtime), and the first cpu-only run failed
+  `MultiDeviceSearchTests.Lowering_Duty_Mid_Run_Slows_The_Launch_Cadence(opencl)` on a timing
+  tolerance (ratio 2.62 against an expected ≈2) before passing on the rerun — a pocl-timing
+  flake in a Plan F test, not a Plan G regression.
+- Cold start to interactive window (MSIX, Release): 1.73 s and 1.84 s, measured from
+  `Start-Process` on the package AUMID to the first captured frame containing the mint accent,
+  i.e. the painted Blazor UI; the window handle itself appears at 0.74–0.90 s. Memory five
+  seconds after start: 211 MB for the application process plus 349 MB across the six WebView2
+  children it owns, ≈560 MB in total, which is what Task Manager groups under the app.
+- CPU search from the GUI, 12 threads, `--starts abc` equivalent (case-sensitive): 137,256/s in
+  LiveStats over 73.5 M candidates in 9 minutes, versus 102,249/s from the CLI's `CPU:` line
+  (`--count 60`, 4,947,712 candidates in 48.4 s) and 91,458/s over a longer CLI run
+  (`--count 250`, 16,866,054 candidates in 184.4 s). The GUI reads 34–50 % higher; the runs were
+  sequential rather than simultaneous, so the gap is unexplained rather than attributable, and it
+  is the one figure here that should be re-taken as a controlled A/B before being quoted.
+- GPU search from the GUI (`cuda:0`, `abcd` case-sensitive): 18.1 M/s in LiveStats over 489.7 M
+  candidates in 27 s, and 17,997,356/s in the rate hint the run persisted, versus 19,400,000/s
+  from the CLI — −7.2 %. The run was stopped by hand rather than by `--count 30`, since the Search
+  page has no count field; 91 hits had accumulated by then, so the sample is larger than the CLI's.
+- Manual checklist: 11/12 verified. The twelfth — trusting the certificate and installing the
+  `.msix` — needs an elevated prompt and is left to the user; the exact commands are in
+  `docs/desktop-app.md`. Two defects surfaced and were fixed while running it: the package
+  manifest declared no toast activator, so `AppNotificationManager.Register()` failed and
+  notifications were silently unavailable; and every tray menu item was wired through
+  `MenuFlyoutItem.Clicked`, which H.NotifyIcon's native popup never raises, so the menu opened,
+  closed and did nothing. Both are covered above under **Build and packaging** and in
+  `docs/desktop-app.md`.
 
 ## Plans
 

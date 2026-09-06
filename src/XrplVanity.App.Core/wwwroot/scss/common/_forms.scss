@@ -1,0 +1,11 @@
+// Native checkboxes and range inputs default to the browser's accent (blue in WebView2),
+// which is the one place the platform overrides the palette. Repaint them mint.
+input[type="checkbox"],
+input[type="range"] {
+  accent-color: var(--mint);
+}
+
+input[type="checkbox"]:disabled,
+input[type="range"]:disabled {
+  accent-color: var(--text-secondary);
+}

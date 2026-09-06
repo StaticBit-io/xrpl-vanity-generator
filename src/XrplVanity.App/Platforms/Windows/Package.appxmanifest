@@ -4,14 +4,16 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap rescap">
 
-  <Identity Name="maui-package-name-placeholder" Publisher="CN=StaticBit" Version="1.0.0.0" />
+  <Identity Name="io.staticbit.vanity" Publisher="CN=StaticBit Vanity Dev" Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="6FD6C604-A3BD-4A37-96CE-9058B9F126BA" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>$placeholder$</DisplayName>
+    <DisplayName>XRPL Vanity</DisplayName>
     <PublisherDisplayName>StaticBit</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
@@ -28,14 +30,29 @@
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="$placeholder$"
-        Description="$placeholder$"
+        DisplayName="XRPL Vanity"
+        Description="XRPL Vanity address generator"
         Square150x150Logo="$placeholder$.png"
         Square44x44Logo="$placeholder$.png"
         BackgroundColor="transparent">
         <uap:DefaultTile Square71x71Logo="$placeholder$.png" Wide310x150Logo="$placeholder$.png" Square310x310Logo="$placeholder$.png" />
         <uap:SplashScreen Image="$placeholder$.png" />
       </uap:VisualElements>
+      <!-- AppNotificationManager.Register() fails with "No COM servers are registered for this app"
+           unless the package declares its own toast activator, so notifications need both entries.
+           The CLSID is arbitrary but must stay identical in the two elements and across releases. -->
+      <Extensions>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="XrplVanity.App.exe" DisplayName="XRPL Vanity" Arguments="----AppNotificationActivated:">
+              <com:Class Id="211e6121-b8f5-4dd1-9a6f-12cb7be3ef37" DisplayName="XRPL Vanity notification activator" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="211e6121-b8f5-4dd1-9a6f-12cb7be3ef37" />
+        </desktop:Extension>
+      </Extensions>
     </Application>
   </Applications>
 
