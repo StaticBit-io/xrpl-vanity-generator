@@ -15,8 +15,9 @@
   else
   {
     <div class="list">
-      <Virtualize TItem="SessionResult" Items="Items.ToList()" Context="item" ItemSize="44" OverscanCount="8">
-        <div class="row @(_animated.Add(item.Address) ? "slide-in" : "") @(OnDelete.HasDelegate ? "has-delete" : "")" @key="item.Address">
+      <Virtualize TItem="SessionResult" Items="_items" Context="item" ItemSize="44" OverscanCount="8">
+        @* _animated.Add returns true only the first time a row is seen, so a re-render (e.g. a seed reveal) does not replay the slide-in. *@
+        <div class="row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
           <span class="mono address">@item.Address</span>
           <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
           <span class="pattern">@item.Pattern <span class="text-secondary">(@item.Position.ToLowerInvariant())</span></span>

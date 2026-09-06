@@ -9,7 +9,9 @@ public partial class ResultsList : IDisposable
     private readonly HashSet<string> _animated = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ITimer> _hideTimers = new(StringComparer.Ordinal);
     private IReadOnlyList<SessionResult>? _lastItems;
+    private List<SessionResult> _items = new();
     private string? _exportError;
+    private volatile bool _disposed;
 
     [Parameter, EditorRequired] public IReadOnlyList<SessionResult> Items { get; set; } = Array.Empty<SessionResult>();
     [Parameter] public bool ShowTarget { get; set; }
@@ -19,6 +21,8 @@ public partial class ResultsList : IDisposable
 
     protected override void OnParametersSet()
     {
+        _items = Items.ToList();
+
         // A new session replaces the Items instance (SearchViewModel.Start clears _results); a
         // revealed seed from a previous session must not leak into the new one's rendering.
         if (!ReferenceEquals(Items, _lastItems))
@@ -30,6 +34,8 @@ public partial class ResultsList : IDisposable
                 _hideTimers.Clear();
                 _revealed.Clear();
             }
+
+            _animated.Clear();
         }
     }
 
@@ -43,12 +49,36 @@ public partial class ResultsList : IDisposable
 
         _revealed.Add(address);
         StopTimer(address);
-        _hideTimers[address] = Clock.CreateTimer(_ => InvokeAsync(() =>
+        _hideTimers[address] = Clock.CreateTimer(_ =>
         {
-            _revealed.Remove(address);
-            StopTimer(address);
-            StateHasChanged();
-        }), null, TimeSpan.FromSeconds(RevealSeconds), Timeout.InfiniteTimeSpan);
+            if (_disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                _ = InvokeAsync(() =>
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    _revealed.Remove(address);
+                    StopTimer(address);
+                    StateHasChanged();
+                });
+            }
+            catch (ObjectDisposedException)
+            {
+                // The renderer is gone; nothing to refresh.
+            }
+            catch (InvalidOperationException)
+            {
+                // The component is no longer attached to a renderer.
+            }
+        }, null, TimeSpan.FromSeconds(RevealSeconds), Timeout.InfiniteTimeSpan);
     }
 
     private void StopTimer(string address)
@@ -66,9 +96,9 @@ public partial class ResultsList : IDisposable
         if (path is null) return;
         try
         {
-            // Items are written in the order given (the newest-first order the view model
-            // exposes maps 1:1 onto the file, matching how the results list itself is read).
-            TsvExport.Write(path, Items.Select(i => (i.Address, i.Seed)));
+            // Items is newest-first in the app; export chronologically (oldest-first), matching
+            // the order the CLI's --out would have written.
+            TsvExport.Write(path, Items.OrderBy(i => i.FoundAt).Select(i => (i.Address, i.Seed)));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -78,6 +108,7 @@ public partial class ResultsList : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         foreach (ITimer timer in _hideTimers.Values) timer.Dispose();
         _hideTimers.Clear();
     }
