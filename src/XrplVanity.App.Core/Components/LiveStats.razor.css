@@ -1,0 +1,7 @@
+.tiles { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+.tile { min-height: 64px; }
+.label { color: var(--text-secondary); font-size: 12px; }
+.target-row { display: grid; grid-template-columns: 90px 1fr 90px 110px 1fr; gap: 10px; align-items: center; font-size: 12px; padding: 6px 4px; border-top: 1px solid var(--dark-gray); margin-top: 8px; }
+.target-row .state { font-weight: 600; text-transform: lowercase; color: var(--text-secondary); }
+.target-row.running .state { color: var(--mint); }
+.target-row.failed .state, .failure { color: var(--negative); }

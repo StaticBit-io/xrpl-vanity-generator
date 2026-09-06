@@ -1,0 +1,33 @@
+@inject IClipboardService Clipboard
+@inject IFileDialogService Dialog
+@inject TimeProvider Clock
+
+<div class="card-box results">
+  <div class="head">
+    <div class="card-title">Results <span class="count">@Items.Count</span></div>
+    <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0)" @onclick="Export">Export TSV…</button>
+  </div>
+  @if (_exportError is not null) { <div class="export-error">@_exportError</div> }
+  @if (Items.Count == 0)
+  {
+    <div class="placeholder">No matches yet — start a search and hits appear here as they are verified.</div>
+  }
+  else
+  {
+    <div class="list">
+      <Virtualize TItem="SessionResult" Items="Items.ToList()" Context="item" ItemSize="44" OverscanCount="8">
+        <div class="row @(_animated.Add(item.Address) ? "slide-in" : "") @(OnDelete.HasDelegate ? "has-delete" : "")" @key="item.Address">
+          <span class="mono address">@item.Address</span>
+          <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
+          <span class="pattern">@item.Pattern <span class="text-secondary">(@item.Position.ToLowerInvariant())</span></span>
+          @if (ShowTarget) { <span class="target text-secondary">@item.Target</span> }
+          <span class="time text-secondary">@item.FoundAt.ToLocalTime().ToString("HH:mm:ss")</span>
+          <span class="mono seed">@(_revealed.Contains(item.Address) ? item.Seed : "••••••••")</span>
+          <button class="btn-icon reveal" title="@(_revealed.Contains(item.Address) ? "Hide seed" : "Reveal seed")" @onclick="() => ToggleReveal(item.Address)">👁</button>
+          <button class="btn-icon copy-seed" title="Copy seed (clipboard clears after @ClipboardClearSeconds s)" @onclick="() => Clipboard.CopySecretAsync(item.Seed, TimeSpan.FromSeconds(ClipboardClearSeconds))">⧉</button>
+          @if (OnDelete.HasDelegate) { <button class="btn-icon delete" title="Delete" @onclick="() => OnDelete.InvokeAsync(item)">🗑</button> }
+        </div>
+      </Virtualize>
+    </div>
+  }
+</div>

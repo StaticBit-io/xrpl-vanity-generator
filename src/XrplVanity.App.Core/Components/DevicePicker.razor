@@ -1,0 +1,17 @@
+@inherits ViewModelComponent
+<div class="card-box">
+  <div class="head"><div class="card-title">Devices</div><button class="btn-icon t" title="Refresh devices" @onclick="Vm.RefreshDevices">⟳</button></div>
+  @if (Vm.NoGpuFound) { <div class="banner-yellow">No CUDA driver or OpenCL platform found — searching on the CPU.</div> }
+  @foreach (TargetChoice t in Vm.Targets)
+  {
+    <label class="target t @(t.Selected ? "selected" : "")" @key="t.Id">
+      <input class="select" type="checkbox" checked="@t.Selected" disabled="@Busy" @onchange="e => Vm.SetTargetSelected(t.Id, (bool)e.Value!)" />
+      <span class="name">@t.Name @if (t.IsCpuDevice) { <span class="tag">[cpu]</span> }</span>
+      <span class="details text-secondary">@t.Details</span>
+      @if (t.IsCpu)
+      {
+        <span class="threads-wrap"><input class="threads" type="range" min="1" max="@Environment.ProcessorCount" value="@Vm.CpuThreads" disabled="@Busy" @onchange="e => Vm.CpuThreads = int.Parse((string)e.Value!)" /> <span class="num small">@Vm.CpuThreads</span> threads</span>
+      }
+    </label>
+  }
+</div>

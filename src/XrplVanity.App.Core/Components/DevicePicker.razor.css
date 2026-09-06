@@ -1,0 +1,8 @@
+.head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.target { display: grid; grid-template-columns: 24px 1fr 1fr auto; gap: 10px; align-items: center; padding: 8px 4px; border-top: 1px solid var(--dark-gray); cursor: pointer; }
+.target:first-of-type { border-top: 0; }
+.target.selected { border-color: var(--mint); }
+.tag { color: var(--yellow); font-size: 12px; margin-left: 6px; }
+.threads-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.threads { accent-color: var(--mint); }
+.banner-yellow { background: rgba(211,231,171,0.12); color: var(--yellow); border-radius: var(--radius-chip); padding: 8px 12px; margin-bottom: 10px; }
