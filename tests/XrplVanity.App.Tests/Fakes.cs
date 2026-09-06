@@ -16,25 +16,104 @@ public sealed class FakeClipboard : IClipboardService
     public TimeSpan? ClearAfter { get; private set; }
     public Task CopyAsync(string text) { Text = text; ClearAfter = null; return Task.CompletedTask; }
     public Task CopySecretAsync(string text, TimeSpan clearAfter) { Text = text; ClearAfter = clearAfter; return Task.CompletedTask; }
+
+    public Task ClearPendingSecretAsync()
+    {
+        ClearPendingSecretCalls++;
+        Text = null;
+        ClearAfter = null;
+        return Task.CompletedTask;
+    }
+
+    public int ClearPendingSecretCalls { get; private set; }
 }
 
 public sealed class MemorySettingsStore : ISettingsStore
 {
     public AppSettings Current { get; private set; } = new();
     public int Saves { get; private set; }
+    public string? LastError { get; private set; }
+
+    /// <summary>When set, every <see cref="Save"/> fails the way a read-only data folder would.</summary>
+    public bool FailSaves { get; init; }
+
+    /// <summary>When set, <see cref="Save"/> throws — a store that breaks the non-throwing contract.</summary>
+    public bool ThrowOnSave { get; init; }
+
     public AppSettings Load() => Current;
-    public void Save(AppSettings settings) { Current = settings; Saves++; }
+
+    public void Save(AppSettings settings)
+    {
+        if (ThrowOnSave)
+        {
+            throw new IOException("settings.json is read-only");
+        }
+
+        if (FailSaves)
+        {
+            LastError = "settings.json could not be written";
+            return;
+        }
+
+        Current = settings;
+        Saves++;
+        LastError = null;
+    }
 }
 
 public sealed class MemoryResultStore : IResultStore
 {
     private readonly List<StoredResult> _items = new();
+    private int _appends;
+    private int _appendRanges;
+
     public bool IsReadOnly { get; init; }
     public string? ReadOnlyReason { get; init; }
+
+    /// <summary>When set, every write fails the way a read-only <c>results.dat</c> would.</summary>
+    public bool ThrowOnWrite { get; init; }
+
+    /// <summary>Single-result appends: a batched search must not perform any.</summary>
+    public int Appends => Volatile.Read(ref _appends);
+
+    /// <summary>Batch appends.</summary>
+    public int AppendRanges => Volatile.Read(ref _appendRanges);
+
     public IReadOnlyList<StoredResult> LoadAll() { lock (_items) return _items.ToArray(); }
-    public void Append(StoredResult result) { lock (_items) _items.Add(result); }
-    public void Delete(string address) { lock (_items) _items.RemoveAll(r => r.Address == address); }
-    public void Clear() { lock (_items) _items.Clear(); }
+
+    public void Append(StoredResult result)
+    {
+        Interlocked.Increment(ref _appends);
+        ThrowIfBroken();
+        lock (_items) _items.Add(result);
+    }
+
+    public void AppendRange(IEnumerable<StoredResult> results)
+    {
+        Interlocked.Increment(ref _appendRanges);
+        ThrowIfBroken();
+        lock (_items) _items.AddRange(results);
+    }
+
+    public void Delete(string address)
+    {
+        ThrowIfBroken();
+        lock (_items) _items.RemoveAll(r => r.Address == address);
+    }
+
+    public void Clear()
+    {
+        ThrowIfBroken();
+        lock (_items) _items.Clear();
+    }
+
+    private void ThrowIfBroken()
+    {
+        if (ThrowOnWrite)
+        {
+            throw new InvalidOperationException(ReadOnlyReason ?? "results.dat could not be written");
+        }
+    }
 }
 
 public sealed class FakeFileDialog : IFileDialogService

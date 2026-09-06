@@ -25,7 +25,11 @@ public sealed class SearchViewModel : IDisposable
     private readonly List<PatternChip> _patterns = new();
     private readonly List<TargetChoice> _targets = new();
     private readonly List<SessionResult> _results = new();
+    private readonly List<StoredResult> _pendingPersist = new();
     private IReadOnlyList<SessionResult> _resultsSnapshot = Array.Empty<SessionResult>();
+    private SessionResult? _lastMatch;
+    private string? _historyWriteError;
+    private int _unnotifiedMatches;
     private AppSettings _settings;
     private PatternSet? _patternSet;
     private SearchSession? _session;
@@ -122,7 +126,14 @@ public sealed class SearchViewModel : IDisposable
         }
     }
 
-    public string? HistoryReadOnlyReason => _resultStore.IsReadOnly ? _resultStore.ReadOnlyReason ?? "history is read-only" : null;
+    /// <summary>
+    /// Non-null when nothing new can reach <c>results.dat</c>: either the store declared itself
+    /// read-only, or a batch flush failed mid-search. Rendered as a banner on History and on the
+    /// Search page, because a persist failure during a run means the seeds are gone on restart.
+    /// </summary>
+    public string? HistoryReadOnlyReason => _resultStore.IsReadOnly
+        ? _resultStore.ReadOnlyReason ?? "history is read-only"
+        : _historyWriteError;
     public AppSettings Settings => _settings;
 
     public int DutyPercent
@@ -305,6 +316,10 @@ public sealed class SearchViewModel : IDisposable
                 SearchRequest request = new(_patternSet!, targets, _count, _dutyPercent);
                 _results.Clear();
                 _resultsSnapshot = Array.Empty<SessionResult>();
+                _pendingPersist.Clear();
+                _unnotifiedMatches = 0;
+                _lastMatch = null;
+                _historyWriteError = null;
                 LastSummary = null;
                 LastFailure = null;
                 _progress = null;
@@ -351,7 +366,17 @@ public sealed class SearchViewModel : IDisposable
         lock (_gate)
         {
             _settings = update(_settings);
-            _settingsStore.Save(_settings);
+            try
+            {
+                // ISettingsStore.Save is contracted not to throw, but this runs from Blazor event
+                // handlers and from the session-completion continuation, where an escaping
+                // exception is either unhandled or unobserved — so the contract is enforced here too.
+                _settingsStore.Save(_settings);
+            }
+            catch (Exception)
+            {
+                // The in-memory settings stay authoritative; the next successful save persists them.
+            }
         }
     }
 
@@ -447,37 +472,110 @@ public sealed class SearchViewModel : IDisposable
             }
         }
 
+        FlushPendingMatches();
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Runs inside <c>MatchSink</c>'s lock, shared by every CPU worker and GPU engine: a short
+    /// pattern reaches five figures of hits per second here, so this does the cheap part only —
+    /// the in-memory list and the pending batch — and raises no event. Persisting, notifying and
+    /// <see cref="Changed"/> happen in <see cref="FlushPendingMatches"/> on the progress tick.
+    /// </summary>
     private void OnMatch(Match match)
     {
-        string target = _progress?.Targets.FirstOrDefault(t => t.State == TargetState.Running)?.Id ?? "?";
-        SessionResult result = new(match.Address, match.Seed, match.Pattern, match.Position.ToString(), DateTimeOffset.Now, target);
+        SessionResult result = new(match.Address, match.Seed, match.Pattern, match.Position.ToString(), DateTimeOffset.Now, ResolveMatchTarget());
         lock (_gate)
         {
             _results.Insert(0, result);
             _resultsSnapshot = _results.ToArray();
+            _pendingPersist.Add(new StoredResult(result.Address, result.Seed, result.Pattern, result.Position, result.FoundAt, result.Target));
+            _unnotifiedMatches++;
+            _lastMatch = result;
+        }
+    }
+
+    /// <summary>
+    /// Plan F's <c>Match</c> carries no source target, so the only honest attribution is the one
+    /// running target when there is exactly one; with the CPU and a GPU both running, any guess
+    /// would be wrong most of the time, so the result records "?" instead.
+    /// </summary>
+    private string ResolveMatchTarget()
+    {
+        SearchProgress? progress = _progress;
+        if (progress is null)
+        {
+            return "?";
         }
 
-        if (!_resultStore.IsReadOnly)
+        string? single = null;
+        foreach (TargetProgress target in progress.Targets)
+        {
+            if (target.State != TargetState.Running) continue;
+            if (single is not null) return "?";
+            single = target.Id;
+        }
+
+        return single ?? "?";
+    }
+
+    /// <summary>
+    /// Persists everything collected since the last flush as one store write and raises at most
+    /// one notification for the batch. Called from the progress tick and once more before the
+    /// terminal state transition; never throws into its caller.
+    /// </summary>
+    private void FlushPendingMatches()
+    {
+        StoredResult[] batch;
+        int unnotified;
+        SessionResult? last;
+        lock (_gate)
+        {
+            if (_pendingPersist.Count == 0 && _unnotifiedMatches == 0)
+            {
+                return;
+            }
+
+            batch = _pendingPersist.ToArray();
+            _pendingPersist.Clear();
+            unnotified = _unnotifiedMatches;
+            _unnotifiedMatches = 0;
+            last = _lastMatch;
+        }
+
+        if (batch.Length > 0 && !_resultStore.IsReadOnly)
         {
             try
             {
-                _resultStore.Append(new StoredResult(result.Address, result.Seed, result.Pattern, result.Position, result.FoundAt, result.Target));
+                _resultStore.AppendRange(batch);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // The store reports read-only state itself; the session result list still has the match.
+                // The session result list still has the matches; the banner says they are not on disk.
+                _historyWriteError = _resultStore.ReadOnlyReason ?? $"results could not be written: {ex.Message}";
             }
         }
 
-        if (_settings.NotificationsEnabled)
+        if (unnotified == 0 || last is null || !_settings.NotificationsEnabled)
         {
-            _notifications.Notify("Match found", $"{match.Address} · {match.Pattern} ({match.Position})");
+            return;
         }
 
-        Changed?.Invoke();
+        try
+        {
+            if (unnotified == 1)
+            {
+                _notifications.Notify("Match found", $"{last.Address} · {last.Pattern} ({last.Position})");
+            }
+            else
+            {
+                _notifications.Notify("Matches found", $"{unnotified} new · latest {last.Address}");
+            }
+        }
+        catch (Exception)
+        {
+            // A toast that cannot be raised must not take the search down with it.
+        }
     }
 
     private void OnLog(string line)
@@ -491,13 +589,7 @@ public sealed class SearchViewModel : IDisposable
 
     private void OnCompleted(SearchSummary summary)
     {
-        Dictionary<string, double> hints = new(_settings.RateHints);
-        foreach (TargetProgress t in summary.Final.Targets)
-        {
-            if (t.State != TargetState.Failed && t.RatePerSecond > 0) hints[t.Id] = t.RatePerSecond;
-        }
-
-        SaveSettings(s => s with { RateHints = hints });
+        FlushPendingMatches();
         SearchSession? finished;
         lock (_gate)
         {
@@ -511,6 +603,16 @@ public sealed class SearchViewModel : IDisposable
                 LastFailure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no target could start";
             }
         }
+
+        // After the state transition, never before it: a settings write that fails would otherwise
+        // fault this continuation and leave the view model stuck in Searching with a dead session.
+        Dictionary<string, double> hints = new(_settings.RateHints);
+        foreach (TargetProgress t in summary.Final.Targets)
+        {
+            if (t.State != TargetState.Failed && t.RatePerSecond > 0) hints[t.Id] = t.RatePerSecond;
+        }
+
+        SaveSettings(s => s with { RateHints = hints });
 
         if (_settings.NotificationsEnabled)
         {
@@ -550,6 +652,7 @@ public sealed class SearchViewModel : IDisposable
 
     private void OnFailed(string message)
     {
+        FlushPendingMatches();
         SearchSession? finished;
         lock (_gate)
         {

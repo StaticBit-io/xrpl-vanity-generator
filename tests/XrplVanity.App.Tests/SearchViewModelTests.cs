@@ -117,11 +117,64 @@ public class SearchViewModelTests
         Assert.Equal(3, vm.Results.Count);
         Assert.All(vm.Results, r => Assert.StartsWith("ra", r.Address));
         Assert.Equal(3, results.LoadAll().Count);
-        Assert.Contains(notes.Sent, n => n.Title == "Match found" && n.Body.Contains(vm.Results[0].Address) && !n.Body.Contains(vm.Results[0].Seed));
+        Assert.Equal(0, results.Appends);   // batched through AppendRange; never one write per hit
+        Assert.Contains(notes.Sent, n => n.Title is "Match found" or "Matches found" && !n.Body.Contains(vm.Results[0].Seed));
         Assert.Contains(notes.Sent, n => n.Title == "Search finished" && n.Body.Contains("3"));
         Assert.True(settings.Current.RateHints.ContainsKey("cpu"), "rate hint stored");
         Assert.True(stateChanges > 0);
         Assert.NotNull(vm.EstimatedTime);   // now computed from the hint
+    }
+
+    [Fact]
+    public void Matches_Are_Persisted_In_Batches_With_Fewer_Notifications_Than_Hits()
+    {
+        (SearchViewModel vm, FakeNotifications notes, MemoryResultStore results, _) = Create();
+        vm.AddPattern("a", MatchPosition.Starts, false);
+        vm.CpuThreads = 2;
+        vm.Count = 50;
+
+        vm.Start();
+
+        WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+        Assert.Equal(SessionOutcome.CountReached, vm.LastSummary!.Outcome);
+        Assert.Equal(50, vm.Results.Count);
+        Assert.Equal(50, results.LoadAll().Count);
+        Assert.Equal(0, results.Appends);            // OnMatch itself writes nothing
+        Assert.True(results.AppendRanges <= 50, "one batch write per flush, not per hit");
+
+        int matchNotifications = notes.Sent.Count(n => n.Title is "Match found" or "Matches found");
+        Assert.True(matchNotifications < 50, $"expected fewer notifications than matches, got {matchNotifications}");
+    }
+
+    [Fact]
+    public void A_Failing_Result_Store_Surfaces_A_History_Banner_Without_Breaking_The_Search()
+    {
+        FakeNotifications notes = new();
+        MemoryResultStore results = new() { ThrowOnWrite = true, ReadOnlyReason = "results.dat could not be written" };
+        SearchViewModel vm = new(new MemorySettingsStore(), results, notes, () => Array.Empty<DeviceCatalogEntry>());
+        vm.AddPattern("a", MatchPosition.Starts, false);
+        vm.Count = 1;
+
+        vm.Start();
+
+        WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+        Assert.Single(vm.Results);
+        Assert.Equal("results.dat could not be written", vm.HistoryReadOnlyReason);
+    }
+
+    [Fact]
+    public void A_Settings_Store_That_Throws_Does_Not_Prevent_A_Session_From_Completing()
+    {
+        MemorySettingsStore settings = new() { ThrowOnSave = true };
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<DeviceCatalogEntry>());
+        vm.AddPattern("a", MatchPosition.Starts, false);
+        vm.Count = 1;
+
+        vm.Start();
+
+        WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+        Assert.Equal(SearchState.Idle, vm.State);
+        Assert.Single(vm.Results);
     }
 
     [Fact]

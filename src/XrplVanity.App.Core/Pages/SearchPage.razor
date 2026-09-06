@@ -34,6 +34,12 @@
     </div>
     <div class="col-bottom">
       <LiveStats Progress="Vm.Progress" />
+      @* A persist failure during a run must be visible here too: the session list still shows the
+         hits, but they are not on disk and are gone on restart. *@
+      @if (Vm.HistoryReadOnlyReason is not null)
+      {
+        <Banner Kind="negative" Text="@Vm.HistoryReadOnlyReason" />
+      }
       <ResultsList Items="Vm.Results" ShowTarget="true" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
     </div>
   </div>

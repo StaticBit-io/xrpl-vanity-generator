@@ -37,10 +37,25 @@ public sealed class JsonSettingsStore : ISettingsStore
         }
     }
 
+    public string? LastError { get; private set; }
+
+    /// <summary>
+    /// Settings are written from Blazor event handlers and from the session-completion
+    /// continuation; a read-only data folder there would fault the continuation and strand the
+    /// view model in <c>Searching</c> with a dead session. A failed write is recorded, not thrown.
+    /// </summary>
     public void Save(AppSettings settings)
     {
-        string temp = _path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(settings, Options));
-        File.Move(temp, _path, overwrite: true);
+        try
+        {
+            string temp = _path + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(settings, Options));
+            File.Move(temp, _path, overwrite: true);
+            LastError = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            LastError = $"settings.json could not be written: {ex.Message}";
+        }
     }
 }

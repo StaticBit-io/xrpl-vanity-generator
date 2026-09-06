@@ -54,6 +54,27 @@ public sealed class DpapiResultStore : IResultStore
         }
     }
 
+    /// <summary>One encrypt-and-rewrite for the whole batch, not one per result.</summary>
+    public void AppendRange(IEnumerable<StoredResult> results)
+    {
+        List<StoredResult> batch = results.ToList();
+        if (batch.Count == 0)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            List<StoredResult> current = EnsureLoaded();
+            ThrowIfReadOnly();
+            List<StoredResult> updated = new(current.Count + batch.Count);
+            updated.AddRange(current);
+            updated.AddRange(batch);
+            Write(updated);
+            _cache = updated;
+        }
+    }
+
     public void Delete(string address)
     {
         lock (_gate)
