@@ -2247,6 +2247,166 @@ git commit -m "docs: Plan F measurements (session throughput, CPU rate, harness 
 
 ---
 
+### Task 8: Leading-character model for `Starts` estimates, and the documentation correction
+
+**Why this task exists (added during execution).** The Task 7 measurements showed the CPU rate line at ~115,000–128,000/s while `docs/benchmarks.md` had estimated 250,000–310,000/s from `count × 58^3 / wall time`. The counter is right; the 58^n assumption is wrong for prefixes. A classic address is base58check of `0x00 ‖ 20-byte hash ‖ 4-byte checksum`; the leading zero byte becomes the fixed `r`, and the remaining 192-bit number has `2^192 / 58^32 ≈ 23.34` possible leading base58 digits, so the character right after `r` is (almost) uniform over alphabet indices 1–22 (`pshnaf39wBUDNEGHJKLM4P`), index 23 (`Q`) gets the remaining 0.34 share, and every other character appears there only when the number is short enough to lose a digit (probability `1/23.34`, then uniform over 58). Measured on this machine with `--case-sensitive --starts X --threads 12`: `a` and `p` match once per ~24 candidates, `Q` once per ~62, `c` once per ~1,600 (58 would predict 58 for all of them).
+
+**Files:**
+- Modify: `src/XrplVanity.Search/SearchEstimator.cs`
+- Modify: `tests/XrplVanity.Tests/Search/SearchEstimatorTests.cs`
+- Modify: `docs/benchmarks.md` ("Expected candidates per match" paragraph; the CPU-path table; the "How the figures were obtained" CPU paragraph)
+- Modify: `docs/2026-09-05-xrpl-vanity-desktop-design.md` ("Estimator" subsection under Plan F)
+- Modify: `README.md` (one sentence in the normalization section about the second character)
+
+**Interfaces:**
+- Produces: `SearchEstimator.LeadingDigitCount` (`public const double` = `2^192 / 58^32` written as the literal `23.338`), `SearchEstimator.LeadingCharacterProbability(char c)` (public static, the weights below), unchanged signatures for `ExpectedCandidatesPerMatch` and `ExpectedTimeToMatch`.
+
+- [ ] **Step 1: Update the estimator tests**
+
+Replace the prefix theory and the case-insensitive test in `tests/XrplVanity.Tests/Search/SearchEstimatorTests.cs` with:
+
+```csharp
+    private const double Leading = 23.338;
+
+    [Theory]
+    [InlineData("a", 1)]
+    [InlineData("ab", 58)]
+    [InlineData("abc", 3364)]
+    [InlineData("abcd", 195_112)]
+    public void Case_Sensitive_Prefix_Uses_The_Leading_Digit_Count_Then_58_Per_Character(string pattern, double restFactor)
+    {
+        // First character after 'r': one of ~23.338 leading digits; every later character: one of 58.
+        Assert.Equal(Leading * restFactor, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, pattern))!.Value, precision: 3);
+    }
+
+    [Theory]
+    [InlineData('p', 1 / 23.338)]                 // alphabet index 1
+    [InlineData('P', 1 / 23.338)]                 // alphabet index 22
+    [InlineData('Q', 0.338 / 23.338)]             // alphabet index 23: the partial leading digit
+    [InlineData('c', 1 / (23.338 * 58))]          // index 36: only when the number loses a digit
+    [InlineData('r', 1 / (23.338 * 58))]          // index 0: same
+    [InlineData('z', 1 / (23.338 * 58))]          // index 57: same
+    public void Leading_Character_Probability_Follows_The_Base58_Digit_Distribution(char c, double expected)
+    {
+        Assert.Equal(expected, SearchEstimator.LeadingCharacterProbability(c), precision: 9);
+    }
+
+    [Fact]
+    public void Leading_Character_Probabilities_Sum_To_About_One()
+    {
+        double sum = 0;
+        foreach (char c in XrplBase58.Alphabet) sum += SearchEstimator.LeadingCharacterProbability(c);
+        Assert.InRange(sum, 0.98, 1.0);
+    }
+
+    [Fact]
+    public void Case_Insensitive_Letters_With_Two_Cases_Double_The_Targets()
+    {
+        // "ab" ignore-case expands to ab, aB, Ab, AB: a and A both lead ('a' index 5, 'A' index 53).
+        double a = SearchEstimator.LeadingCharacterProbability('a') / 58 + SearchEstimator.LeadingCharacterProbability('A') / 58;
+        Assert.Equal(1.0 / (2 * a), SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "ab", ignoreCase: true))!.Value, precision: 3);
+        // "o" has no upper-case form and "L" no lower-case form: no expansion.
+        Assert.Equal(1.0 / SearchEstimator.LeadingCharacterProbability('o'), SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "o", ignoreCase: true))!.Value, precision: 3);
+        Assert.Equal(1.0 / SearchEstimator.LeadingCharacterProbability('L'), SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "L", ignoreCase: true))!.Value, precision: 3);
+    }
+
+    [Fact]
+    public void Several_Patterns_Add_Their_Probabilities()
+    {
+        PatternSet two = new PatternSet.Builder()
+            .Add(MatchPosition.Starts, "a", ignoreCase: false)
+            .Add(MatchPosition.Ends, "b", ignoreCase: false)
+            .Build();
+        double expected = 1.0 / (SearchEstimator.LeadingCharacterProbability('a') + 1.0 / 58);
+        Assert.Equal(expected, SearchEstimator.ExpectedCandidatesPerMatch(two)!.Value, precision: 3);
+    }
+```
+
+Keep the `Ends`, `Contains`, empty-set and ETA tests unchanged (`Ends` and `Contains` are unaffected: the checksum tail and interior positions are uniform).
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `dotnet run --project tests/XrplVanity.Tests -c Release -- -class "*SearchEstimatorTests"`
+Expected: build error (`LeadingCharacterProbability` missing), or failures on the new expectations.
+
+- [ ] **Step 3: Implement the model**
+
+In `src/XrplVanity.Search/SearchEstimator.cs` add:
+
+```csharp
+    /// <summary>
+    /// 2^192 / 58^32: the number of base58 digits the character right after the fixed leading
+    /// 'r' can take. A classic address encodes 0x00 ‖ hash160 ‖ checksum; the zero byte becomes
+    /// 'r' and the remaining 192-bit number has this many possible leading digits, so that
+    /// character is (almost) uniform over alphabet indices 1..22, index 23 gets the fractional
+    /// remainder, and any other character appears there only when the number is one digit
+    /// shorter (probability 1 / LeadingDigitCount, then uniform over 58).
+    /// </summary>
+    public const double LeadingDigitCount = 23.338;
+
+    /// <summary>Probability that <paramref name="c"/> is the character right after the leading 'r'.</summary>
+    public static double LeadingCharacterProbability(char c)
+    {
+        int index = XrplBase58.Alphabet.IndexOf(c);
+        if (index < 0)
+        {
+            return 0;
+        }
+
+        int fullDigits = (int)Math.Floor(LeadingDigitCount);          // 23: indices 1..22 are full
+        double remainder = LeadingDigitCount - fullDigits;             // 0.338: index 23's share
+        double shorter = 1.0 / (LeadingDigitCount * AlphabetSize);     // a number that lost a digit
+        if (index >= 1 && index < fullDigits)
+        {
+            return 1.0 / LeadingDigitCount;
+        }
+
+        if (index == fullDigits)
+        {
+            return remainder / LeadingDigitCount + shorter;
+        }
+
+        return shorter;
+    }
+```
+
+and change the per-target probability in `ExpectedCandidatesPerMatch`:
+
+```csharp
+            double single = position == MatchPosition.Starts
+                ? LeadingCharacterProbability(value[0]) * Math.Pow(AlphabetSize, -(value.Length - 1))
+                : Math.Pow(AlphabetSize, -value.Length);
+```
+
+(`Contains` keeps its position factor on top of `single`; `Ends` uses `single` as before.) Update the class summary comment to describe the leading-character model in one sentence. `XrplBase58.Alphabet` is in `XrplVanity.Core`.
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `dotnet run --project tests/XrplVanity.Tests -c Release -- -class "*SearchEstimatorTests"`
+Expected: all passed. Then the full suite once (`dotnet run --project tests/XrplVanity.Tests -c Release`): 0 failed, 0 skipped.
+
+- [ ] **Step 5: Correct the documentation**
+
+`docs/benchmarks.md`:
+- Replace the "Expected candidates per match" paragraph with one that states the model: a case-sensitive prefix of length *n* matches once per `23.34 × 58^(n−1)` candidates when its first character is one of `pshnaf39wBUDNEGHJKLM4P`, once per `69 × 58^(n−1)` for `Q`, and once per `1,354 × 58^(n−1)` for any other first character; suffixes and substrings keep `58^n`; give the measured single-character figures from this task (`a`, `p` ≈ 24; `Q` ≈ 62; `c` ≈ 1,600) as the evidence.
+- In the CPU-path table, mark the `≈250,000–310,000/s (estimated…)` row as superseded: keep the row but change its rate cell to "superseded — the estimate assumed 58^3 per match; the measured rate is the `CPU:` row below", so the history stays honest.
+- In "How the figures were obtained", the CPU paragraph: replace the `count × 58^length` sentence with the corrected model and say the CLI now counts candidates itself.
+
+`docs/2026-09-05-xrpl-vanity-desktop-design.md`, "Estimator" subsection: replace the sentence about `58^−n` for `Starts` with the leading-character model (one sentence plus the constant), keep `Ends`/`Contains` as they are, and add `LeadingCharacterProbability` to the code block.
+
+`README.md`, in the normalization section after the alphabet sentence, add: "The character right after the leading `r` is not uniform: it is one of `pshnaf39wBUDNEGHJKLM4P` about 94% of the time, `Q` about 1.5%, and anything else only about 0.07% each — so a prefix that starts with, say, `c` or `z` is roughly 58 times rarer than one that starts with `a`."
+
+Run the documentation validator on the three Markdown files: `PYTHONIOENCODING=utf-8 python "C:/Users/Evril/.claude/skills/developer-documentation/scripts/validate_docs.py" docs/benchmarks.md docs/2026-09-05-xrpl-vanity-desktop-design.md README.md`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/XrplVanity.Search/SearchEstimator.cs tests/XrplVanity.Tests/Search/SearchEstimatorTests.cs docs/benchmarks.md docs/2026-09-05-xrpl-vanity-desktop-design.md README.md
+git commit -m "fix(search): prefix estimates use the base58 leading-digit distribution; docs: correct the 58^n assumption and the CPU estimate"
+```
+
+---
+
 ## Self-review
 
 - **Spec coverage.** Types and behaviour of the "Types" and "Behaviour" lists → Tasks 3–4; `DutyPercent` on `MultiDeviceSearch` → Task 2; `FirstAvailableDevice` semantics via `TryOpenFirst` → Tasks 2 and 4; estimator formulas → Task 5; `DeviceCatalog` → Task 5; CLI migration, contract and the CPU line → Task 6; harness → Task 7; `MatchSink` move → Task 1.
