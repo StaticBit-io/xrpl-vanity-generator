@@ -53,6 +53,10 @@ public class EstimateCardTests : BunitContext
     [InlineData(3364, "3,364")]
     [InlineData(11_316_496, "11.3 M")]
     [InlineData(2.2e9, "2.2 G")]
+    [InlineData(45_907_500_000_000d, "45.9 T")]
+    [InlineData(1e15, "1 P")]
+    [InlineData(1.5e18, "1.5 E")]
+    [InlineData(2e21, "2e21")]
     public void Formats_Candidates(double value, string expected) => Assert.Equal(expected, Formatting.Candidates(value));
 
     [Fact]

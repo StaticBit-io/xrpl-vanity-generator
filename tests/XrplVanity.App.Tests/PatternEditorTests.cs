@@ -42,6 +42,42 @@ public class PatternEditorTests : BunitContext
     }
 
     [Fact]
+    public void Typing_Into_The_Box_Updates_The_View_Models_Entry_Text()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("input.pattern").Input("abc");
+
+        Assert.Equal("abc", vm.EntryText);
+    }
+
+    [Fact]
+    public void The_Hint_Line_Names_The_Typed_Text_When_The_Entry_Is_Reachable()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("input.pattern").Input("ab");
+
+        cut.WaitForAssertion(() => Assert.Equal("Press Enter to add \"ab\" — Start adds it too.", cut.Find(".pattern-hint").TextContent.Trim()));
+        Assert.Empty(cut.FindAll(".pattern-problem"));
+    }
+
+    [Fact]
+    public void The_Problem_Line_Names_The_Typed_Text_For_An_Unreachable_Entry()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        // "@" is not in the XRPL base58 alphabet and stays unreachable after normalization.
+        cut.Find("input.pattern").Input("@");
+
+        cut.WaitForAssertion(() => Assert.Equal("\"@\" cannot occur in an XRPL address.", cut.Find(".pattern-problem").TextContent.Trim()));
+        Assert.Empty(cut.FindAll(".pattern-hint"));
+    }
+
+    [Fact]
     public void An_Unreachable_Chip_Shows_Its_Warning()
     {
         SearchViewModel vm = Vm();

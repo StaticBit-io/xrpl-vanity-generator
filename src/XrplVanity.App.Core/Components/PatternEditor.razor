@@ -14,13 +14,13 @@
     }
   </div>
   <div class="entry pattern-entry">
-    <select class="pos form-select" @bind="_position">
+    <select class="pos form-select" @bind="Vm.EntryPosition">
       <option value="Starts">starts with</option>
       <option value="Ends">ends with</option>
       <option value="Contains">contains</option>
     </select>
-    <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="_text" @bind:event="oninput" @onkeydown="OnKeyDown" />
-    <label class="case-label"><input class="case" type="checkbox" @bind="_ignoreCase" /> ignore case</label>
+    <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+    <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
     <label class="btn-secondary-dark t">
       load list…
       <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
@@ -33,5 +33,9 @@
   @if (Vm.PatternProblem is not null)
   {
     <div class="pattern-problem">@Vm.PatternProblem</div>
+  }
+  @if (Vm.PatternHint is not null)
+  {
+    <div class="pattern-hint">@Vm.PatternHint</div>
   }
 </div>

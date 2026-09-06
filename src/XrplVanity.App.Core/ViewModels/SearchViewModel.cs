@@ -33,6 +33,9 @@ public sealed class SearchViewModel : IDisposable
     private int _unnotifiedMatches;
     private AppSettings _settings;
     private PatternSet? _patternSet;
+    private string _entryText = string.Empty;
+    private MatchPosition _entryPosition = MatchPosition.Starts;
+    private bool _entryIgnoreCase = true;
     private SearchSession? _session;
     private SearchProgress? _progress;
     private int _dutyPercent;
@@ -195,14 +198,95 @@ public sealed class SearchViewModel : IDisposable
 
     public bool CanStart => State == SearchState.Idle && StartBlockedReason is null;
 
-    /// <summary>Non-null when the pattern set has no reachable pattern; rendered inside the Patterns card.</summary>
+    /// <summary>
+    /// The pattern draft not yet committed to a chip. Setting these does not persist to settings —
+    /// only a committed <see cref="PatternChip"/> (via <see cref="AddPattern"/> or
+    /// <see cref="AddPatternFromEntry"/>) is saved.
+    /// </summary>
+    public string EntryText
+    {
+        get { lock (_gate) return _entryText; }
+        set
+        {
+            string normalized = value ?? string.Empty;
+            bool changed;
+            lock (_gate)
+            {
+                changed = normalized != _entryText;
+                _entryText = normalized;
+            }
+
+            if (!changed) return;
+            Changed?.Invoke();
+        }
+    }
+
+    public MatchPosition EntryPosition
+    {
+        get { lock (_gate) return _entryPosition; }
+        set
+        {
+            bool changed;
+            lock (_gate)
+            {
+                changed = value != _entryPosition;
+                _entryPosition = value;
+            }
+
+            if (!changed) return;
+            Changed?.Invoke();
+        }
+    }
+
+    public bool EntryIgnoreCase
+    {
+        get { lock (_gate) return _entryIgnoreCase; }
+        set
+        {
+            bool changed;
+            lock (_gate)
+            {
+                changed = value != _entryIgnoreCase;
+                _entryIgnoreCase = value;
+            }
+
+            if (!changed) return;
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Non-null when there is neither a reachable committed pattern nor a reachable pending entry;
+    /// blocks Start. Rendered inside the Patterns card, below the entry row.
+    /// </summary>
     public string? PatternProblem
     {
         get
         {
             lock (_gate)
             {
-                return _patternSet is null || !_patternSet.HasPatterns ? "Add at least one reachable pattern." : null;
+                if (_patternSet is not null && _patternSet.HasPatterns) return null;
+                string trimmedEntry = _entryText.Trim();
+                if (IsReachableEntry(trimmedEntry)) return null;
+                return trimmedEntry.Length == 0
+                    ? "Add at least one reachable pattern."
+                    : $"\"{trimmedEntry}\" cannot occur in an XRPL address.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Non-null while the pending entry is reachable — whether or not a pattern is already
+    /// committed. Does not block Start; rendered inside the Patterns card, below the entry row.
+    /// </summary>
+    public string? PatternHint
+    {
+        get
+        {
+            lock (_gate)
+            {
+                string trimmedEntry = _entryText.Trim();
+                return IsReachableEntry(trimmedEntry) ? $"Press Enter to add \"{trimmedEntry}\" — Start adds it too." : null;
             }
         }
     }
@@ -233,6 +317,28 @@ public sealed class SearchViewModel : IDisposable
 
         PersistDraft();
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Commits the pending entry as a chip, the same way pressing Enter in the entry row does.
+    /// Returns false without side effects when the trimmed entry is blank.
+    /// </summary>
+    public bool AddPatternFromEntry()
+    {
+        string trimmed;
+        MatchPosition position;
+        bool ignoreCase;
+        lock (_gate)
+        {
+            trimmed = _entryText.Trim();
+            if (trimmed.Length == 0) return false;
+            position = _entryPosition;
+            ignoreCase = _entryIgnoreCase;
+            _entryText = string.Empty;
+        }
+
+        AddPattern(trimmed, position, ignoreCase);
+        return true;
     }
 
     public void RemovePattern(PatternChip chip)
@@ -331,6 +437,13 @@ public sealed class SearchViewModel : IDisposable
     /// </summary>
     public void Start()
     {
+        string pendingEntry;
+        lock (_gate) pendingEntry = _entryText.Trim();
+        if (IsReachableEntry(pendingEntry))
+        {
+            AddPatternFromEntry();
+        }
+
         SearchSession? session = null;
         try
         {
@@ -455,6 +568,10 @@ public sealed class SearchViewModel : IDisposable
             return sum;
         }
     }
+
+    /// <summary>A trimmed entry is reachable when normalizing it yields a non-empty, in-alphabet value.</summary>
+    private static bool IsReachableEntry(string trimmedEntry) =>
+        trimmedEntry.Length > 0 && PatternNormalizer.Normalize(trimmedEntry) is { Reachable: true, Value.Length: > 0 };
 
     private void RebuildPatternSet()
     {

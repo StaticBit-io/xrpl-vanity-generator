@@ -1,21 +1,16 @@
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
-using XrplVanity.Core;
 
 namespace XrplVanity.App.Core.Components;
 
 public partial class PatternEditor : ViewModelComponent
 {
-    private string _position = "Starts";
-    private string _text = string.Empty;
-    private bool _ignoreCase = true;
     private string? _listError;
 
     private void OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key != "Enter") return;
-        Vm.AddPattern(_text, Enum.Parse<MatchPosition>(_position), _ignoreCase);
-        _text = string.Empty;
+        Vm.AddPatternFromEntry();
     }
 
     private async Task OnListChosen(InputFileChangeEventArgs e)
@@ -33,6 +28,6 @@ public partial class PatternEditor : ViewModelComponent
             return;
         }
 
-        Vm.AddPatternsFromList(content.Split('\n'), _ignoreCase);
+        Vm.AddPatternsFromList(content.Split('\n'), Vm.EntryIgnoreCase);
     }
 }

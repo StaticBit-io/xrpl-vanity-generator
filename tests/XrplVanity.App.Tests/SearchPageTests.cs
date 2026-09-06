@@ -34,6 +34,18 @@ public class SearchPageTests : BunitContext
     }
 
     [Fact]
+    public void Start_Is_Enabled_With_Only_Pending_Text_And_No_Hint_Appears_Beside_It()
+    {
+        SearchViewModel vm = Register();
+        IRenderedComponent<SearchPage> cut = Render<SearchPage>();
+
+        vm.EntryText = "ab";
+
+        cut.WaitForAssertion(() => Assert.False(cut.Find("button.start").HasAttribute("disabled")));
+        Assert.Empty(cut.FindAll(".start-hint"));   // the target hint is unaffected by the pending entry
+    }
+
+    [Fact]
     public void Start_Is_Disabled_With_A_Reason_Beside_Start_Until_A_Target_Is_Selected()
     {
         SearchViewModel vm = Register();

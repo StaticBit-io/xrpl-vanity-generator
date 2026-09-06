@@ -6,6 +6,10 @@ public static class Formatting
 {
     public static string Candidates(double value)
     {
+        if (value >= 1e21) return value.ToString("0.#e0", CultureInfo.InvariantCulture);
+        if (value >= 1e18) return (value / 1e18).ToString("0.#", CultureInfo.InvariantCulture) + " E";
+        if (value >= 1e15) return (value / 1e15).ToString("0.#", CultureInfo.InvariantCulture) + " P";
+        if (value >= 1e12) return (value / 1e12).ToString("0.#", CultureInfo.InvariantCulture) + " T";
         if (value >= 1e9) return (value / 1e9).ToString("0.#", CultureInfo.InvariantCulture) + " G";
         if (value >= 1e6) return (value / 1e6).ToString("0.#", CultureInfo.InvariantCulture) + " M";
         return Math.Round(value).ToString("N0", CultureInfo.InvariantCulture);

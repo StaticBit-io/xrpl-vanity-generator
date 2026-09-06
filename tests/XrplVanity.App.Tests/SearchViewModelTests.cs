@@ -309,6 +309,103 @@ public class SearchViewModelTests
     }
 
     [Fact]
+    public void Setting_EntryText_Raises_Changed()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        int changes = 0;
+        vm.Changed += () => Interlocked.Increment(ref changes);
+
+        vm.EntryText = "ab";
+
+        Assert.Equal("ab", vm.EntryText);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void AddPatternFromEntry_Adds_The_Chip_And_Clears_The_Entry()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryText = "ab";
+        vm.EntryPosition = MatchPosition.Contains;
+        vm.EntryIgnoreCase = false;
+
+        bool added = vm.AddPatternFromEntry();
+
+        Assert.True(added);
+        Assert.Equal(string.Empty, vm.EntryText);
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("ab", chip.Text);
+        Assert.Equal(MatchPosition.Contains, chip.Position);
+        Assert.False(chip.IgnoreCase);
+    }
+
+    [Fact]
+    public void AddPatternFromEntry_On_A_Blank_Entry_Adds_Nothing_And_Returns_False()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        Assert.False(vm.AddPatternFromEntry());
+        Assert.Empty(vm.Patterns);
+    }
+
+    [Fact]
+    public void Start_With_Only_Pending_Text_Commits_It_And_The_Search_Runs()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryText = "a";
+        vm.Count = 1;
+
+        Assert.True(vm.CanStart);
+        vm.Start();
+
+        WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("a", chip.Text);
+        Assert.Single(vm.Results);
+    }
+
+    [Fact]
+    public void CanStart_Is_True_With_Reachable_Pending_Text_And_No_Chips()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryText = "ab";
+        Assert.Empty(vm.Patterns);
+        Assert.True(vm.CanStart);
+    }
+
+    [Fact]
+    public void PatternProblem_Is_The_Generic_Message_For_A_Blank_Entry_And_No_Chips()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        Assert.Equal("Add at least one reachable pattern.", vm.PatternProblem);
+    }
+
+    [Fact]
+    public void PatternProblem_Names_The_Typed_Text_For_An_Unreachable_Entry()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        // "@" is not in the XRPL base58 alphabet and stays unreachable after normalization
+        // (unlike "0", which the normalizer folds onto "o" and which would then be reachable).
+        vm.EntryText = "@";
+        Assert.Equal("\"@\" cannot occur in an XRPL address.", vm.PatternProblem);
+    }
+
+    [Fact]
+    public void PatternProblem_Is_Null_Once_A_Reachable_Chip_Exists()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("ab", MatchPosition.Starts, false);
+        Assert.Null(vm.PatternProblem);
+    }
+
+    [Fact]
+    public void PatternHint_Tells_The_User_To_Press_Enter_When_The_Entry_Is_Reachable_And_No_Chip_Exists()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryText = "ab";
+        Assert.Equal("Press Enter to add \"ab\" — Start adds it too.", vm.PatternHint);
+    }
+
+    [Fact]
     public void Live_Lists_Can_Be_Read_Concurrently_With_A_Running_Search()
     {
         (SearchViewModel vm, _, _, _) = Create();
