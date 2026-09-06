@@ -1,0 +1,51 @@
+using Microsoft.Windows.AppNotifications;
+using Microsoft.Windows.AppNotifications.Builder;
+using XrplVanity.App.Core.Services;
+
+namespace XrplVanity.App.Services;
+
+/// <summary>
+/// Windows App SDK toasts. <see cref="Activated"/> is deliberately not on
+/// <see cref="INotificationService"/>: only the host cares that a toast was clicked, and
+/// <see cref="TrayCoordinator"/> subscribes to this concrete type to bring the window back.
+/// </summary>
+public sealed class WindowsNotificationService : INotificationService
+{
+    public WindowsNotificationService()
+    {
+        try
+        {
+            AppNotificationManager.Default.NotificationInvoked += (_, _) => Activated?.Invoke();
+            AppNotificationManager.Default.Register();
+            IsAvailable = true;
+        }
+        catch (Exception)
+        {
+            // Unpackaged runs without a registered identity cannot show toasts; the UI already
+            // shows every match, so the app stays fully usable without them.
+            IsAvailable = false;
+        }
+    }
+
+    public bool IsAvailable { get; }
+
+    public event Action? Activated;
+
+    public void Notify(string title, string body)
+    {
+        if (!IsAvailable)
+        {
+            return;
+        }
+
+        try
+        {
+            AppNotification notification = new AppNotificationBuilder().AddText(title).AddText(body).BuildNotification();
+            AppNotificationManager.Default.Show(notification);
+        }
+        catch (Exception)
+        {
+            // Notifications are best effort; the UI already shows the result.
+        }
+    }
+}
