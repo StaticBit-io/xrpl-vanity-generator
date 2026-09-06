@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -45,10 +46,11 @@ public sealed class DpapiResultStore : IResultStore
     {
         lock (_gate)
         {
-            List<StoredResult> all = EnsureLoaded();
+            List<StoredResult> current = EnsureLoaded();
             ThrowIfReadOnly();
-            all.Add(result);
-            Write(all);
+            List<StoredResult> updated = new(current) { result };
+            Write(updated);
+            _cache = updated;
         }
     }
 
@@ -56,10 +58,11 @@ public sealed class DpapiResultStore : IResultStore
     {
         lock (_gate)
         {
-            List<StoredResult> all = EnsureLoaded();
+            List<StoredResult> current = EnsureLoaded();
             ThrowIfReadOnly();
-            all.RemoveAll(r => string.Equals(r.Address, address, StringComparison.Ordinal));
-            Write(all);
+            List<StoredResult> updated = current.Where(r => !string.Equals(r.Address, address, StringComparison.Ordinal)).ToList();
+            Write(updated);
+            _cache = updated;
         }
     }
 
@@ -69,8 +72,9 @@ public sealed class DpapiResultStore : IResultStore
         {
             EnsureLoaded();
             ThrowIfReadOnly();
-            _cache = new List<StoredResult>();
-            Write(_cache);
+            List<StoredResult> updated = new List<StoredResult>();
+            Write(updated);
+            _cache = updated;
         }
     }
 
@@ -94,7 +98,7 @@ public sealed class DpapiResultStore : IResultStore
 #pragma warning restore CA1416
             _cache = JsonSerializer.Deserialize<List<StoredResult>>(plain) ?? new List<StoredResult>();
         }
-        catch (Exception ex) when (ex is CryptographicException or JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is CryptographicException or JsonException or IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
             IsReadOnly = true;
             ReadOnlyReason = $"results.dat could not be read: {ex.Message}";
@@ -114,12 +118,21 @@ public sealed class DpapiResultStore : IResultStore
 
     private void Write(List<StoredResult> all)
     {
-        byte[] plain = JsonSerializer.SerializeToUtf8Bytes(all);
+        try
+        {
+            byte[] plain = JsonSerializer.SerializeToUtf8Bytes(all);
 #pragma warning disable CA1416 // Windows-only by design; RequireWindows() skips the covering tests elsewhere.
-        byte[] protectedBytes = ProtectedData.Protect(plain, Entropy, DataProtectionScope.CurrentUser);
+            byte[] protectedBytes = ProtectedData.Protect(plain, Entropy, DataProtectionScope.CurrentUser);
 #pragma warning restore CA1416
-        string temp = _path + ".tmp";
-        File.WriteAllBytes(temp, protectedBytes);
-        File.Move(temp, _path, overwrite: true);
+            string temp = _path + ".tmp";
+            File.WriteAllBytes(temp, protectedBytes);
+            File.Move(temp, _path, overwrite: true);
+        }
+        catch (Exception ex) when (ex is CryptographicException or IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            IsReadOnly = true;
+            ReadOnlyReason = $"results.dat could not be written: {ex.Message}";
+            throw new InvalidOperationException(ReadOnlyReason, ex);
+        }
     }
 }

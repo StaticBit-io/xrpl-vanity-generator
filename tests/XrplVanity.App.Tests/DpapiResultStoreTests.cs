@@ -60,4 +60,22 @@ public class DpapiResultStoreTests
         Assert.NotNull(store.ReadOnlyReason);
         Assert.Throws<InvalidOperationException>(() => store.Append(new("rA", "s", "a", "Starts", DateTimeOffset.UtcNow, "cpu")));
     }
+
+    [Fact]
+    public void A_Failed_Write_Leaves_The_Cache_And_Disk_Untouched_And_Turns_The_Store_Read_Only()
+    {
+        RequireWindows();
+        string folder = TempFolder();
+        DpapiResultStore store = new(folder);
+        StoredResult first = new("rFirst", "sEdFakeSeedOne", "a", "Starts", DateTimeOffset.UtcNow, "cpu");
+        store.Append(first);
+
+        Directory.CreateDirectory(Path.Combine(folder, "results.dat.tmp"));
+
+        Assert.Throws<InvalidOperationException>(() => store.Append(new("rSecond", "sEdFakeSeedTwo", "b", "Starts", DateTimeOffset.UtcNow, "cpu")));
+        Assert.True(store.IsReadOnly);
+        Assert.Contains("could not be written", store.ReadOnlyReason);
+        Assert.Equal(new[] { first }, store.LoadAll());
+        Assert.Equal(new[] { first }, new DpapiResultStore(folder).LoadAll());
+    }
 }
