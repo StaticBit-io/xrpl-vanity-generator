@@ -397,23 +397,42 @@ public static class Program
         using SearchSession session = new(request, writer.Write, line => stderr.WriteLine(line));
 
         HashSet<string> announced = new(StringComparer.Ordinal);
-        session.ProgressChanged += progress =>
-        {
-            foreach (TargetProgress t in progress.Targets)
-            {
-                if (t.State == TargetState.Running && t.Id != "cpu" && announced.Add(t.Id))
-                {
-                    stderr.WriteLine(multi ? $"GPU[{t.Id}]: {t.Name}" : $"GPU: {t.Id[..t.Id.IndexOf(':')]}:{t.Name}");
-                }
-            }
-        };
+        session.ProgressChanged += progress => AnnounceDevices(progress, multi, announced, stderr);
 
         using CancellationTokenRegistration registration = cancellation.Register(session.Stop);
         session.Start();
         SearchSummary summary = session.Completion.GetAwaiter().GetResult();
 
+        // A run short enough to finish inside one 250 ms tick never saw a Running snapshot; the
+        // final one still carries the device name, so the announcement is not lost.
+        AnnounceDevices(summary.Final, multi, announced, stderr);
         RenderSummary(summary, multi, stderr);
         return ExitCodeFor(summary, multi, stderr);
+    }
+
+    /// <summary>
+    /// Writes the one-per-device name line the moment a device target is known to have opened —
+    /// while it runs, and equally once it has finished or failed, so a run that completes inside
+    /// a single progress tick still announces its device. A target that never opened keeps its
+    /// selector as its <see cref="TargetProgress.Name"/> and is skipped. Called from the progress
+    /// handler, so it must never throw: a throw there stops the search.
+    /// </summary>
+    internal static void AnnounceDevices(SearchProgress progress, bool multi, HashSet<string> announced, TextWriter stderr)
+    {
+        foreach (TargetProgress t in progress.Targets)
+        {
+            bool opened = t.State is TargetState.Running or TargetState.Finished or TargetState.Failed
+                && !string.Equals(t.Name, t.Id, StringComparison.Ordinal);
+            if (t.Id == "cpu" || !opened || !announced.Add(t.Id))
+            {
+                continue;
+            }
+
+            int colon = t.Id.IndexOf(':');
+            stderr.WriteLine(multi ? $"GPU[{t.Id}]: {t.Name}"
+                : colon >= 0 ? $"GPU: {t.Id[..colon]}:{t.Name}"
+                : $"GPU: {t.Name}");
+        }
     }
 
     /// <summary>
@@ -451,16 +470,24 @@ public static class Program
         return summary.Outcome == SessionOutcome.CountReached ? 0 : 130;
     }
 
+    /// <summary>
+    /// Writes the end-of-run figures. Every per-target line uses that target's own clock and rate
+    /// (<see cref="TargetProgress.Seconds"/>, <see cref="TargetProgress.RatePerSecond"/>), so a
+    /// device's context creation and program compile stay outside its time the way they did
+    /// before the search moved behind <see cref="SearchSession"/>. Only the multi-device
+    /// aggregate is measured on the session clock, because that is the wall time the devices
+    /// overlapped in.
+    /// </summary>
     internal static void RenderSummary(SearchSummary summary, bool multi, TextWriter stderr)
     {
         SearchProgress final = summary.Final;
-        double seconds = Math.Max(final.Elapsed.TotalSeconds, 1e-9);
+        double sessionSeconds = Math.Max(final.Elapsed.TotalSeconds, 1e-9);
         TargetProgress? cpu = final.Targets.FirstOrDefault(t => t.Id == "cpu");
         List<TargetProgress> devices = final.Targets.Where(t => t.Id != "cpu").ToList();
 
         if (cpu is not null)
         {
-            stderr.WriteLine($"CPU: searched {cpu.Candidates:N0} candidates in {seconds:F1} s ({cpu.Candidates / seconds:N0}/s).");
+            stderr.WriteLine($"CPU: searched {cpu.Candidates:N0} candidates in {Math.Max(cpu.Seconds, 1e-9):F1} s ({cpu.RatePerSecond:N0}/s).");
         }
 
         if (devices.Count == 0)
@@ -477,14 +504,18 @@ public static class Program
             }
 
             string tail = d.Failure is null || d.Candidates == 0 ? string.Empty : $" (stopped: {d.Failure})";
-            stderr.WriteLine($"GPU: searched {d.Candidates:N0} candidates in {seconds:F1} s ({d.Candidates / seconds:N0}/s).{tail}");
+            stderr.WriteLine(
+                $"GPU: searched {d.Candidates:N0} candidates in {Math.Max(d.Seconds, 1e-9):F1} s " +
+                $"({d.RatePerSecond:N0}/s); consistency errors: {d.ConsistencyErrors}.{tail}");
             return;
         }
 
         int opened = 0;
         long total = 0;
+        long errors = 0;
         foreach (TargetProgress d in devices)
         {
+            errors += d.ConsistencyErrors;
             if (d.State == TargetState.Failed && d.Candidates == 0)
             {
                 stderr.WriteLine($"GPU[{d.Id}]: failed: {d.Failure}");
@@ -494,12 +525,16 @@ public static class Program
             opened++;
             total += d.Candidates;
             string tail = d.Failure is null ? string.Empty : $" (stopped: {d.Failure})";
-            stderr.WriteLine($"GPU[{d.Id}]: searched {d.Candidates:N0} candidates in {seconds:F1} s ({d.Candidates / seconds:N0}/s).{tail}");
+            stderr.WriteLine(
+                $"GPU[{d.Id}]: searched {d.Candidates:N0} candidates in {Math.Max(d.Seconds, 1e-9):F1} s " +
+                $"({d.RatePerSecond:N0}/s); consistency errors: {d.ConsistencyErrors}.{tail}");
         }
 
         if (opened > 0)
         {
-            stderr.WriteLine($"GPU: searched {total:N0} candidates on {opened} device(s) in {seconds:F1} s ({total / seconds:N0}/s).");
+            stderr.WriteLine(
+                $"GPU: searched {total:N0} candidates on {opened} device(s) in {sessionSeconds:F1} s " +
+                $"({total / sessionSeconds:N0}/s); consistency errors: {errors}.");
         }
     }
 

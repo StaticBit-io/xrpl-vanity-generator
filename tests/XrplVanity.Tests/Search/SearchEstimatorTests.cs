@@ -24,7 +24,7 @@ public class SearchEstimatorTests
     }
 
     [Fact]
-    public void Suffix_Has_The_Same_Expectation_As_A_Prefix()
+    public void Suffix_Expects_58_To_The_Length()
     {
         Assert.Equal(3364, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Ends, "ab"))!.Value, precision: 6);
     }
@@ -41,7 +41,7 @@ public class SearchEstimatorTests
     [InlineData('p', 1 / 23.338)]                 // alphabet index 1
     [InlineData('P', 1 / 23.338)]                 // alphabet index 22
     [InlineData('Q', 0.338 / 23.338)]             // alphabet index 23: the partial leading digit
-    [InlineData('c', 1 / (23.338 * 58))]          // index 36: only when the number loses a digit
+    [InlineData('c', 1 / (23.338 * 58))]          // index 35: only when the number loses a digit
     [InlineData('r', 1 / (23.338 * 58))]          // index 0: same
     [InlineData('z', 1 / (23.338 * 58))]          // index 57: same
     public void Leading_Character_Probability_Follows_The_Base58_Digit_Distribution(char c, double expected)

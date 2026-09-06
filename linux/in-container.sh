@@ -13,6 +13,10 @@ expect_contains() { # expect_contains <label> <needle> <haystack>
     # (e.g. "GPU[opencl:0]: searched") contain brackets, which BRE reads as a character class.
     if printf '%s' "$3" | grep -qF -- "$2"; then printf 'ok   %s\n' "$1"; else printf 'FAIL %s: expected "%s"\n%s\n' "$1" "$2" "$3"; exit 1; fi
 }
+expect_not_contains() { # expect_not_contains <label> <needle> <haystack>
+    # -F for the same reason as expect_contains: needles are literal text, not BRE patterns.
+    if printf '%s' "$3" | grep -qF -- "$2"; then printf 'FAIL %s: did not expect "%s"\n%s\n' "$1" "$2" "$3"; exit 1; else printf 'ok   %s\n' "$1"; fi
+}
 expect_exit() { # expect_exit <label> <expected> <actual>
     if [ "$3" -eq "$2" ]; then printf 'ok   %s (exit %s)\n' "$1" "$3"; else printf 'FAIL %s: expected exit %s, got %s\n' "$1" "$2" "$3"; exit 1; fi
 }
@@ -52,16 +56,18 @@ if [ "$MODE" = gpu ]; then expect_contains "list shows cuda:0" "cuda:0" "$LIST";
 
 step "smoke: --backend opencl"
 set +e; OUT="$("${CLI[@]}" --backend opencl --starts ab --count 1 2>&1)"; RC=$?; set -e
-expect_exit "opencl search" 0 "$RC"; expect_contains "ran on opencl" "GPU: opencl:" "$OUT"
+expect_exit "opencl search" 0 "$RC"; expect_contains "ran on opencl" "GPU: opencl:" "$OUT"; expect_contains "no consistency errors" "consistency errors: 0" "$OUT"
 
 step "smoke: --gpu (first available backend)"
 set +e; OUT="$("${CLI[@]}" --gpu --starts ab --count 1 2>&1)"; RC=$?; set -e
 expect_exit "gpu search" 0 "$RC"
 if [ "$MODE" = gpu ]; then expect_contains "ran on cuda" "GPU: cuda:" "$OUT"; else expect_contains "fell to opencl (no CUDA)" "GPU: opencl:" "$OUT"; fi
+expect_contains "no consistency errors" "consistency errors: 0" "$OUT"; expect_not_contains "no consistency warning" "GPU consistency error" "$OUT"
 
 step "smoke: --gpu-devices all"
 set +e; OUT="$("${CLI[@]}" --gpu-devices all --starts ab --count 2 2>&1)"; RC=$?; set -e
-expect_exit "multi-device search" 0 "$RC"; expect_contains "opencl worker ran" "GPU[opencl:0]: searched" "$OUT"
+expect_exit "multi-device search" 0 "$RC"; expect_contains "opencl worker ran" "GPU[opencl:0]: searched" "$OUT"; expect_contains "no consistency errors" "consistency errors: 0." "$OUT"
+expect_not_contains "no consistency warning" "GPU consistency error" "$OUT"
 if [ "$MODE" = gpu ]; then
     expect_contains "cuda worker ran" "GPU[cuda:0]: searched" "$OUT"; expect_contains "two devices" "on 2 device(s)" "$OUT"
 else

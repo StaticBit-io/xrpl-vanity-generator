@@ -82,8 +82,14 @@ public class CliProgramTests
 
     // -- ExitCodeFor: a device that fails mid-run must not read as a clean Ctrl+C exit ----------
 
-    private static TargetProgress DeviceTarget(TargetState state, long candidates, string? failure) =>
-        new("cuda:0", "Test Device", state, candidates, 0, failure);
+    /// <summary>
+    /// A hand-built device target. <c>seconds</c> is the target's own clock, so the rate the CLI
+    /// prints is derived from it, not from the session elapsed time passed to
+    /// <see cref="SummaryWith"/>.
+    /// </summary>
+    private static TargetProgress DeviceTarget(TargetState state, long candidates, string? failure,
+        string id = "cuda:0", double seconds = 2, long consistencyErrors = 0) =>
+        new(id, "Test Device", state, candidates, seconds > 0 ? candidates / seconds : 0, failure, seconds, consistencyErrors);
 
     private static SearchSummary SummaryWith(SessionOutcome outcome, params TargetProgress[] targets)
     {
@@ -107,7 +113,7 @@ public class CliProgramTests
     public void ExitCodeFor_Cpu_Only_Failed_Writes_Search_Failed_Not_Gpu_And_Returns_2()
     {
         StringWriter stderr = new();
-        TargetProgress cpu = new("cpu", "CPU", TargetState.Failed, 100, 0, "report callback failed: disk full");
+        TargetProgress cpu = new("cpu", "CPU", TargetState.Failed, 100, 50, "report callback failed: disk full", Seconds: 2);
         SearchSummary summary = SummaryWith(SessionOutcome.Cancelled, cpu);
 
         int rc = Program.ExitCodeFor(summary, multi: false, stderr);
@@ -164,5 +170,84 @@ public class CliProgramTests
         string[] lines = stderr.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Single(lines);
         Assert.EndsWith("(stopped: device lost)", lines[0].TrimEnd());
+    }
+
+    [Fact]
+    public void RenderSummary_Single_Device_Uses_The_Device_Clock_And_Reports_Consistency_Errors()
+    {
+        StringWriter stderr = new();
+        // Session elapsed is 1 s (SummaryWith); the device searched for 2 s of its own, so a line
+        // built from the session clock would read "1.0 s" and double the rate.
+        SearchSummary summary = SummaryWith(SessionOutcome.CountReached,
+            DeviceTarget(TargetState.Finished, candidates: 20_000_000, failure: null, seconds: 2, consistencyErrors: 3));
+
+        Program.RenderSummary(summary, multi: false, stderr);
+
+        Assert.Equal("GPU: searched 20,000,000 candidates in 2.0 s (10,000,000/s); consistency errors: 3.", stderr.ToString().TrimEnd());
+    }
+
+    [Fact]
+    public void RenderSummary_Multi_Device_Lines_Are_Device_Local_And_The_Aggregate_Is_The_Session_Clock()
+    {
+        StringWriter stderr = new();
+        SearchSummary summary = SummaryWith(SessionOutcome.CountReached,
+            DeviceTarget(TargetState.Finished, candidates: 6_000_000, failure: null, id: "cuda:0", seconds: 2),
+            DeviceTarget(TargetState.Finished, candidates: 2_000_000, failure: null, id: "opencl:0", seconds: 4, consistencyErrors: 1));
+
+        Program.RenderSummary(summary, multi: true, stderr);
+
+        string[] lines = stderr.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(3, lines.Length);
+        Assert.Equal("GPU[cuda:0]: searched 6,000,000 candidates in 2.0 s (3,000,000/s); consistency errors: 0.", lines[0].TrimEnd());
+        Assert.Equal("GPU[opencl:0]: searched 2,000,000 candidates in 4.0 s (500,000/s); consistency errors: 1.", lines[1].TrimEnd());
+        // The aggregate is measured on the session wall clock (1 s here), not on any device's.
+        Assert.Equal("GPU: searched 8,000,000 candidates on 2 device(s) in 1.0 s (8,000,000/s); consistency errors: 1.", lines[2].TrimEnd());
+    }
+
+    [Fact]
+    public void RenderSummary_Cpu_Line_Uses_The_Pool_Clock()
+    {
+        StringWriter stderr = new();
+        TargetProgress cpu = new("cpu", "CPU (2 threads)", TargetState.Finished, 500_000, 250_000, null, Seconds: 2);
+        SearchSummary summary = SummaryWith(SessionOutcome.CountReached, cpu);
+
+        Program.RenderSummary(summary, multi: false, stderr);
+
+        Assert.Equal("CPU: searched 500,000 candidates in 2.0 s (250,000/s).", stderr.ToString().TrimEnd());
+    }
+
+    // -- AnnounceDevices: the name line must survive a run that finishes inside one tick --------
+
+    [Fact]
+    public void AnnounceDevices_Announces_A_Finished_Device_Once()
+    {
+        StringWriter stderr = new();
+        HashSet<string> announced = new(StringComparer.Ordinal);
+        SearchProgress progress = new(TimeSpan.FromSeconds(1), 0, 0, 0,
+            new[] { DeviceTarget(TargetState.Finished, candidates: 10, failure: null) });
+
+        Program.AnnounceDevices(progress, multi: false, announced, stderr);
+        Program.AnnounceDevices(progress, multi: false, announced, stderr);
+
+        Assert.Equal("GPU: cuda:Test Device", stderr.ToString().TrimEnd());
+    }
+
+    [Fact]
+    public void AnnounceDevices_Skips_A_Target_That_Never_Opened_And_Does_Not_Throw_On_A_Colon_Less_Id()
+    {
+        StringWriter stderr = new();
+        HashSet<string> announced = new(StringComparer.Ordinal);
+        // An unresolved --gpu target: id "gpu", and Name still the selector because it never opened.
+        SearchProgress unopened = new(TimeSpan.FromSeconds(1), 0, 0, 0,
+            new[] { new TargetProgress("gpu", "gpu", TargetState.Failed, 0, 0, "no device could be opened") });
+
+        Program.AnnounceDevices(unopened, multi: false, announced, stderr);
+        Assert.Equal(string.Empty, stderr.ToString());
+
+        SearchProgress resolvedWithoutColon = new(TimeSpan.FromSeconds(1), 0, 0, 0,
+            new[] { new TargetProgress("gpu", "Test Device", TargetState.Running, 10, 5, null, Seconds: 2) });
+
+        Program.AnnounceDevices(resolvedWithoutColon, multi: false, announced, stderr);
+        Assert.Equal("GPU: Test Device", stderr.ToString().TrimEnd());
     }
 }

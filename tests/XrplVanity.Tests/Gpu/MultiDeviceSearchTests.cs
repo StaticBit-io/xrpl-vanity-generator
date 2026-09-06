@@ -325,7 +325,8 @@ public sealed class MultiDeviceSearchTests
         bool slowDevice = launch > TimeSpan.FromSeconds(2);
         int launchesPerWindow = slowDevice ? 2 : 4;
         int dutyPercent = slowDevice ? 50 : 25;
-        double expectedRatio = slowDevice ? 1.5 : 4.0;
+        // The launch period is launch × 100/duty, so 50% duty doubles it and 25% quadruples it.
+        double expectedRatio = slowDevice ? 2.0 : 4.0;
         double minRatio = slowDevice ? 1.3 : 2.0;
         double maxRatio = slowDevice ? 2.5 : 8.0;
 
