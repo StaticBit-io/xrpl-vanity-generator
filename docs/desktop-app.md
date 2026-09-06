@@ -246,6 +246,41 @@ storage layer. Each step names what you should see.
 Exiting stops the search first and gives the teardown 10 s before the process ends; the
 session's own dispose cap is 30 s, so a session that refuses to settle costs 10 s, not 30.
 
+### Run the packaged build without installing it
+
+Installing the `.msix` needs an elevated prompt. To try the packaged application without
+one, register the published layout in developer mode (*Settings → System → For
+developers → Developer Mode* must be on). Publish first, so `bin\publish\` is current,
+then copy the manifest the build produced next to it and register that folder:
+
+```powershell
+Copy-Item src\XrplVanity.App\bin\Release\net10.0-windows10.0.22621.0\win-x64\AppxManifest.xml src\XrplVanity.App\bin\publish\
+Add-AppxPackage -Register src\XrplVanity.App\bin\publish\AppxManifest.xml
+```
+
+"XRPL Vanity" then appears in the Start menu and runs with package identity, so
+notifications and the tray behave as they do after a real install. Remove it again with
+`Remove-AppxPackage (Get-AppxPackage io.staticbit.vanity).PackageFullName` — that also
+deletes the package's `LocalState`, including `results.dat`, so export anything you want
+to keep first.
+
+**Do not run `XrplVanity.App.exe` directly from `bin\Release\...\win-x64\` or from
+`bin\publish\`.** A Release build is a packaged application: it needs package identity,
+and the exe exits immediately with `REGDB_E_CLASSNOTREG` from the Windows App SDK
+initialiser without it. `bin\Release\...\win-x64\` is also only an intermediate output
+and carries no `wwwroot`, so even registered it would show "can't reach this page". The
+publish layout in `bin\publish\` is the complete one. For a loose, runnable build use the
+Debug configuration, which is unpackaged:
+
+```powershell
+dotnet build src\XrplVanity.App\XrplVanity.App.csproj -c Debug -f net10.0-windows10.0.22621.0 -t:Run
+```
+
+A stale registration blocks that too: if a package with the identity `io.staticbit.vanity`
+is registered from a folder that no longer holds `AppxManifest.xml`, both the Debug launch
+and `Add-AppxPackage -Register` fail. Remove the stale registration first with the
+`Remove-AppxPackage` line above.
+
 ## Troubleshooting
 
 **The window opens blank or shows "can't reach this page".** The WebView2 runtime is
