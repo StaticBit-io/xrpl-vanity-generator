@@ -246,6 +246,16 @@ storage layer. Each step names what you should see.
 Exiting stops the search first and gives the teardown 10 s before the process ends; the
 session's own dispose cap is 30 s, so a session that refuses to settle costs 10 s, not 30.
 
+### One click: run-desktop-app.bat
+
+`run-desktop-app.bat` in the repository root does everything below in one step:
+it finds or creates the signing certificate, closes a running instance, publishes,
+copies the manifest into the publish layout, registers the package for the current
+user and starts the application. Double-click it, or run it from any directory — it
+changes to its own folder first. It needs the .NET 10 SDK and Developer Mode, and it
+stops with a plain-language message when either is missing. No administrator rights
+are required. The rest of this section is what the script does, step by step.
+
 ### Run the packaged build without installing it
 
 Installing the `.msix` needs an elevated prompt. To try the packaged application without

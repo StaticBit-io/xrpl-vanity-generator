@@ -361,6 +361,10 @@ found them can read them back.
 
 ![The Search page of the XRPL Vanity desktop application](docs/images/desktop-search.png)
 
+On a machine with the .NET 10 SDK and Developer Mode on, `run-desktop-app.bat` in
+the repository root builds it, registers it for the current user and starts it in
+one double-click, without administrator rights.
+
 See [docs/desktop-app.md](docs/desktop-app.md) for the requirements, how to build
 and run it from source, how to sign and install the MSIX, and the manual smoke
 checklist.
