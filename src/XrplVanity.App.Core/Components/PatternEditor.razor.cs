@@ -1,22 +1,15 @@
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
-using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
 
 namespace XrplVanity.App.Core.Components;
 
-public partial class PatternEditor : IDisposable
+public partial class PatternEditor : ViewModelComponent
 {
     private string _position = "Starts";
     private string _text = string.Empty;
     private bool _ignoreCase = true;
-
-    [Parameter, EditorRequired] public SearchViewModel Vm { get; set; } = null!;
-
-    protected override void OnInitialized() => Vm.Changed += OnChanged;
-
-    private void OnChanged() => InvokeAsync(StateHasChanged);
+    private string? _listError;
 
     private void OnKeyDown(KeyboardEventArgs e)
     {
@@ -27,10 +20,19 @@ public partial class PatternEditor : IDisposable
 
     private async Task OnListChosen(InputFileChangeEventArgs e)
     {
-        using StreamReader reader = new(e.File.OpenReadStream(maxAllowedSize: 1024 * 1024));
-        string content = await reader.ReadToEndAsync();
+        _listError = null;
+        string content;
+        try
+        {
+            using StreamReader reader = new(e.File.OpenReadStream(maxAllowedSize: 1024 * 1024));
+            content = await reader.ReadToEndAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _listError = $"Could not read the list: {ex.Message}";
+            return;
+        }
+
         Vm.AddPatternsFromList(content.Split('\n'), _ignoreCase);
     }
-
-    public void Dispose() => Vm.Changed -= OnChanged;
 }

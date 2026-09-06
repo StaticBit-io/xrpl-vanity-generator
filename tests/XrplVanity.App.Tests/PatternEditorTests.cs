@@ -1,4 +1,6 @@
+using System.Reflection;
 using Bunit;
+using Microsoft.AspNetCore.Components.Forms;
 using XrplVanity.App.Core.Components;
 using XrplVanity.App.Core.ViewModels;
 using Xunit;
@@ -48,5 +50,60 @@ public class PatternEditorTests : BunitContext
         cut.Find(".chip button.remove").Click();
         Assert.Empty(vm.Patterns);
         Assert.Empty(cut.FindAll(".chip"));
+    }
+
+    [Fact]
+    public void Disposing_The_Component_Stops_It_From_Reacting_To_Later_View_Model_Changes()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Instance.Dispose();
+
+        // Vm.Changed is raised from search worker threads (see SearchViewModel); after Dispose the
+        // component must ignore it instead of throwing against a torn-down render tree.
+        Exception? caught = null;
+        Thread worker = new(() =>
+        {
+            try
+            {
+                vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+            }
+            catch (Exception ex)
+            {
+                caught = ex;
+            }
+        });
+        worker.Start();
+        worker.Join();
+
+        Assert.Null(caught);
+    }
+
+    [Fact]
+    public async Task A_List_Read_Failure_Is_Shown_Instead_Of_Thrown()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        InputFileChangeEventArgs args = new(new[] { new ThrowingBrowserFile() });
+        MethodInfo onListChosen = typeof(PatternEditor).GetMethod("OnListChosen", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        await cut.InvokeAsync(() => (Task)onListChosen.Invoke(cut.Instance, new object[] { args })!);
+        cut.Render();
+
+        Assert.Contains("Could not read the list", cut.Find(".list-error").TextContent);
+        Assert.Empty(vm.Patterns);
+    }
+
+    private sealed class ThrowingBrowserFile : IBrowserFile
+    {
+        public string Name => "big-list.txt";
+        public DateTimeOffset LastModified => DateTimeOffset.UtcNow;
+        public long Size => 2 * 1024 * 1024;
+        public string ContentType => "text/plain";
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default) =>
+            throw new IOException("The file exceeds the allowed size.");
     }
 }

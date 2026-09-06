@@ -1,3 +1,4 @@
+@inherits ViewModelComponent
 <div class="card-box">
   <div class="card-title">Patterns</div>
   <div class="chips">
@@ -25,4 +26,8 @@
       <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
     </label>
   </div>
+  @if (_listError is not null)
+  {
+    <div class="list-error">@_listError</div>
+  }
 </div>
