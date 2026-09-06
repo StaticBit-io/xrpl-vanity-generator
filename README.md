@@ -64,6 +64,10 @@ candidate address matches if *any* pattern matches at its tagged position.
 XRPL addresses use the base58 alphabet
 `rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz` — 58 characters; `0`, `O`, `I` and `l`
 do not exist, so `o` and `i` occur only in lower case and `L` only in upper case.
+The character right after the leading `r` is not uniform: it is one of
+`pshnaf39wBUDNEGHJKLM4P` about 94% of the time, `Q` about 1.5%, and anything else only
+about 0.07% each — so a prefix that starts with, say, `c` or `z` is roughly 58 times
+rarer than one that starts with `a`.
 Patterns are normalized into this alphabet (`l -> L`, `0 -> o`,
 `O -> o`, `I -> i`). A pattern that still contains a character that cannot
 occur in an address (outside the base58 alphabet, even after normalization)

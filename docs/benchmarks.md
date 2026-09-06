@@ -31,8 +31,10 @@ run. `T` covers the search loop only: device open and OpenCL program compilation
 excluded. Every device hit is re-derived by the CPU reference before it is printed, and
 that verification is inside `T`, so the CLI rate falls when the pattern matches often
 (each hit costs one CPU derivation on the launching thread). The figures below use
-`--case-sensitive --starts abcd` (one match per 58^4 ≈ 11.3 million candidates on average)
-and `--count 30`, so hits are rare and the rate reflects the device.
+`--case-sensitive --starts abcd` (one match per ≈4.6 million candidates on average — `a` is
+one of the 22 alphabet characters that lead the leading-character distribution below, so the
+expectation is `23.34 × 58^3`, not `58^4`) and `--count 30`, so hits are rare and the rate
+reflects the device.
 
 **Kernel benchmark test.** `GpuSearchTests.Throughput_Meets_The_Floor_For_The_Device_Class`
 runs four launches of 2^20 candidates after a warm-up with a pattern that never matches.
@@ -40,14 +42,26 @@ It measures the device pipeline alone (derivation, matching, hit-buffer drain wi
 hits). It asserts a floor of 500,000/s for GPU devices and 10,000/s for CPU devices.
 
 **Expected candidates per match.** Addresses use the 58-character XRPL base58 alphabet
-`rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz`; a case-sensitive prefix of
-length *n* matches once per 58^*n* candidates on average (58^3 = 195,112; 58^4 = 11,316,496).
+`rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz`. A classic address is
+base58check of a zero version byte, a 20-byte hash, and a 4-byte checksum; the zero byte
+becomes the fixed leading `r`, and the remaining 192-bit number does not divide evenly
+into base58 digits (`2^192 / 58^32 ≈ 23.34`), so the character right after `r` is not
+uniform over the alphabet. A case-sensitive prefix of length *n* matches once per
+`23.34 × 58^(n−1)` candidates when its first character is one of
+`pshnaf39wBUDNEGHJKLM4P`, once per `69 × 58^(n−1)` when it is `Q`, and once per
+`1,354 × 58^(n−1)` for any other first character; suffixes and substrings stay uniform at
+`58^n`, since the checksum tail and interior positions are unaffected. Measured on this
+machine with `--case-sensitive --starts X --threads 12`: `a` and `p` matched once per
+~24 candidates, `Q` once per ~62, and `c` once per ~1,600 — consistent with the model.
 Case-insensitive patterns match every case variant of each letter, except `o` and `i`
 (no upper-case form in the alphabet) and `L` (no lower-case form).
 
-**CPU path.** The CPU path has no candidate counter, so its rate is an estimate:
-expected candidates for the pattern (`count × 58^length`) divided by wall-clock time.
-The candidate count for a random search follows a Poisson-like distribution, so a run
+**CPU path.** The CLI now counts candidates itself and prints a
+`CPU: searched N candidates in T s (R/s)` line, so its rate is measured directly. An
+earlier estimate (the superseded row in the CPU path table below) divided
+`count × 58^length` by wall-clock time, which assumes a uniform `Starts` distribution;
+the leading-character model above gives the correct expectation for a prefix. The
+candidate count for a random search still follows a Poisson-like distribution, so a run
 with `--count 60` has roughly ±13% statistical spread; wall time includes about one
 second of process start-up. Two runs are reported.
 
@@ -62,7 +76,7 @@ Windows, 12 worker threads (the default), commit 8b66560.
 | --- | --- | --- |
 | `nhartner/xrp-vanity-address` (Java, GraalVM native image) | ~39,000/s | measured 2026-09-02, recorded in `2026-09-03-xrpl-vanity-design.md` |
 | .NET prototype (throwaway spike) | ~138,000/s | same document |
-| `xrpl-vanity --case-sensitive --starts abc --count 60` | ≈250,000–310,000/s (estimated; two runs: 259,000/s and 306,000/s) | this page |
+| `xrpl-vanity --case-sensitive --starts abc --count 60` | superseded — the estimate assumed 58^3 per match; the measured rate is the `CPU:` row below | this page |
 | `xrpl-vanity --case-sensitive --starts abc --count 60` (CPU: line) | 118,885/s and 111,576/s (measured from the `CPU: searched … (R/s)` line, Plan F) | this page (Plan F) |
 
 The shipped CLI is faster than the spike because it uses span-based, allocation-free
@@ -191,7 +205,7 @@ Kernel benchmark test on every available backend (prints one
 dotnet run --project tests/XrplVanity.Tests -c Release -- -class "*GpuSearchTests"
 ```
 
-CPU path (estimate the rate as `60 × 58^3 / wall seconds`):
+CPU path (the CLI prints its own `CPU: searched … (R/s)` line; no estimate needed):
 
 ```bash
 time dotnet run --project src/XrplVanity.Cli -c Release --no-build -- --case-sensitive --starts abc --count 60

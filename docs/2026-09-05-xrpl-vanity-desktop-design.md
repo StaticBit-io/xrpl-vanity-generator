@@ -170,6 +170,11 @@ public static class SearchEstimator
 {
     public const int NominalAddressLength = 34;   // typical classic address length; used for `contains`
 
+    public const double LeadingDigitCount = 23.338;   // 2^192 / 58^32: leading digits right after 'r'
+
+    /// Probability that a character is the one right after the fixed leading 'r'.
+    public static double LeadingCharacterProbability(char c);
+
     /// Expected candidates per match for the whole set, or null when the set has no reachable pattern.
     public static double? ExpectedCandidatesPerMatch(PatternSet patterns);
 
@@ -179,12 +184,16 @@ public static class SearchEstimator
 ```
 
 The probability that a candidate matches one concrete target of length *n* is 58^−*n* for
-`Starts` (the prefix excludes the fixed leading `r`, consistent with the measured 58^n in
-`docs/benchmarks.md`) and for `Ends`, and (`NominalAddressLength` − 1 − *n* + 1) × 58^−*n* for
-`Contains`. `PatternSet.EnumerateTargets()` already yields every case variant as its own
-target, so the set's probability is the sum over targets (an upper bound that ignores
-overlaps; the estimate is a guide, not a guarantee) and the expected candidates per match
-is its reciprocal.
+`Ends`, and (`NominalAddressLength` − 1 − *n* + 1) × 58^−*n* for `Contains` (both uniform:
+the checksum tail and interior positions carry no fixed structure). For `Starts`, the
+character right after the fixed leading `r` is not uniform: a classic address's zero
+version byte becomes `r`, leaving a 192-bit number that does not divide evenly into base58
+digits (`LeadingDigitCount = 2^192 / 58^32 ≈ 23.34`), so the expectation for a prefix of
+length *n* is `LeadingCharacterProbability(first character) × 58^−(n−1)`.
+`PatternSet.EnumerateTargets()` already yields every case variant as its own target, so
+the set's probability is the sum over targets (an upper bound that ignores overlaps; the
+estimate is a guide, not a guarantee) and the expected candidates per match is its
+reciprocal.
 
 ### CLI migration
 

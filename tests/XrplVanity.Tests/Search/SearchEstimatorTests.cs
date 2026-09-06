@@ -7,17 +7,20 @@ namespace XrplVanity.Tests.Search;
 
 public class SearchEstimatorTests
 {
+    private const double Leading = 23.338;
+
     private static PatternSet Set(MatchPosition position, string pattern, bool ignoreCase = false) =>
         new PatternSet.Builder().Add(position, pattern, ignoreCase).Build();
 
     [Theory]
-    [InlineData("a", 58)]
-    [InlineData("ab", 3364)]
-    [InlineData("abc", 195_112)]
-    [InlineData("abcd", 11_316_496)]
-    public void Case_Sensitive_Prefix_Expects_58_To_The_Length(string pattern, double expected)
+    [InlineData("a", 1)]
+    [InlineData("ab", 58)]
+    [InlineData("abc", 3364)]
+    [InlineData("abcd", 195_112)]
+    public void Case_Sensitive_Prefix_Uses_The_Leading_Digit_Count_Then_58_Per_Character(string pattern, double restFactor)
     {
-        Assert.Equal(expected, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, pattern))!.Value, precision: 6);
+        // First character after 'r': one of ~23.338 leading digits; every later character: one of 58.
+        Assert.Equal(Leading * restFactor, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, pattern))!.Value, precision: 3);
     }
 
     [Fact]
@@ -34,14 +37,35 @@ public class SearchEstimatorTests
         Assert.Equal(expected, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Contains, "ab"))!.Value, precision: 6);
     }
 
+    [Theory]
+    [InlineData('p', 1 / 23.338)]                 // alphabet index 1
+    [InlineData('P', 1 / 23.338)]                 // alphabet index 22
+    [InlineData('Q', 0.338 / 23.338)]             // alphabet index 23: the partial leading digit
+    [InlineData('c', 1 / (23.338 * 58))]          // index 36: only when the number loses a digit
+    [InlineData('r', 1 / (23.338 * 58))]          // index 0: same
+    [InlineData('z', 1 / (23.338 * 58))]          // index 57: same
+    public void Leading_Character_Probability_Follows_The_Base58_Digit_Distribution(char c, double expected)
+    {
+        Assert.Equal(expected, SearchEstimator.LeadingCharacterProbability(c), precision: 9);
+    }
+
+    [Fact]
+    public void Leading_Character_Probabilities_Sum_To_About_One()
+    {
+        double sum = 0;
+        foreach (char c in XrplBase58.Alphabet) sum += SearchEstimator.LeadingCharacterProbability(c);
+        Assert.InRange(sum, 0.98, 1.0);
+    }
+
     [Fact]
     public void Case_Insensitive_Letters_With_Two_Cases_Double_The_Targets()
     {
-        // "ab": a/A and b/B both exist in the alphabet -> 4 variants -> 58^2 / 4.
-        Assert.Equal(3364.0 / 4.0, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "ab", ignoreCase: true))!.Value, precision: 6);
+        // "ab" ignore-case expands to ab, aB, Ab, AB: a and A both lead ('a' index 5, 'A' index 53).
+        double a = SearchEstimator.LeadingCharacterProbability('a') / 58 + SearchEstimator.LeadingCharacterProbability('A') / 58;
+        Assert.Equal(1.0 / (2 * a), SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "ab", ignoreCase: true))!.Value, precision: 3);
         // "o" has no upper-case form and "L" no lower-case form: no expansion.
-        Assert.Equal(58, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "o", ignoreCase: true))!.Value, precision: 6);
-        Assert.Equal(58, SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "L", ignoreCase: true))!.Value, precision: 6);
+        Assert.Equal(1.0 / SearchEstimator.LeadingCharacterProbability('o'), SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "o", ignoreCase: true))!.Value, precision: 3);
+        Assert.Equal(1.0 / SearchEstimator.LeadingCharacterProbability('L'), SearchEstimator.ExpectedCandidatesPerMatch(Set(MatchPosition.Starts, "L", ignoreCase: true))!.Value, precision: 3);
     }
 
     [Fact]
@@ -51,7 +75,8 @@ public class SearchEstimatorTests
             .Add(MatchPosition.Starts, "a", ignoreCase: false)
             .Add(MatchPosition.Ends, "b", ignoreCase: false)
             .Build();
-        Assert.Equal(29, SearchEstimator.ExpectedCandidatesPerMatch(two)!.Value, precision: 6);
+        double expected = 1.0 / (SearchEstimator.LeadingCharacterProbability('a') + 1.0 / 58);
+        Assert.Equal(expected, SearchEstimator.ExpectedCandidatesPerMatch(two)!.Value, precision: 3);
     }
 
     [Fact]
