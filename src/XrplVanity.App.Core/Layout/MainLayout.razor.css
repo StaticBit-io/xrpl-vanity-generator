@@ -1,0 +1,4 @@
+/* .shell/.content sizing lives in wwwroot/scss/components/_layout.scss (unscoped, shared with
+   every page). This scoped rule only keeps the content column from overflowing the shell grid
+   when its children (cards, rows) are wider than the available space. */
+.content { min-width: 0; }

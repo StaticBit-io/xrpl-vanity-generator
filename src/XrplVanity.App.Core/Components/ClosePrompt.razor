@@ -1,0 +1,13 @@
+@if (Visible)
+{
+  <div class="modal-backdrop"></div>
+  <div class="modal-box card-box">
+    <h3>Close XRPL Vanity?</h3>
+    <p>A search keeps running while the window is in the tray.</p>
+    <label><input class="remember" type="checkbox" @bind="_remember" /> Remember my choice</label>
+    <div class="buttons">
+      <button class="btn-primary-mint tray t" @onclick="() => OnChoice.InvokeAsync((CloseBehavior.MinimizeToTray, _remember))">Minimise to tray</button>
+      <button class="btn-secondary-dark exit t" @onclick="() => OnChoice.InvokeAsync((CloseBehavior.Exit, _remember))">Exit</button>
+    </div>
+  </div>
+}

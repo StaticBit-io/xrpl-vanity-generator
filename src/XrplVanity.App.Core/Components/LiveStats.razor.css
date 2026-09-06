@@ -5,3 +5,8 @@
 .target-row .state { font-weight: 600; text-transform: lowercase; color: var(--text-secondary); }
 .target-row.running .state { color: var(--mint); }
 .target-row.failed .state, .failure { color: var(--negative); }
+@media (max-width: 1000px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .target-row { grid-template-columns: 80px 1fr 80px 90px; }
+  .failure { grid-column: 1 / -1; }
+}

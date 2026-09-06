@@ -1,0 +1,40 @@
+@page "/"
+@inherits ViewModelPage
+
+<header class="page-head">
+  <h1>XRPL Vanity <StatusPill State="Vm.State" /></h1>
+  <div class="actions">
+    @if (Vm.State == SearchState.Idle)
+    {
+      <button class="btn-primary-mint start t" disabled="@(!Vm.CanStart)" @onclick="Vm.Start">Start</button>
+      @if (Vm.StartBlockedReason is not null)
+      {
+        <div class="start-hint text-secondary">@Vm.StartBlockedReason</div>
+      }
+    }
+    else
+    {
+      <button class="btn-stop stop t" disabled="@(Vm.State == SearchState.Stopping)" @onclick="Vm.Stop">Stop</button>
+    }
+  </div>
+</header>
+<div class="content-scroll">
+  @if (Vm.LastFailure is not null)
+  {
+    <Banner Kind="negative" Text="@Vm.LastFailure" />
+  }
+  <div class="search-grid">
+    <div class="col">
+      <PatternEditor Vm="Vm" />
+      <EstimateCard Vm="Vm" />
+    </div>
+    <div class="col">
+      <DevicePicker Vm="Vm" />
+      <DutySlider Vm="Vm" />
+    </div>
+    <div class="col-bottom">
+      <LiveStats Progress="Vm.Progress" />
+      <ResultsList Items="Vm.Results" ShowTarget="true" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
+    </div>
+  </div>
+</div>

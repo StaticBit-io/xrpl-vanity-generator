@@ -1,0 +1,52 @@
+@page "/settings"
+@inherits ViewModelPage
+@inject INotificationService Notifications
+@inject IWindowService Window
+
+<header class="page-head">
+  <h1>Settings</h1>
+  <div class="text-secondary" style="font-size:12px">changes save immediately</div>
+</header>
+<div class="settings-grid">
+  <div class="card-box">
+    <div class="card-title">Window</div>
+    <div class="srow">
+      <div>Close button<div class="desc">What the &times; in the title bar does</div></div>
+      <select class="close-behavior form-select" @onchange="OnCloseBehaviorChanged">
+        <option value="Ask" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.Ask)">Ask every time</option>
+        <option value="MinimizeToTray" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.MinimizeToTray)">Minimise to tray</option>
+        <option value="Exit" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.Exit)">Exit</option>
+      </select>
+    </div>
+    <div class="srow">
+      <div>Notifications<div class="desc">Toast on every match and when a search finishes@(Notifications.IsAvailable ? "" : " · unavailable on this system")</div></div>
+      <input class="notifications" type="checkbox" checked="@Vm.Settings.NotificationsEnabled" disabled="@(!Notifications.IsAvailable)" @onchange="OnNotificationsChanged" />
+    </div>
+    <div class="srow">
+      <div>Default GPU duty<div class="desc">Applied to new searches</div></div>
+      <input class="default-duty" type="number" min="1" max="100" value="@Vm.Settings.DutyPercent" @onchange="OnDefaultDutyChanged" />
+    </div>
+  </div>
+  <div class="card-box">
+    <div class="card-title">Secrets</div>
+    <div class="srow">
+      <div>Clear clipboard after copying a seed<div class="desc">Only if the clipboard still holds the seed</div></div>
+      <input class="clipboard-seconds" type="number" min="0" value="@Vm.Settings.ClipboardClearSeconds" @onchange="OnClipboardSecondsChanged" />
+    </div>
+    <div class="srow">
+      <div>Hide a revealed seed after<div class="desc">Also hidden when leaving the page</div></div>
+      <input class="reveal-seconds" type="number" min="0" value="@Vm.Settings.SeedRevealSeconds" @onchange="OnRevealSecondsChanged" />
+    </div>
+    <div class="srow">
+      <div>Rate hints<div class="desc">Last measured speed per device, used for the estimate before a run</div></div>
+      <button class="btn-secondary-dark forget-hints t" @onclick="ForgetHints">Forget rate hints</button>
+    </div>
+  </div>
+  <div class="card-box full">
+    <div class="card-title">Data</div>
+    <div class="srow">
+      <div>Data folder<div class="desc mono">@Window.DataFolder</div></div>
+      <button class="btn-secondary-dark open-folder t" @onclick="Window.OpenDataFolder">Open folder</button>
+    </div>
+  </div>
+</div>

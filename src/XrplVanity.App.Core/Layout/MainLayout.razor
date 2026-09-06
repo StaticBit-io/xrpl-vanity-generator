@@ -1,0 +1,50 @@
+@inherits LayoutComponentBase
+@inject SearchViewModel Vm
+@inject IWindowService Window
+
+<div class="shell">
+  <NavRail />
+  <main class="content">@Body</main>
+</div>
+<ClosePrompt Visible="_askClose" OnChoice="OnCloseChoice" />
+
+@code {
+    private bool _askClose;
+
+    protected override void OnInitialized() => Window.CloseRequested += OnCloseRequested;
+
+    private void OnCloseRequested()
+    {
+        switch (Vm.Settings.CloseBehavior)
+        {
+            case CloseBehavior.MinimizeToTray:
+                Window.HideToTray();
+                break;
+            case CloseBehavior.Exit:
+                Window.Exit();
+                break;
+            default:
+                _askClose = true;
+                InvokeAsync(StateHasChanged);
+                break;
+        }
+    }
+
+    private void OnCloseChoice((CloseBehavior Choice, bool Remember) value)
+    {
+        _askClose = false;
+        if (value.Remember)
+        {
+            Vm.SaveSettings(s => s with { CloseBehavior = value.Choice });
+        }
+
+        if (value.Choice == CloseBehavior.Exit)
+        {
+            Window.Exit();
+        }
+        else
+        {
+            Window.HideToTray();
+        }
+    }
+}

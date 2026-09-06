@@ -1,0 +1,7 @@
+<div class="banner-@Kind">@Text</div>
+
+@code {
+    /// <summary>"yellow" or "negative"; the classes are defined globally in _layout.scss.</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = "yellow";
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+}

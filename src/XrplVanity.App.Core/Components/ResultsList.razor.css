@@ -10,3 +10,8 @@
 .address { color: var(--text); }
 .seed { color: var(--text-secondary); letter-spacing: 0.05em; }
 .export-error { color: var(--negative); font-size: 12px; margin-bottom: 8px; }
+@media (max-width: 1000px) {
+  .row, .row.has-target { grid-template-columns: minmax(230px, 1fr) 28px 120px 120px 28px 28px; }
+  .row.has-delete, .row.has-target.has-delete { grid-template-columns: minmax(230px, 1fr) 28px 120px 120px 28px 28px 28px; }
+  .row .target, .row .time { display: none; }
+}

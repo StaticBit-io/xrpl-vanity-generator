@@ -1,0 +1,22 @@
+@page "/history"
+@inherits ViewModelPage
+@inject IResultStore Store
+@inject TimeProvider Clock
+
+<header class="page-head">
+  <h1>History <span class="pill">@_all.Count stored</span></h1>
+  <div class="actions">
+    @if (!Store.IsReadOnly)
+    {
+      <button class="btn-secondary-dark clear t" @onclick="OnClearClicked">@(_clearArmedAt is null ? "Clear history" : "Click again to confirm")</button>
+    }
+  </div>
+</header>
+@if (Store.IsReadOnly)
+{
+  <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
+}
+<div class="filter-row">
+  <input class="filter form-control mono" placeholder="filter by address or pattern" @bind="_filter" @bind:event="oninput" />
+</div>
+<ResultsList Items="Filtered()" ShowTarget="true" OnDelete="Delete" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
