@@ -1,0 +1,422 @@
+using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Services;
+using XrplVanity.App.Core.Storage;
+using XrplVanity.Core;
+using XrplVanity.Gpu;
+using XrplVanity.Search;
+
+namespace XrplVanity.App.Core.ViewModels;
+
+/// <summary>
+/// The application's single source of UI truth: the pattern and target drafts, the running
+/// session and its progress, the session results, and the estimate. Session events arrive on
+/// worker threads; every mutation here happens under <c>_gate</c> and ends with <see cref="Changed"/>,
+/// which components subscribe to and marshal through <c>InvokeAsync(StateHasChanged)</c>.
+/// </summary>
+public sealed class SearchViewModel : IDisposable
+{
+    private static readonly TimeSpan LiveRateAfter = TimeSpan.FromSeconds(2);
+
+    private readonly ISettingsStore _settingsStore;
+    private readonly IResultStore _resultStore;
+    private readonly INotificationService _notifications;
+    private readonly Func<IReadOnlyList<DeviceCatalogEntry>> _deviceSource;
+    private readonly object _gate = new();
+    private readonly List<PatternChip> _patterns = new();
+    private readonly List<TargetChoice> _targets = new();
+    private readonly List<SessionResult> _results = new();
+    private AppSettings _settings;
+    private PatternSet? _patternSet;
+    private SearchSession? _session;
+    private SearchProgress? _progress;
+    private int _dutyPercent;
+
+    public SearchViewModel(ISettingsStore settingsStore, IResultStore resultStore, INotificationService notifications, Func<IReadOnlyList<DeviceCatalogEntry>> deviceSource)
+    {
+        _settingsStore = settingsStore;
+        _resultStore = resultStore;
+        _notifications = notifications;
+        _deviceSource = deviceSource;
+        _settings = settingsStore.Load();
+        _dutyPercent = _settings.DutyPercent;
+        CpuThreads = Math.Clamp(_settings.CpuThreads, 1, Math.Max(1, Environment.ProcessorCount));
+        Count = _settings.Count;
+        foreach (PatternDraft draft in _settings.Patterns)
+        {
+            if (Enum.TryParse(draft.Position, out MatchPosition position))
+            {
+                _patterns.Add(new PatternChip(draft.Text, position, draft.IgnoreCase));
+            }
+        }
+
+        RefreshDevices();
+        RebuildPatternSet();
+    }
+
+    public event Action? Changed;
+
+    public SearchState State { get; private set; } = SearchState.Idle;
+    public IReadOnlyList<PatternChip> Patterns => _patterns;
+    public IReadOnlyList<TargetChoice> Targets => _targets;
+    public IReadOnlyList<SessionResult> Results => _results;
+    public SearchProgress? Progress => _progress;
+    public SearchSummary? LastSummary { get; private set; }
+    public string? LastFailure { get; private set; }
+    public bool NoGpuFound { get; private set; }
+    public int CpuThreads { get; set; }
+    public int? Count { get; set; }
+    public string? HistoryReadOnlyReason => _resultStore.IsReadOnly ? _resultStore.ReadOnlyReason ?? "history is read-only" : null;
+    public AppSettings Settings => _settings;
+
+    public int DutyPercent
+    {
+        get => _dutyPercent;
+        set
+        {
+            int clamped = Math.Clamp(value, 1, DutyCycle.Full);
+            lock (_gate)
+            {
+                _dutyPercent = clamped;
+                if (_session is not null)
+                {
+                    _session.DutyPercent = clamped;
+                }
+            }
+
+            SaveSettings(s => s with { DutyPercent = clamped });
+            Changed?.Invoke();
+        }
+    }
+
+    public double? ExpectedCandidates => _patternSet is null ? null : SearchEstimator.ExpectedCandidatesPerMatch(_patternSet);
+
+    /// <summary>ETA from the live rate after 2 s of searching, else from the rate hints of the selected targets, else null.</summary>
+    public TimeSpan? EstimatedTime => SearchEstimator.ExpectedTimeToMatch(ExpectedCandidates, CurrentRate());
+
+    public string EstimateNote
+    {
+        get
+        {
+            if (ExpectedCandidates is null) return "add a pattern to see an estimate";
+            double rate = CurrentRate();
+            if (rate <= 0) return "rate unknown until the first run";
+            return _progress is not null && _progress.Elapsed >= LiveRateAfter && State == SearchState.Searching
+                ? "from the live rate"
+                : "from the last measured rate of the selected targets";
+        }
+    }
+
+    public bool CanStart => State == SearchState.Idle && StartBlockedReason is null;
+
+    public string? StartBlockedReason
+    {
+        get
+        {
+            if (_patternSet is null || !_patternSet.HasPatterns) return "Add at least one reachable pattern.";
+            if (!_targets.Any(t => t.Selected)) return "Select the CPU or at least one device.";
+            return null;
+        }
+    }
+
+    public void AddPattern(string text, MatchPosition position, bool ignoreCase)
+    {
+        string trimmed = text.Trim();
+        if (trimmed.Length == 0) return;
+        lock (_gate)
+        {
+            _patterns.Add(new PatternChip(trimmed, position, ignoreCase));
+            RebuildPatternSet();
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    public void RemovePattern(PatternChip chip)
+    {
+        lock (_gate)
+        {
+            _patterns.Remove(chip);
+            RebuildPatternSet();
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    public void UpdatePattern(PatternChip chip, MatchPosition position, bool ignoreCase)
+    {
+        lock (_gate)
+        {
+            chip.Position = position;
+            chip.IgnoreCase = ignoreCase;
+            RebuildPatternSet();
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    /// <summary>Adds every non-blank line of a word list as a Starts chip.</summary>
+    public void AddPatternsFromList(IEnumerable<string> lines, bool ignoreCase)
+    {
+        lock (_gate)
+        {
+            foreach (string line in lines)
+            {
+                string word = line.Trim();
+                if (word.Length > 0) _patterns.Add(new PatternChip(word, MatchPosition.Starts, ignoreCase));
+            }
+
+            RebuildPatternSet();
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    public void SetTargetSelected(string id, bool selected)
+    {
+        lock (_gate)
+        {
+            TargetChoice? target = _targets.FirstOrDefault(t => t.Id == id);
+            if (target is null) return;
+            target.Selected = selected;
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    public void RefreshDevices()
+    {
+        IReadOnlyList<DeviceCatalogEntry> entries;
+        try
+        {
+            entries = _deviceSource();
+        }
+        catch (Exception)
+        {
+            entries = Array.Empty<DeviceCatalogEntry>();
+        }
+
+        lock (_gate)
+        {
+            // A target is selected when the saved draft (first call) or the current draft (refresh)
+            // selected it. Nothing is auto-selected beyond the CPU on a fresh install, and OpenCL
+            // CPU implementations ([cpu]) are never selected unless the user picked them.
+            HashSet<string> selected = new(_targets.Count == 0 ? _settings.Targets : _targets.Where(t => t.Selected).Select(t => t.Id), StringComparer.Ordinal);
+            _targets.Clear();
+            _targets.Add(new TargetChoice("cpu", "CPU", $"{Environment.ProcessorCount} logical processors", false, selected.Contains("cpu")));
+            foreach (DeviceCatalogEntry e in entries)
+            {
+                _targets.Add(new TargetChoice(e.Id, e.Name, $"{e.Selector.Backend} · {e.Details}", e.IsCpuDevice, selected.Contains(e.Id)));
+            }
+
+            NoGpuFound = !entries.Any(e => !e.IsCpuDevice);
+        }
+
+        Changed?.Invoke();
+    }
+
+    public void Start()
+    {
+        SearchRequest request;
+        lock (_gate)
+        {
+            if (!CanStart) return;
+            List<SearchTarget> targets = new();
+            foreach (TargetChoice t in _targets.Where(t => t.Selected))
+            {
+                targets.Add(t.IsCpu
+                    ? new SearchTarget.Cpu(CpuThreads)
+                    : new SearchTarget.Device(ParseSelector(t.Id)));
+            }
+
+            request = new SearchRequest(_patternSet!, targets, Count, _dutyPercent);
+            _results.Clear();
+            LastSummary = null;
+            LastFailure = null;
+            State = SearchState.Starting;
+            _session = new SearchSession(request, OnMatch, OnLog);
+            _session.ProgressChanged += OnProgress;
+            _session.Completion.ContinueWith(t => OnCompleted(t.Result), TaskContinuationOptions.OnlyOnRanToCompletion);
+            _session.Start();
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    public void Stop()
+    {
+        lock (_gate)
+        {
+            if (_session is null || State is SearchState.Idle or SearchState.Stopping) return;
+            State = SearchState.Stopping;
+            _session.Stop();
+        }
+
+        Changed?.Invoke();
+    }
+
+    public void SaveSettings(Func<AppSettings, AppSettings> update)
+    {
+        lock (_gate)
+        {
+            _settings = update(_settings);
+            _settingsStore.Save(_settings);
+        }
+    }
+
+    public void Dispose()
+    {
+        SearchSession? session;
+        lock (_gate)
+        {
+            session = _session;
+            _session = null;
+        }
+
+        session?.Dispose();
+    }
+
+    private static DeviceSelector ParseSelector(string id)
+    {
+        int colon = id.IndexOf(':');
+        return new DeviceSelector(id[..colon], int.Parse(id[(colon + 1)..]));
+    }
+
+    private double CurrentRate()
+    {
+        SearchProgress? progress = _progress;
+        if (progress is not null && State == SearchState.Searching && progress.Elapsed >= LiveRateAfter && progress.TotalRatePerSecond > 0)
+        {
+            return progress.TotalRatePerSecond;
+        }
+
+        double sum = 0;
+        foreach (TargetChoice t in _targets.Where(t => t.Selected))
+        {
+            if (_settings.RateHints.TryGetValue(t.Id, out double hint)) sum += hint;
+        }
+
+        return sum;
+    }
+
+    private void RebuildPatternSet()
+    {
+        PatternSet.Builder builder = new();
+        foreach (PatternChip chip in _patterns)
+        {
+            builder.Add(chip.Position, chip.Text, chip.IgnoreCase);
+        }
+
+        PatternSet set = builder.Build();
+        foreach (PatternChip chip in _patterns)
+        {
+            NormalizedPattern normalized = PatternNormalizer.Normalize(chip.Text);
+            chip.Warning = !normalized.Reachable ? "cannot occur in an XRPL address"
+                : normalized.Value.Length == 0 ? "empty pattern"
+                : chip.IgnoreCase && normalized.Value.Length > PatternSet.MaxIgnoreCaseLength ? $"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively"
+                : null;
+        }
+
+        _patternSet = set;
+    }
+
+    private void PersistDraft()
+    {
+        SaveSettings(s => s with
+        {
+            Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase)).ToArray(),
+            Targets = _targets.Where(t => t.Selected).Select(t => t.Id).ToArray(),
+            CpuThreads = CpuThreads,
+            Count = Count,
+        });
+    }
+
+    private void OnProgress(SearchProgress progress)
+    {
+        lock (_gate)
+        {
+            _progress = progress;
+            if (State == SearchState.Starting && progress.Targets.Any(t => t.State == TargetState.Running))
+            {
+                State = SearchState.Searching;
+            }
+        }
+
+        Changed?.Invoke();
+    }
+
+    private void OnMatch(Match match)
+    {
+        string target = _progress?.Targets.FirstOrDefault(t => t.State == TargetState.Running)?.Id ?? "?";
+        SessionResult result = new(match.Address, match.Seed, match.Pattern, match.Position.ToString(), DateTimeOffset.Now, target);
+        lock (_gate)
+        {
+            _results.Insert(0, result);
+        }
+
+        if (!_resultStore.IsReadOnly)
+        {
+            try
+            {
+                _resultStore.Append(new StoredResult(result.Address, result.Seed, result.Pattern, result.Position, result.FoundAt, result.Target));
+            }
+            catch (Exception)
+            {
+                // The store reports read-only state itself; the session result list still has the match.
+            }
+        }
+
+        if (_settings.NotificationsEnabled)
+        {
+            _notifications.Notify("Match found", $"{match.Address} · {match.Pattern} ({match.Position})");
+        }
+
+        Changed?.Invoke();
+    }
+
+    private void OnLog(string line)
+    {
+        if (line.StartsWith("warning:", StringComparison.Ordinal) || line.StartsWith("error:", StringComparison.Ordinal))
+        {
+            LastFailure = line;
+            Changed?.Invoke();
+        }
+    }
+
+    private void OnCompleted(SearchSummary summary)
+    {
+        Dictionary<string, double> hints = new(_settings.RateHints);
+        foreach (TargetProgress t in summary.Final.Targets)
+        {
+            if (t.State != TargetState.Failed && t.RatePerSecond > 0) hints[t.Id] = t.RatePerSecond;
+        }
+
+        SaveSettings(s => s with { RateHints = hints });
+        SearchSession? finished;
+        lock (_gate)
+        {
+            LastSummary = summary;
+            _progress = summary.Final;
+            State = SearchState.Idle;
+            finished = _session;
+            _session = null;
+            if (summary.Outcome == SessionOutcome.AllTargetsFailed)
+            {
+                LastFailure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no target could start";
+            }
+        }
+
+        if (_settings.NotificationsEnabled)
+        {
+            _notifications.Notify("Search finished", $"{summary.Final.Reported} found · {summary.Outcome}");
+        }
+
+        Changed?.Invoke();
+        finished?.Dispose();
+    }
+}
