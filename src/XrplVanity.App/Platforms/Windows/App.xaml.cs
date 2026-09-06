@@ -56,8 +56,16 @@ public partial class App : MauiWinUIApplication
         // resolved off the UI thread so a slow OpenCL driver cannot delay the first paint.
         _ = Task.Run(() =>
         {
-            TrayCoordinator coordinator = services.GetRequiredService<TrayCoordinator>();
-            MainThread.BeginInvokeOnMainThread(coordinator.Start);
+            try
+            {
+                TrayCoordinator coordinator = services.GetRequiredService<TrayCoordinator>();
+                MainThread.BeginInvokeOnMainThread(coordinator.Start);
+            }
+            catch (Exception)
+            {
+                // A missing tray (e.g. GPU enumeration failure while resolving the view model) must
+                // not crash start-up; the window and the search itself still work without it.
+            }
         });
     }
 }

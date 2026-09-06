@@ -31,6 +31,27 @@ public sealed class WindowsNotificationService : INotificationService
 
     public event Action? Activated;
 
+    /// <summary>
+    /// Unregisters from the notification platform. Called from <see cref="WindowsWindowService.Exit"/>
+    /// before <c>Application.Current.Quit()</c> so the process does not leave a dangling registration.
+    /// </summary>
+    public void Shutdown()
+    {
+        if (!IsAvailable)
+        {
+            return;
+        }
+
+        try
+        {
+            AppNotificationManager.Default.Unregister();
+        }
+        catch (Exception)
+        {
+            // Best effort during shutdown; the process is exiting either way.
+        }
+    }
+
     public void Notify(string title, string body)
     {
         if (!IsAvailable)

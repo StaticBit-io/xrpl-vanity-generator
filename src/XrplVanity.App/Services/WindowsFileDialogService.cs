@@ -15,6 +15,13 @@ public sealed class WindowsFileDialogService : IFileDialogService
 
     public async Task<string?> PickSaveTsvAsync(string suggestedName)
     {
+        if (_windowService.Handle == IntPtr.Zero)
+        {
+            // No window to own the picker yet (e.g. called before Attach()); fail soft instead of
+            // letting WinRT.Interop.InitializeWithWindow throw on a zero handle.
+            return null;
+        }
+
         FileSavePicker picker = new()
         {
             SuggestedStartLocation = PickerLocationId.DocumentsLibrary,

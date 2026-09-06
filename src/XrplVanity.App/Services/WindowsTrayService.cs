@@ -123,7 +123,10 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
     private static Icon? LoadIcon()
     {
         // MauiAsset lands next to the executable both unpackaged and inside the MSIX package;
-        // the package reader is the fallback and runs off the UI thread so it cannot deadlock.
+        // the package reader is the fallback. This call still blocks whatever thread calls
+        // LoadIcon — Task.Run does not make that free — but it moves the async read itself onto a
+        // thread-pool thread with no captured synchronization context, so blocking on its result
+        // here cannot deadlock the way an in-place .GetAwaiter().GetResult() on the UI thread could.
         string path = Path.Combine(AppContext.BaseDirectory, IconAssetName);
         try
         {

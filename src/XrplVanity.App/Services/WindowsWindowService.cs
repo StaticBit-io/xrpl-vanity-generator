@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Windowing;
@@ -32,10 +33,9 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
     private IntPtr _handle;
     private IntPtr _previousWndProc;
     private WndProc? _wndProc;
-    private int _minTrackWidth;
-    private int _minTrackHeight;
     private SizeInt32? _pendingSize;
     private bool _disposed;
+    private bool _exiting;
 
     public WindowsWindowService(IServiceProvider services, ISettingsStore settingsStore)
     {
@@ -83,9 +83,6 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
             workArea.X + Math.Max(0, (workArea.Width - width) / 2),
             workArea.Y + Math.Max(0, (workArea.Height - height) / 2)));
 
-        // MINMAXINFO's track size is the whole window in physical pixels, the same thing Resize takes.
-        _minTrackWidth = (int)Math.Round(MinimumWidth * scale);
-        _minTrackHeight = (int)Math.Round(MinimumHeight * scale);
         InstallMinimumSizeHook();
 
         _appWindow.Closing += OnAppWindowClosing;
@@ -124,12 +121,24 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
 
     public void Exit()
     {
+        lock (_gate)
+        {
+            if (_exiting)
+            {
+                // Already tearing down (a second close, a second tray "Exit"); do nothing more.
+                return;
+            }
+
+            _exiting = true;
+        }
+
         FlushPendingSize();
 
         // Stop the search before anything tears the process down: the session owns worker threads
         // and GPU contexts, and Quit() does not unwind them.
         _services.GetService<SearchViewModel>()?.Dispose();
         _services.GetService<ITrayService>()?.Hide();
+        _services.GetService<WindowsNotificationService>()?.Shutdown();
 
         MainThread.BeginInvokeOnMainThread(() => Application.Current?.Quit());
     }
@@ -138,7 +147,14 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
     {
         string folder = DataFolder;
         Directory.CreateDirectory(folder);
-        _ = Launcher.Default.OpenAsync(new Uri(folder));
+        try
+        {
+            Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or System.IO.FileNotFoundException)
+        {
+            // Opening the folder is best effort; the button must never crash the app.
+        }
     }
 
     /// <summary>Raised when the title bar's close button is pressed.</summary>
@@ -174,6 +190,13 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
 
     private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        if (_exiting)
+        {
+            // This close was raised by Exit()'s own Application.Current.Quit() — let it proceed.
+            // Cancelling it here would leave a zombie process: no window, no tray, unkillable.
+            return;
+        }
+
         // The window never closes itself: MainLayout decides between hiding and exiting.
         args.Cancel = true;
         RaiseCloseRequested();
@@ -231,16 +254,38 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
         // WM_GETMINMAXINFO is the documented way to give a window a minimum track size; the
         // delegate is kept in a field so the GC cannot collect it while the window proc points at it.
         _wndProc = MinimumSizeWndProc;
-        _previousWndProc = SetWindowLongPtrW(_handle, GwlpWndProc, Marshal.GetFunctionPointerForDelegate(_wndProc));
+
+        // SetWindowLongPtrW can legitimately return zero on success (if the previous wndproc
+        // pointer itself was zero), so per the documented pattern, clear the last error first and
+        // treat a zero return as failure only when GetLastPInvokeError is also non-zero.
+        Marshal.SetLastPInvokeError(0);
+        IntPtr previous = SetWindowLongPtrW(_handle, GwlpWndProc, Marshal.GetFunctionPointerForDelegate(_wndProc));
+        if (previous == IntPtr.Zero && Marshal.GetLastPInvokeError() != 0)
+        {
+            // Hooking the window proc failed. Leave the window without an enforced floor rather
+            // than routing messages through a null previous proc, which would crash on the next
+            // window message.
+            _wndProc = null;
+            return;
+        }
+
+        _previousWndProc = previous;
     }
 
     private IntPtr MinimumSizeWndProc(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam)
     {
         if (message == WmGetMinMaxInfo && lParam != IntPtr.Zero)
         {
+            // Recomputed from the window's current DPI on every call, not the DPI captured at
+            // Attach() time, so the 900x600 logical floor holds after the window moves to a
+            // monitor with a different scale factor.
+            double scale = GetDpiForWindow(hwnd) / 96.0;
+            int minTrackWidth = (int)Math.Round(MinimumWidth * scale);
+            int minTrackHeight = (int)Math.Round(MinimumHeight * scale);
+
             MinMaxInfo info = Marshal.PtrToStructure<MinMaxInfo>(lParam);
-            info.MinTrackSize.X = Math.Max(info.MinTrackSize.X, _minTrackWidth);
-            info.MinTrackSize.Y = Math.Max(info.MinTrackSize.Y, _minTrackHeight);
+            info.MinTrackSize.X = Math.Max(info.MinTrackSize.X, minTrackWidth);
+            info.MinTrackSize.Y = Math.Max(info.MinTrackSize.Y, minTrackHeight);
             Marshal.StructureToPtr(info, lParam, fDeleteOld: false);
         }
 
@@ -270,7 +315,7 @@ public sealed class WindowsWindowService : IWindowService, IDisposable
     [DllImport("user32.dll", ExactSpelling = true)]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
 
-    [DllImport("user32.dll", ExactSpelling = true)]
+    [DllImport("user32.dll", ExactSpelling = true, SetLastError = true)]
     private static extern IntPtr SetWindowLongPtrW(IntPtr hwnd, int index, IntPtr value);
 
     [DllImport("user32.dll", ExactSpelling = true)]

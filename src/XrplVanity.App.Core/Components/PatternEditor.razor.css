@@ -2,6 +2,7 @@
 .entry { display: grid; grid-template-columns: 140px 1fr auto auto; gap: 8px; align-items: center; }
 .entry .form-select, .entry .form-control { background: var(--chips); color: var(--text); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); }
 .entry .form-control:focus, .entry .form-select:focus { border-color: var(--mint); box-shadow: none; outline: none; }
+.entry .form-control::placeholder { color: var(--text-secondary); opacity: 1; }
 .case-label { color: var(--text-secondary); white-space: nowrap; display: flex; gap: 6px; align-items: center; }
 .list-error { color: var(--negative); font-size: 12px; margin-top: 6px; }
 @media (max-width: 1000px) {
