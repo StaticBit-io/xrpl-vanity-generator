@@ -1,0 +1,9 @@
+.t { transition: background-color var(--ease), color var(--ease), border-color var(--ease), opacity var(--ease), transform var(--ease), box-shadow var(--ease); }
+@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes slide-in { from { opacity: 0; transform: translateY(-6px); background-color: rgba(100, 207, 149, 0.18); } to { opacity: 1; transform: none; background-color: transparent; } }
+.breathe { animation: breathe 1.8s ease-in-out infinite; }
+.slide-in { animation: slide-in 600ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .t { transition: none; }
+  .breathe, .slide-in { animation: none; }
+}

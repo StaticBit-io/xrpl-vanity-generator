@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XrplVanity.App.Core\XrplVanity.App.Core.csproj" />
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="bunit" Version="2.9.0" />
+  </ItemGroup>
+</Project>

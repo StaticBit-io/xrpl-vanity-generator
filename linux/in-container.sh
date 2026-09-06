@@ -31,7 +31,7 @@ if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi -L || true; else echo 
 dotnet --version
 
 step "build"
-dotnet build XrplVanity.sln -c Release
+dotnet build XrplVanity.Portable.slnf -c Release
 
 if [ "$MODE" = gpu ]; then export XRPL_VANITY_REQUIRE_BACKENDS=cuda,opencl; else export XRPL_VANITY_REQUIRE_BACKENDS=opencl; fi
 step "tests (required backends: $XRPL_VANITY_REQUIRE_BACKENDS)"
@@ -46,6 +46,15 @@ cat "$SUITE_LOG"
 rm -f "$SUITE_LOG"
 if [ "$MODE" = gpu ]; then expect_contains "no skipped rows" "Skipped: 0," "$SUITE"; fi
 [ "$RC" -eq 0 ] || { printf 'FAIL tests exited %s\n' "$RC"; exit "$RC"; }
+
+step "app tests"
+APP_SUITE_LOG="$(mktemp)"
+set +e; dotnet run --project tests/XrplVanity.App.Tests -c Release --no-build > "$APP_SUITE_LOG" 2>&1; RC=$?; set -e
+APP_SUITE="$(cat "$APP_SUITE_LOG")"
+cat "$APP_SUITE_LOG"
+rm -f "$APP_SUITE_LOG"
+expect_contains "no failed rows" "Failed: 0" "$APP_SUITE"
+[ "$RC" -eq 0 ] || { printf 'FAIL app tests exited %s\n' "$RC"; exit "$RC"; }
 
 CLI=(dotnet run --project src/XrplVanity.Cli -c Release --no-build --)
 

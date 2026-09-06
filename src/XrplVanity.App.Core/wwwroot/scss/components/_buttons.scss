@@ -1,0 +1,9 @@
+.btn-primary-mint { background: var(--mint); color: #0D0D0D; border: 0; border-radius: var(--radius-chip); padding: 10px 22px; font-weight: 600; }
+.btn-primary-mint:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-primary-mint:disabled { opacity: 0.45; }
+.btn-stop { background: var(--secondary-dark); color: var(--text); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 10px 22px; font-weight: 600; }
+.btn-stop:hover { border-color: var(--negative); color: var(--negative); }
+.btn-secondary-dark { background: var(--secondary-dark); color: var(--text); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 6px 12px; }
+.btn-secondary-dark:hover:not(:disabled) { border-color: var(--text-secondary); }
+.btn-icon { background: transparent; border: 0; color: var(--text-secondary); padding: 4px; border-radius: 6px; }
+.btn-icon:hover { color: var(--text); background: var(--chips); }

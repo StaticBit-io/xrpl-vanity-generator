@@ -7,3 +7,6 @@ matches*.txt
 
 # Search output files hold seeds (secrets): never commit them.
 *.tsv
+
+# Compiled by DartSassBuilder at build time.
+src/XrplVanity.App.Core/wwwroot/scss/*.css

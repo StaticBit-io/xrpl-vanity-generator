@@ -1,0 +1,14 @@
+{
+  "solution": {
+    "path": "XrplVanity.sln",
+    "projects": [
+      "src\\XrplVanity.Core\\XrplVanity.Core.csproj",
+      "src\\XrplVanity.Gpu\\XrplVanity.Gpu.csproj",
+      "src\\XrplVanity.Search\\XrplVanity.Search.csproj",
+      "src\\XrplVanity.Cli\\XrplVanity.Cli.csproj",
+      "src\\XrplVanity.App.Core\\XrplVanity.App.Core.csproj",
+      "tests\\XrplVanity.Tests\\XrplVanity.Tests.csproj",
+      "tests\\XrplVanity.App.Tests\\XrplVanity.App.Tests.csproj"
+    ]
+  }
+}

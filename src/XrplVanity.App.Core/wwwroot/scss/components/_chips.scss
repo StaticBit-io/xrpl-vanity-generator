@@ -1,0 +1,5 @@
+.chip { display: inline-flex; align-items: center; gap: 8px; background: var(--chips); border-radius: var(--radius-chip); padding: 6px 10px; color: var(--text); }
+.chip .chip-pos { color: var(--text-secondary); font-size: 12px; }
+.chip .chip-warn { color: var(--yellow); font-size: 12px; }
+.chip button { background: transparent; border: 0; color: var(--text-secondary); cursor: pointer; padding: 0 2px; }
+.chip button:hover { color: var(--text); }
