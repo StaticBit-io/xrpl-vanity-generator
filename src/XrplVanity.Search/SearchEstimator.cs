@@ -9,8 +9,9 @@ namespace XrplVanity.Search;
 /// leading-digit distribution (<see cref="LeadingCharacterProbability"/>) instead of a uniform
 /// 58^-1, because the fixed leading 'r' consumes the address's zero version byte and leaves a
 /// 192-bit number that does not divide evenly into base58 digits. The set's probability is the
-/// sum over targets (overlaps ignored: an upper bound on the probability, hence a lower bound on
-/// the expected candidates) and the expectation is its reciprocal. A guide, not a guarantee.
+/// sum over targets and paired rules (overlaps ignored: an upper bound on the probability, hence
+/// a lower bound on the expected candidates) and the expectation is its reciprocal. A guide, not
+/// a guarantee.
 /// </summary>
 public static class SearchEstimator
 {
@@ -81,7 +82,9 @@ public static class SearchEstimator
             }
 
             // The two halves sit at fixed, non-overlapping ends of the body, so they are
-            // independent and their probabilities multiply.
+            // independent and their probabilities multiply. The end half needs no per-variant
+            // sum: every one of its variants costs the same 58^-EndsLength, while the start
+            // half's variants differ in their leading character.
             probability += startsProbability * pair.Ends.Count * Math.Pow(AlphabetSize, -pair.EndsLength);
         }
 
