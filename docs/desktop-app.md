@@ -29,7 +29,23 @@ The application has three pages:
   than 33 characters — the longest address body — are flagged as unreachable rather than
   searched for.
 - **History** — every result the application has ever stored, with a filter over the
-  address and the pattern, per-row delete and a two-step "Clear history".
+  address and the pattern. Each row carries a checkbox, and a "select all shown" checkbox
+  above the list adds every row the filter currently shows; unticking it removes only
+  those rows from the selection, and it draws as a dash rather than a tick when the
+  visible rows are only partly selected. The selection is held by address, so typing in
+  the filter hides rows without unselecting them. Once anything is selected, a bar
+  appears below the filter with the count ("3 selected"), `Export selected…`,
+  `Delete selected` and `Clear selection`; the header's `Export TSV…` is disabled while
+  the bar is showing, and `Clear selection` is what empties the selection outright. One
+  confirmation dialog covers the row delete, `Delete selected` and `Clear history`: it
+  names the seed, not the row, as the thing that cannot be recovered. The row and
+  selection variants list the addresses being deleted, up to ten, collapsing the rest into
+  "…and N more" (never a seed); the clear variant states the total instead and notes that
+  the filter does not narrow it. The confirm button is always red, reading `Delete`,
+  `Delete N` or `Clear history` depending on the path; `Cancel` takes focus so a stray
+  Enter is harmless, and Escape cancels the same way. A read-only store hides both delete
+  paths — the row's delete button and `Delete selected` — while the checkboxes and
+  `Export selected…` still work.
 - **Settings** — everything in the table below. There is no Save button: each control
   writes to `settings.json` as it changes.
 
@@ -250,18 +266,24 @@ storage layer. Each step names what you should see.
 14. **Export.** Press **Export TSV…**, save the file and open it in a text editor: one
     line per result, address and seed separated by a tab, in the same format the command
     line tool's `--out` writes.
-15. **Every control is dark.** Open History and Settings and check each form control: the
+15. **Select, export and delete together.** On History, tick two rows (or tick "select
+    all shown" and then untick the rest), press **Export selected…** and save the file:
+    the file holds exactly those two lines. Press **Delete selected**: the confirmation
+    dialog names both addresses; confirming removes both rows and nothing else.
+16. **Every control is dark.** Open History and Settings and check each form control: the
     filter box, the close-behaviour select, the four number inputs, the notifications
     checkbox and both scrollbars. Nothing may render on a white background, and no
     checkbox may show a white or blue box.
-16. **A read-only data folder produces banners, not crashes.** Deny your account write
+17. **A read-only data folder produces banners, not crashes.** Deny your account write
     access to the data folder (`icacls "<folder>" /deny "%USERNAME%":(W)`), then: on
-    History, press **Clear history** twice and delete a row — each shows a red banner with
-    the reason and leaves the list intact; on Search, run a short pattern and confirm the
+    History, press **Clear history** and confirm the dialog, and delete a row through its
+    own dialog — each confirmed action shows a red banner with the reason and leaves the
+    list intact (and, once the store has turned read-only this way, **Clear history**
+    itself disappears from the header); on Search, run a short pattern and confirm the
     same banner appears above the results list while the hits still accumulate on screen;
     and confirm the window still closes normally. Restore access with
     `icacls "<folder>" /remove:d "%USERNAME%"`.
-17. **The reference-rates link opens in a browser.** On the Search page, click
+18. **The reference-rates link opens in a browser.** On the Search page, click
     **reference rates** in the estimate note: the benchmarks page opens in the default
     browser and the application window is unchanged — no blank frame inside the app.
 
