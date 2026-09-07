@@ -94,4 +94,44 @@ public class SearchEstimatorTests
         Assert.Null(SearchEstimator.ExpectedTimeToMatch(1000, 0));
         Assert.Null(SearchEstimator.ExpectedTimeToMatch(1000, -5));
     }
+
+    [Fact]
+    public void A_Pair_Multiplies_The_Two_Halves()
+    {
+        PatternSet set = new PatternSet.Builder().AddPair("abc", "xyz", ignoreCase: false).Build();
+        double expected = 1.0 / (SearchEstimator.LeadingCharacterProbability('a')
+                                 * Math.Pow(58, -2)   // the rest of "abc"
+                                 * Math.Pow(58, -3)); // "xyz"
+        Assert.Equal(expected, SearchEstimator.ExpectedCandidatesPerMatch(set)!.Value, precision: 3);
+        Assert.InRange(SearchEstimator.ExpectedCandidatesPerMatch(set)!.Value, 1.5e10, 1.6e10);
+    }
+
+    [Fact]
+    public void A_Case_Insensitive_Pair_Counts_Every_Variant_Of_Both_Halves()
+    {
+        PatternSet set = new PatternSet.Builder().AddPair("ab", "yz", ignoreCase: true).Build();
+        double starts = 2 * (SearchEstimator.LeadingCharacterProbability('a')
+                             + SearchEstimator.LeadingCharacterProbability('A')) * Math.Pow(58, -1);
+        double ends = 4 * Math.Pow(58, -2);
+        Assert.Equal(1.0 / (starts * ends), SearchEstimator.ExpectedCandidatesPerMatch(set)!.Value, precision: 3);
+    }
+
+    [Fact]
+    public void A_Pair_And_A_Plain_Pattern_Add_Their_Probabilities()
+    {
+        PatternSet set = new PatternSet.Builder()
+            .AddPair("abc", "xyz", ignoreCase: false)
+            .Add(MatchPosition.Starts, "a", ignoreCase: false)
+            .Build();
+        double pair = SearchEstimator.LeadingCharacterProbability('a') * Math.Pow(58, -2) * Math.Pow(58, -3);
+        double plain = SearchEstimator.LeadingCharacterProbability('a');
+        Assert.Equal(1.0 / (pair + plain), SearchEstimator.ExpectedCandidatesPerMatch(set)!.Value, precision: 6);
+    }
+
+    [Fact]
+    public void A_Set_With_Only_An_Unreachable_Pair_Has_No_Estimate()
+    {
+        PatternSet set = new PatternSet.Builder().AddPair("ab", "@", ignoreCase: false).Build();
+        Assert.Null(SearchEstimator.ExpectedCandidatesPerMatch(set));
+    }
 }

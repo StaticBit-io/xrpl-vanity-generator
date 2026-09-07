@@ -72,6 +72,19 @@ public static class SearchEstimator
                 : single;
         }
 
+        foreach (PatternSet.Pair pair in patterns.Pairs)
+        {
+            double startsProbability = 0;
+            foreach (string variant in pair.Starts)
+            {
+                startsProbability += LeadingCharacterProbability(variant[0]) * Math.Pow(AlphabetSize, -(pair.StartsLength - 1));
+            }
+
+            // The two halves sit at fixed, non-overlapping ends of the body, so they are
+            // independent and their probabilities multiply.
+            probability += startsProbability * pair.Ends.Count * Math.Pow(AlphabetSize, -pair.EndsLength);
+        }
+
         return probability > 0 ? 1.0 / probability : null;
     }
 
