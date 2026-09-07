@@ -249,6 +249,53 @@ same cost note beside the existing "expected candidates per match" paragraph.
 `docs/desktop-app.md` describes the fourth entry mode. The plan's measurements section records
 the before/after throughput.
 
+### Measured
+
+Windows, reference RTX 5070 Ti + i5-11400F (same machine as `docs/benchmarks.md`),
+commit 1b52423, 2026-09-06, nothing else CPU-heavy running, taken before this
+documentation was written.
+
+**Kernel benchmark test** (`GpuSearchTests.Throughput_Meets_The_Floor_For_The_Device_Class`,
+a non-matching pattern, run with `-showLiveOutput` since the default runner output hides
+per-test `[OUTPUT]` lines):
+
+```bash
+dotnet run --project tests/XrplVanity.Tests -c Release -- -class "*GpuSearchTests" -showLiveOutput
+```
+
+| Backend | Recorded baseline (`docs/benchmarks.md`, pre-pair) | Measured on this branch | Difference |
+| --- | --- | --- | --- |
+| `cuda` | 19,300,000/s | 19,579,551/s | +1.4% |
+| `opencl` | 21,000,000/s | 21,303,774/s | +1.4% |
+
+Both backends ran for real (0 skipped, 10/10 tests passed) and both land within the same
+noise band the reference page already documents for repeated runs (compare the two CUDA
+CLI figures in "Single GPU device", −0.4% and +0.5% of each other). The `pairCount == 0`
+branch the kernel now always evaluates costs nothing measurable, confirming goal 5.
+
+**Paired search, CLI, GPU** (`--starts-ends ab:yz`, case-sensitive, `m = 2`, `n = 2`,
+expected ≈ 4.55 M candidates/match):
+
+```bash
+dotnet run --project src/XrplVanity.Cli -c Release -- --gpu --case-sensitive --starts-ends ab:yz --count 3
+```
+
+```
+GPU: cuda:NVIDIA GeForce RTX 5070 Ti (sm_120)
+Address: rabM8ZQb1VYAqiEcezXkSkxjs3REKFcDyz	Seed: [redacted]
+Address: rabA4yT4wGfLNmeHsFRtZ7YoNHHYeBr6yz	Seed: [redacted]
+Address: rabxiDYqtUBYuui75SESwZUa53eeMoxqyz	Seed: [redacted]
+GPU: searched 4,194,304 candidates in 0.3 s (15,345,409/s); consistency errors: 0.
+```
+
+All three addresses genuinely start with `ab` and end with `yz`; seeds are never recorded
+in this document. The reported 15,345,409/s is well below the kernel-only floor above,
+which is consistent with the CLI's usual behavior on a short, few-hundred-millisecond run:
+the sample is a single small launch (4,194,304 = 2^22 candidates) dominated by device-open
+and PTX-load overhead that the kernel benchmark excludes, plus the CPU re-verification of
+the 3 hits it printed. It is not evidence of a per-candidate cost from the new pair path —
+the kernel benchmark above, which isolates the search loop, shows no such cost.
+
 ## Risks
 
 - The kernel signature changes, so a stale PTX would silently mismatch its host call. The

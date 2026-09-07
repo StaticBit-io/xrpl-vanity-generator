@@ -61,6 +61,19 @@ machine with `--case-sensitive --starts X --threads 12`: `a` and `p` matched onc
 Case-insensitive patterns match every case variant of each letter, except `o` and `i`
 (no upper-case form in the alphabet) and `L` (no lower-case form).
 
+**Paired patterns (`--starts-ends`).** A paired rule requires a prefix of *m* characters
+and a suffix of *n* characters on the same address. The two halves sit at fixed,
+non-overlapping ends of the body, so their probabilities multiply; the leading-digit
+factor above applies once, to the prefix's first character, and every other
+position — including the entire suffix — is uniform over 58. That makes the cost of the
+pair **exactly** the cost of a single prefix of length *m + n* starting with the same
+character, not merely "about" the same: splitting *m + n* constrained characters into a
+prefix and a suffix does not change which position carries the leading-digit factor or
+how many positions are uniform, so the product is identical regardless of where the
+split falls. Worked example, case-sensitive `abc` + `xyz` (`m = 3`, `n = 3`, leading
+character `a`, one of the common 22): `23.338 × 58^5 ≈ 15.3 G` candidates per match —
+the same figure a case-sensitive `--starts abcxyz` would give. This is pinned by a test.
+
 **CPU path.** The CLI now counts candidates itself and prints a
 `CPU: searched N candidates in T s (R/s)` line, so its rate is measured directly. An
 earlier estimate (the superseded row in the CPU path table below) divided

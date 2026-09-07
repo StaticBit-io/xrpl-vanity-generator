@@ -36,10 +36,19 @@ xrpl-vanity --list google20kwords 5
 
 # suffix / anywhere — mix positions in a single run
 xrpl-vanity --ends xyz --contains dao
+
+# paired — the body must start with abc AND end with xyz
+xrpl-vanity --starts-ends abc:xyz
 ```
 
-A run may combine `--starts`, `--ends`, and `--contains` together, and a
-candidate address matches if *any* pattern matches at its tagged position.
+A run may combine `--starts`, `--ends`, `--contains`, and `--starts-ends`
+together, and a candidate address matches if *any* pattern matches at its
+tagged position. `--starts-ends PREFIX:SUFFIX` is the one exception to "any
+pattern is one condition": it requires both halves on the same address, so a
+prefix of *m* characters plus a suffix of *n* characters costs exactly as
+much as a single prefix of *m + n* characters — the cost is set by the
+number of constrained characters, not by how they are split between the two
+ends.
 
 ## Flags
 
@@ -49,6 +58,7 @@ candidate address matches if *any* pattern matches at its tagged position.
 | `--starts P...` | — | patterns to match at address start (after `r`) |
 | `--ends P...` | — | patterns to match at address end |
 | `--contains P...` | — | patterns to match anywhere |
+| `--starts-ends PREFIX:SUFFIX` | — | requires both a prefix and a suffix on the same address (repeatable) |
 | `--list FILE [minLen]` | — | load `starts` patterns from a word list, optional min length filter (default 4) |
 | `--case-sensitive` | off (case-insensitive) | match the pattern exactly as typed; by default every case combination is matched |
 | `--threads N` | `ProcessorCount` | number of worker threads (CPU path only; ignored with `--gpu`) |

@@ -12,15 +12,20 @@ search.
 
 The application has three pages:
 
-- **Search** — build a pattern set (`starts` / `ends` / `contains`, case-sensitive or
-  case-insensitive), pick the targets to search on (the CPU with a thread count, plus
-  every CUDA and OpenCL device found), see the estimated candidates per match and the
-  expected time, set the GPU duty cycle, and watch the live rate, candidate count and
-  hits. Every hit lands in the results list with its address, pattern, target and time.
-  The four base58 look-alikes absent from the XRPL alphabet (`0`, `O`, `I`, `l`) are
-  folded onto the letter they are normally mistaken for (`0`/`O` → `o`, `I` → `i`,
-  `l` → `L`) rather than rejected, and the chip shows the folded form next to what you
-  typed.
+- **Search** — build a pattern set (`starts` / `ends` / `contains` / `starts and ends
+  with`, case-sensitive or case-insensitive), pick the targets to search on (the CPU
+  with a thread count, plus every CUDA and OpenCL device found), see the estimated
+  candidates per match and the expected time, set the GPU duty cycle, and watch the
+  live rate, candidate count and hits. Every hit lands in the results list with its
+  address, pattern, target and time. The four base58 look-alikes absent from the XRPL
+  alphabet (`0`, `O`, `I`, `l`) are folded onto the letter they are normally mistaken
+  for (`0`/`O` → `o`, `I` → `i`, `l` → `L`) rather than rejected, and the chip shows the
+  folded form next to what you typed.
+  Choosing `starts and ends with` swaps the single text box for two — `starts with…`
+  and `ends with…` — and requires both before the rule is added; the resulting chip
+  shows both halves (`starts abc … ends xyz`) and costs exactly as much as a single
+  `starts` pattern of the combined length, since the estimate multiplies the two
+  independent halves.
 - **History** — every result the application has ever stored, with a filter over the
   address and the pattern, per-row delete and a two-step "Clear history".
 - **Settings** — everything in the table below. There is no Save button: each control
@@ -216,38 +221,45 @@ storage layer. Each step names what you should see.
 6. **Start and stop on the GPU.** Clear the CPU checkbox, select a `cuda` or `opencl`
    device and repeat. The device row shows the device name and its own rate, which should
    be two orders of magnitude above the CPU rate.
-7. **Duty from the tray during a search.** With a GPU search running, open the tray menu
+7. **Paired pattern.** Switch the position selector to `starts and ends with`: the single
+   text box is replaced by two, `starts with…` and `ends with…`. Fill both and press
+   Enter (or Start with both non-empty): the chip reads `starts <prefix> … ends <suffix>`,
+   with the `Aa` marker when case-sensitive and the same per-half warnings a single
+   pattern shows. Run a short paired search on the GPU: a hit only appears once both
+   halves are present in the same address, and the results list shows the `prefix..suffix`
+   form for it.
+8. **Duty from the tray during a search.** With a GPU search running, open the tray menu
    and pick a different duty percentage. The GPU duty card on the Search page follows
    immediately and the measured rate scales with it.
-8. **Toast on a hit.** With notifications enabled, each match raises a Windows toast
+9. **Toast on a hit.** With notifications enabled, each match raises a Windows toast
    titled "Match found" showing the address, the pattern and the position — never a seed.
-9. **Toast on completion.** Stopping or completing a search raises a "Search finished"
-   toast with the number of hits and the outcome.
-10. **Close to tray and remembering the choice.** With **Close button** set to "Ask every
+10. **Toast on completion.** Stopping or completing a search raises a "Search finished"
+    toast with the number of hits and the outcome.
+11. **Close to tray and remembering the choice.** With **Close button** set to "Ask every
     time", the × opens the prompt; choosing "Minimize to tray" with *Remember my choice*
     ticked hides the window, keeps the process alive and writes `"CloseBehavior": "MinimizeToTray"`
     to `settings.json`. The next × hides the window without asking.
-11. **History survives a restart.** Exit from the tray menu, launch again, open History:
+12. **History survives a restart.** Exit from the tray menu, launch again, open History:
     every stored result is still there, seeds still masked.
-12. **Clipboard clears.** Copy a seed from a result row, paste it somewhere to confirm it
+13. **Clipboard clears.** Copy a seed from a result row, paste it somewhere to confirm it
     arrived, wait out the "Clear clipboard after copying a seed" delay (30 s by default)
     and paste again: the clipboard is empty. Copying anything else in the meantime keeps
     the newer content.
-13. **Export.** Press **Export TSV…**, save the file and open it in a text editor: one
+14. **Export.** Press **Export TSV…**, save the file and open it in a text editor: one
     line per result, address and seed separated by a tab, in the same format the command
     line tool's `--out` writes.
-14. **Every control is dark.** Open History and Settings and check each form control: the
+15. **Every control is dark.** Open History and Settings and check each form control: the
     filter box, the close-behaviour select, the four number inputs, the notifications
     checkbox and both scrollbars. Nothing may render on a white background, and no
     checkbox may show a white or blue box.
-15. **A read-only data folder produces banners, not crashes.** Deny your account write
+16. **A read-only data folder produces banners, not crashes.** Deny your account write
     access to the data folder (`icacls "<folder>" /deny "%USERNAME%":(W)`), then: on
     History, press **Clear history** twice and delete a row — each shows a red banner with
     the reason and leaves the list intact; on Search, run a short pattern and confirm the
     same banner appears above the results list while the hits still accumulate on screen;
     and confirm the window still closes normally. Restore access with
     `icacls "<folder>" /remove:d "%USERNAME%"`.
-16. **The reference-rates link opens in a browser.** On the Search page, click
+17. **The reference-rates link opens in a browser.** On the Search page, click
     **reference rates** in the estimate note: the benchmarks page opens in the default
     browser and the application window is unchanged — no blank frame inside the app.
 
