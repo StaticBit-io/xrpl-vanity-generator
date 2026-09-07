@@ -316,6 +316,21 @@ public class ResultsListTests : BunitContext
     }
 
     [Fact]
+    public void An_Empty_Universe_Drops_The_Whole_Selection()
+    {
+        // KnownAddresses empty is a cleared store, not "no universe supplied" — nothing survives.
+        SessionResult[] all = ThreeResults();
+        IRenderedComponent<ResultsList> cut = RenderList(all, selectable: true, knownAddresses: all.Select(r => r.Address).ToArray());
+        cut.Find("input.pick-all").Change(true);
+
+        cut.Render(p => p
+            .Add(x => x.Items, Array.Empty<SessionResult>())
+            .Add(x => x.KnownAddresses, Array.Empty<string>()));
+
+        Assert.Empty(cut.FindAll(".sel-bar"));
+    }
+
+    [Fact]
     public void A_Selection_Hidden_By_The_Filter_Is_Still_Counted_And_Still_Deleted()
     {
         // HistoryPage passes only the rows its filter lets through, plus the unfiltered universe as
@@ -366,13 +381,16 @@ public class ResultsListTests : BunitContext
             SessionResult[] all = ThreeResults();
             IRenderedComponent<ResultsList> cut = RenderList(all, selectable: true);
             cut.FindAll("input.pick")[0].Change(true);
+            cut.FindAll("input.pick")[2].Change(true);
 
             cut.Find("button.export-selected").Click();
 
             cut.WaitForAssertion(() => Assert.True(File.Exists(path)));
             string[] lines = File.ReadAllLines(path);
-            Assert.Single(lines);
-            Assert.StartsWith(all[0].Address + "\t", lines[0]);
+            // Two of the three rows, oldest-first, matching what the CLI's --out would write.
+            Assert.Equal(2, lines.Length);
+            Assert.StartsWith(all[2].Address + "\t", lines[0]);
+            Assert.StartsWith(all[0].Address + "\t", lines[1]);
         }
         finally
         {

@@ -6,7 +6,7 @@
   <div class="head">
     <div class="card-title">Results <span class="count">@Items.Count</span></div>
     @* Greyed out while a selection exists: the bar below is then the place to export from, so this button never changes meaning mid-click. *@
-    <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0 || _selected.Count > 0)" @onclick="() => Export(_items)">Export TSV…</button>
+    <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0 || (Selectable && _selected.Count > 0))" @onclick="() => Export(_items)">Export TSV…</button>
   </div>
   @if (_exportError is not null) { <div class="export-error">@_exportError</div> }
   @if (Selectable && _selected.Count > 0)
@@ -38,7 +38,7 @@
       <Virtualize TItem="SessionResult" Items="_items" Context="item" ItemSize="44" OverscanCount="8">
         @* _animated.Add returns true only the first time a row is seen, so a re-render (e.g. a seed reveal) does not replay the slide-in. *@
         <div class="result-row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(Selectable ? "has-select" : "") @(_selected.ContainsKey(item.Address) ? "picked" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
-          @if (Selectable) { <input class="pick" type="checkbox" checked="@_selected.ContainsKey(item.Address)" @onchange="e => Pick(item, (bool)e.Value!)" /> }
+          @if (Selectable) { <input class="pick" type="checkbox" aria-label="@($"Select {item.Address}")" checked="@_selected.ContainsKey(item.Address)" @onchange="e => Pick(item, (bool)e.Value!)" /> }
           <span class="mono address">@item.Address</span>
           <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
           <span class="pattern">@item.Pattern <span class="muted">(@item.Position.ToLowerInvariant())</span></span>

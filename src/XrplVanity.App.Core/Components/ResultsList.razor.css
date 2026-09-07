@@ -23,7 +23,8 @@
    has none. The dash is drawn over the unticked box instead; the aria-label carries the count. */
 .pick-all-label.partial { position: relative; }
 .pick-all-label.partial::before { content: ""; position: absolute; left: 2px; top: 50%; width: 9px; height: 2px; border-radius: 1px; background: var(--mint); transform: translateY(-50%); pointer-events: none; }
-.pick, .pick-all { accent-color: var(--mint); margin: 0; }
+/* The size is stated rather than inherited from the user agent: the dash above is centred on it. */
+.pick, .pick-all { accent-color: var(--mint); margin: 0; width: 13px; height: 13px; }
 @media (max-width: 1000px) {
   .result-row, .result-row.has-target { --cols: minmax(230px, 1fr) 28px 120px 120px 28px 28px; }
   .result-row.has-delete, .result-row.has-target.has-delete { --cols: minmax(230px, 1fr) 28px 120px 120px 28px 28px 28px; }
