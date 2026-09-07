@@ -24,8 +24,20 @@
   {
     <Banner Kind="negative" Text="@_storeError" />
   }
+  @* Two filters over one list, narrowing together: the text box searches free-form, the select
+     picks one cell of the pattern column so a whole pattern can be selected and acted on at once. *@
   <div class="filter-row">
     <input class="filter form-control mono" placeholder="filter by address or pattern" @bind="_filter" @bind:event="oninput" />
+    @if (_options.Count > 0)
+    {
+      <select class="pattern-filter form-select" aria-label="Filter by pattern" @bind="_patternKey">
+        <option value="">All patterns — @_all.Count</option>
+        @foreach (PatternOption option in _options)
+        {
+          <option value="@option.Key">@option.Display — @option.Count</option>
+        }
+      </select>
+    }
   </div>
   @* KnownAddresses is the unfiltered universe on purpose: a row leaves the selection when it leaves the store, not when the filter hides it. *@
   <ResultsList Items="Filtered()" ShowTarget="true" Selectable="true" KnownAddresses="_knownAddresses"

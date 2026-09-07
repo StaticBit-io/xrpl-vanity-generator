@@ -48,6 +48,110 @@ public class HistoryPageTests : BunitContext
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".result-row")));
     }
 
+    /// <summary>
+    /// One pattern text at two positions and a paired pattern: the column shows those as three
+    /// different cells, so the filter that narrows the column has to offer them as three choices.
+    /// </summary>
+    private static void SeedMixed(MemoryResultStore store)
+    {
+        store.Append(new StoredResult("rFast1", "s1", "fast", "Starts", Newest, "cpu"));
+        store.Append(new StoredResult("rSlow2", "s2", "slow", "Starts", Newest.AddMinutes(-1), "cpu"));
+        store.Append(new StoredResult("rFast3", "s3", "fast", "Ends", Newest.AddMinutes(-2), "cpu"));
+        store.Append(new StoredResult("rPair4", "s4", "abc:xyz", "Pair", Newest.AddMinutes(-3), "gpu"));
+    }
+
+    [Fact]
+    public void The_Pattern_Filter_Lists_Each_Pattern_And_Position_Once_With_Its_Count()
+    {
+        MemoryResultStore store = new();
+        SeedMixed(store);
+        store.Append(new StoredResult("rFast5", "s5", "fast", "Starts", Newest.AddMinutes(-4), "cpu"));
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        string[] options = cut.FindAll("select.pattern-filter option").Select(o => o.TextContent.Trim()).ToArray();
+
+        Assert.Equal(
+            new[] { "All patterns — 5", "abc:xyz (pair) — 1", "fast (ends) — 1", "fast (starts) — 2", "slow (starts) — 1" },
+            options);
+    }
+
+    [Fact]
+    public void Choosing_A_Pattern_Narrows_The_List_To_That_Pattern_At_That_Position()
+    {
+        MemoryResultStore store = new();
+        SeedMixed(store);
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        cut.Find("select.pattern-filter").Change("Starts|fast");
+
+        string address = Assert.Single(cut.FindAll(".result-row .address")).TextContent.Trim();
+        Assert.Equal("rFast1", address);   // rFast3 carries the same text at the other position
+    }
+
+    [Fact]
+    public void The_Pattern_And_Text_Filters_Narrow_Together()
+    {
+        MemoryResultStore store = new();
+        SeedMixed(store);
+        store.Append(new StoredResult("rFast5", "s5", "fast", "Starts", Newest.AddMinutes(-4), "cpu"));
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        cut.Find("select.pattern-filter").Change("Starts|fast");
+        Assert.Equal(2, cut.FindAll(".result-row").Count);
+
+        cut.Find("input.filter").Input("rFast5");
+
+        string address = Assert.Single(cut.FindAll(".result-row .address")).TextContent.Trim();
+        Assert.Equal("rFast5", address);
+    }
+
+    /// <summary>
+    /// Same invariant as the text filter: the selection is held by address against every stored
+    /// row, so narrowing the column hides rows without quietly unpicking them.
+    /// </summary>
+    [Fact]
+    public void A_Selection_Survives_The_Pattern_Filter_Hiding_Its_Rows()
+    {
+        MemoryResultStore store = new();
+        SeedMixed(store);
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        cut.Find("input.pick-all").Change(true);
+        cut.Find("select.pattern-filter").Change("Starts|fast");
+        Assert.Single(cut.FindAll(".result-row"));
+
+        cut.Find("button.delete-selected").Click();
+        Assert.Contains("Delete 4 results?", cut.Find(".modal-box h3").TextContent);
+    }
+
+    /// <summary>
+    /// Deleting the last row of the chosen pattern removes that option, and a select pointing at
+    /// an option that no longer exists would leave the page showing an empty list with no way
+    /// back except guessing which control emptied it.
+    /// </summary>
+    [Fact]
+    public void Deleting_The_Last_Row_Of_The_Chosen_Pattern_Falls_Back_To_All_Patterns()
+    {
+        MemoryResultStore store = new();
+        SeedMixed(store);
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        cut.Find("select.pattern-filter").Change("Starts|slow");
+        cut.Find("button.delete").Click();
+        cut.Find("button.confirm").Click();
+
+        Assert.Equal(3, cut.FindAll(".result-row").Count);
+        Assert.DoesNotContain(cut.FindAll("select.pattern-filter option"), o => o.TextContent.Contains("slow"));
+    }
+
+    [Fact]
+    public void An_Empty_History_Has_No_Pattern_Filter()
+    {
+        IRenderedComponent<HistoryPage> cut = RenderPage(new MemoryResultStore());
+
+        Assert.Empty(cut.FindAll("select.pattern-filter"));
+    }
+
     [Fact]
     public void Deleting_A_Row_Asks_First_And_Cancelling_Keeps_It()
     {

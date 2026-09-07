@@ -30,6 +30,9 @@
 
 // History page
 .filter-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin-bottom: 10px; }
+// The auto column sizes to the widest option, and a paired pattern's "prefix:suffix" label can be
+// long enough to squeeze the text filter next to it; the cap keeps that column from taking over.
+.filter-row .pattern-filter { max-width: 260px; }
 .storage-note { font-size: 12px; padding-top: 2px; }
 
 // Settings page

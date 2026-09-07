@@ -28,13 +28,20 @@ The application has three pages:
   independent halves. The halves may touch but never overlap, so halves totalling more
   than 33 characters — the longest address body — are flagged as unreachable rather than
   searched for.
-- **History** — every result the application has ever stored, with a filter over the
-  address and the pattern. Each row carries a checkbox, and a "select all shown" checkbox
-  above the list adds every row the filter currently shows; unticking it removes only
+- **History** — every result the application has ever stored, narrowed by two filters
+  that work together: a text box over the address and the pattern, and a drop-down over
+  the pattern column alone. The drop-down lists every stored pattern once per position it
+  was matched at, with its row count — `fast (starts) — 12`, `fast (ends) — 3`,
+  `abc:xyz (pair) — 1` — so one word searched as a prefix and as a suffix stay two
+  separate choices, and `All patterns` returns the whole history. Deleting the last row
+  of the chosen pattern drops that choice back to `All patterns` rather than leaving an
+  empty list. Each row carries a checkbox, and a "select all shown" checkbox
+  above the list adds every row the filters currently show; unticking it removes only
   those rows from the selection, and it draws as a dash rather than a tick when the
-  visible rows are only partly selected. The selection is held by address, so typing in
-  the filter hides rows without unselecting them, and selected rows are tinted so the
-  selection is legible without reading the checkboxes. Once anything is selected, the
+  visible rows are only partly selected. Picking a pattern and ticking "select all shown"
+  is therefore how a whole pattern gets exported or deleted in one go. The selection is
+  held by address, so narrowing either filter hides rows without unselecting them, and
+  selected rows are tinted so the selection is legible without reading the checkboxes. Once anything is selected, the
   count ("3 selected") and the buttons `Export selected…`, `Delete selected` and
   `Clear selection` appear on the right of that same "select all shown" row, which is
   held open whether or not anything is selected so that ticking the first checkbox never
@@ -44,7 +51,7 @@ The application has three pages:
   names the seed, not the row, as the thing that cannot be recovered. The row and
   selection variants list the addresses being deleted, up to ten, collapsing the rest into
   "…and N more" (never a seed); the clear variant states the total instead and notes that
-  the filter does not narrow it. The confirm button is always red, reading `Delete`,
+  the filters do not narrow it. The confirm button is always red, reading `Delete`,
   `Delete N` or `Clear history` depending on the path; `Cancel` takes focus so a stray
   Enter is harmless, and Escape cancels the same way. A read-only store hides both delete
   paths — the row's delete button and `Delete selected` — while the checkboxes and
@@ -273,11 +280,18 @@ storage layer. Each step names what you should see.
     all shown" and then untick the rest), press **Export selected…** and save the file:
     the file holds exactly those two lines. Press **Delete selected**: the confirmation
     dialog names both addresses; confirming removes both rows and nothing else.
-16. **Every control is dark.** Open History and Settings and check each form control: the
-    filter box, the close-behaviour select, the four number inputs, the notifications
-    checkbox and both scrollbars. Nothing may render on a white background, and no
+16. **The pattern filter narrows and composes.** Run two searches that store results for
+    different patterns, then on History open the pattern drop-down: each pattern appears
+    once per position with its row count. Pick one — only its rows remain, and typing in
+    the text box narrows that further rather than widening it. Tick "select all shown",
+    switch back to `All patterns` and confirm the count in the selection bar is unchanged:
+    hiding rows never unselects them. Delete every row of the chosen pattern and the
+    drop-down returns to `All patterns` on its own.
+17. **Every control is dark.** Open History and Settings and check each form control: the
+    filter box, the pattern drop-down, the close-behaviour select, the four number inputs,
+    the notifications checkbox and both scrollbars. Nothing may render on a white background, and no
     checkbox may show a white or blue box.
-17. **A read-only data folder produces banners, not crashes.** Deny your account write
+18. **A read-only data folder produces banners, not crashes.** Deny your account write
     access to the data folder (`icacls "<folder>" /deny "%USERNAME%":(W)`), then: on
     History, delete a row through its dialog — the confirmed action shows a red banner
     with the reason and leaves the list intact. That first failure turns the store
@@ -290,7 +304,7 @@ storage layer. Each step names what you should see.
     appears above the results list while the hits still accumulate on screen; and confirm
     the window still closes normally. Restore access with
     `icacls "<folder>" /remove:d "%USERNAME%"`.
-18. **The reference-rates link opens in a browser.** On the Search page, click
+19. **The reference-rates link opens in a browser.** On the Search page, click
     **reference rates** in the estimate note: the benchmarks page opens in the default
     browser and the application window is unchanged — no blank frame inside the app.
 

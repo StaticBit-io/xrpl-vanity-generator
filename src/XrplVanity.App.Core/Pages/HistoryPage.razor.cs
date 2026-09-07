@@ -8,7 +8,9 @@ public partial class HistoryPage
 {
     private List<StoredResult> _all = new();
     private string[] _knownAddresses = Array.Empty<string>();
+    private List<PatternOption> _options = new();
     private string _filter = string.Empty;
+    private string _patternKey = string.Empty;
     private string? _storeError;
     private int _lastSessionResultCount = -1;
     private PendingAction? _pending;
@@ -34,12 +36,30 @@ public partial class HistoryPage
         base.OnViewModelChanged();
     }
 
+    /// <summary>
+    /// The pattern column shows text and position together, so the filter over it keys on both:
+    /// the same word searched as a prefix and as a suffix are two different rows to pick between.
+    /// '|' separates them safely — it is neither a base58 character nor part of a pair's
+    /// "prefix:suffix" display.
+    /// </summary>
+    private static string OptionKey(string pattern, string position) => $"{position}|{pattern}";
+
     private List<SessionResult> Filtered()
     {
-        IEnumerable<StoredResult> matches = _filter.Length == 0
-            ? _all
-            : _all.Where(r => r.Address.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+        IEnumerable<StoredResult> matches = _all;
+
+        // The two filters narrow together: picking a pattern and typing an address gives the rows
+        // that satisfy both, not their union.
+        if (_patternKey.Length > 0)
+        {
+            matches = matches.Where(r => OptionKey(r.Pattern, r.Position) == _patternKey);
+        }
+
+        if (_filter.Length > 0)
+        {
+            matches = matches.Where(r => r.Address.Contains(_filter, StringComparison.OrdinalIgnoreCase)
                 || r.Pattern.Contains(_filter, StringComparison.OrdinalIgnoreCase));
+        }
 
         return matches.Select(r => new SessionResult(r.Address, r.Seed, r.Pattern, r.Position, r.FoundAt, r.Target)).ToList();
     }
@@ -89,7 +109,7 @@ public partial class HistoryPage
     private void AskClear()
         => _pending = new PendingAction(
             "Clear the whole history?",
-            () => $"All {_all.Count} results and their seeds are removed from results.dat. This cannot be undone, and the filter does not narrow it — everything goes.",
+            () => $"All {_all.Count} results and their seeds are removed from results.dat. This cannot be undone, and the filters do not narrow it — everything goes.",
             "Clear history",
             null,
             () => Write(Store.Clear));
@@ -128,6 +148,24 @@ public partial class HistoryPage
         // The list prunes its selection against this, not against the filtered rows it is shown,
         // so typing in the filter never silently unpicks anything.
         _knownAddresses = _all.Select(r => r.Address).ToArray();
+
+        _options = _all
+            .GroupBy(r => (r.Pattern, r.Position))
+            .Select(g => new PatternOption(
+                OptionKey(g.Key.Pattern, g.Key.Position),
+                $"{g.Key.Pattern} ({g.Key.Position.ToLowerInvariant()})",
+                g.Count()))
+            .OrderBy(o => o.Display, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Deleting the last row of the chosen pattern takes its option with it. A select still
+        // pointing at it would leave an empty list and no visible reason for it, so the choice
+        // falls back to the whole history.
+        if (_patternKey.Length > 0 && !_options.Any(o => o.Key == _patternKey))
+        {
+            _patternKey = string.Empty;
+        }
+
         _lastSessionResultCount = Vm.Results.Count;
     }
 
@@ -138,4 +176,11 @@ public partial class HistoryPage
     /// </summary>
     private sealed record PendingAction(string Title, Func<string> Message, string ConfirmLabel,
         IReadOnlyList<string>? Addresses, Action Execute);
+
+    /// <summary>
+    /// One choice in the pattern filter: <paramref name="Display"/> reads exactly like the cell in
+    /// the pattern column ("fast (starts)"), and <paramref name="Count"/> is how many stored rows
+    /// carry it.
+    /// </summary>
+    private sealed record PatternOption(string Key, string Display, int Count);
 }
