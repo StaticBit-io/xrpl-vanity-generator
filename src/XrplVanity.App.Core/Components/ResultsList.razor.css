@@ -14,10 +14,11 @@
 .address { color: var(--text); }
 .seed { color: var(--text-secondary); letter-spacing: 0.05em; }
 .export-error { color: var(--negative); font-size: 12px; margin-bottom: 8px; }
-/* min-height holds the row open while nothing is selected, so the actions appearing inside it
-   cannot move the list. It is the tallest thing the row can hold: a secondary button. */
-.sel-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 34px; margin-top: 8px; }
+.sel-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
 .sel-bar { display: flex; align-items: center; gap: 10px; margin-left: auto; padding: 4px 10px; border-radius: var(--radius-chip); background: rgba(100, 207, 149, 0.10); font-size: 13px; }
+/* Hidden, not absent: the bar keeps its box, so the row is exactly as tall with no selection as
+   with one and the list never moves. visibility also takes the buttons out of the tab order. */
+.sel-bar.idle { visibility: hidden; }
 .sel-bar b { color: var(--mint); font-weight: 600; }
 .sel-bar .acts { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .sel-bar .danger { color: var(--negative); }

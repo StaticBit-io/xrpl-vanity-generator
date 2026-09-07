@@ -241,7 +241,8 @@ public class ResultsListTests : BunitContext
 
         cut.FindAll("input.pick")[0].Change(false);
         Assert.Single(cut.FindAll(".sel-row"));
-        Assert.Empty(cut.FindAll(".sel-bar"));
+        // Still in the document, holding its box open, so the row's height never changes.
+        Assert.True(cut.Find(".sel-row .sel-bar").ClassList.Contains("idle"));
     }
 
     [Fact]
@@ -249,9 +250,10 @@ public class ResultsListTests : BunitContext
     {
         IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);
 
-        Assert.Empty(cut.FindAll(".sel-bar"));
+        Assert.True(cut.Find(".sel-bar").ClassList.Contains("idle"));
         cut.FindAll("input.pick")[0].Change(true);
 
+        Assert.False(cut.Find(".sel-bar").ClassList.Contains("idle"));
         Assert.Contains("1 selected", cut.Find(".sel-bar").TextContent);
         Assert.True(cut.FindAll(".result-row")[0].ClassList.Contains("picked"));
     }
@@ -265,7 +267,7 @@ public class ResultsListTests : BunitContext
         Assert.Contains("3 selected", cut.Find(".sel-bar").TextContent);
 
         cut.Find("input.pick-all").Change(false);
-        Assert.Empty(cut.FindAll(".sel-bar"));
+        Assert.True(cut.Find(".sel-bar").ClassList.Contains("idle"));
     }
 
     [Fact]
@@ -316,7 +318,7 @@ public class ResultsListTests : BunitContext
 
         cut.Find("button.clear-selection").Click();
 
-        Assert.Empty(cut.FindAll(".sel-bar"));
+        Assert.True(cut.Find(".sel-bar").ClassList.Contains("idle"));
     }
 
     [Fact]
