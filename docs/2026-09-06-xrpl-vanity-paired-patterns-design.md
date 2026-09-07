@@ -244,7 +244,7 @@ a TSV export all show `abc..xyz` for a paired hit with no further work.
 ## Documentation
 
 `README.md` gains the option row and one sentence on the cost model (a prefix of *m* plus a
-suffix of *n* costs about as much as a single prefix of *m + n*). `docs/benchmarks.md` gains the
+suffix of *n* costs exactly as much as a single prefix of *m + n*). `docs/benchmarks.md` gains the
 same cost note beside the existing "expected candidates per match" paragraph.
 `docs/desktop-app.md` describes the fourth entry mode. The plan's measurements section records
 the before/after throughput.

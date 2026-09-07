@@ -23,9 +23,10 @@ The application has three pages:
   folded form next to what you typed.
   Choosing `starts and ends with` swaps the single text box for two — `starts with…`
   and `ends with…` — and requires both before the rule is added; the resulting chip
-  shows both halves (`starts abc … ends xyz`) and costs exactly as much as a single
+  labels both halves (`starts abc`, `ends xyz`) and costs exactly as much as a single
   `starts` pattern of the combined length, since the estimate multiplies the two
-  independent halves.
+  independent halves. The halves may touch but never overlap, so halves totalling more
+  than 34 characters — the longest address body — can never be satisfied.
 - **History** — every result the application has ever stored, with a filter over the
   address and the pattern, per-row delete and a two-step "Clear history".
 - **Settings** — everything in the table below. There is no Save button: each control
@@ -223,7 +224,7 @@ storage layer. Each step names what you should see.
    be two orders of magnitude above the CPU rate.
 7. **Paired pattern.** Switch the position selector to `starts and ends with`: the single
    text box is replaced by two, `starts with…` and `ends with…`. Fill both and press
-   Enter (or Start with both non-empty): the chip reads `starts <prefix> … ends <suffix>`,
+   Enter (or Start with both non-empty): the chip reads `starts <prefix>` `ends <suffix>`,
    with the `Aa` marker when case-sensitive and the same per-half warnings a single
    pattern shows. Run a short paired search on the GPU: a hit only appears once both
    halves are present in the same address, and the results list shows the `prefix..suffix`
