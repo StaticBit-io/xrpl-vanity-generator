@@ -97,6 +97,22 @@ public class TargetTableTests
     }
 
     [Fact]
+    public void Two_Pairs_Of_Equal_Length_But_Different_Halves_Stay_In_Separate_Groups()
+    {
+        PatternSet set = new PatternSet.Builder()
+            .AddPair("ab", "yz", ignoreCase: false)
+            .AddPair("cd", "wx", ignoreCase: false)
+            .Build();
+        TargetTable table = TargetTable.Build(set);
+
+        // Merging halves by length alone would let the device match "cd" against "yz".
+        Assert.Equal(2, table.PairCount);
+        Assert.Equal(4, table.GroupCount);
+        Assert.NotEqual(table.Pairs[0], table.Pairs[2]);
+        Assert.NotEqual(table.Pairs[1], table.Pairs[3]);
+    }
+
+    [Fact]
     public void A_Set_Without_Pairs_Has_An_Empty_Pairs_Buffer_And_Unchanged_Groups()
     {
         PatternSet set = new PatternSet.Builder().Add(MatchPosition.Starts, "ab", ignoreCase: false).Build();

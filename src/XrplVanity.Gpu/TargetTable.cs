@@ -7,9 +7,10 @@ using XrplVanity.Core;
 namespace XrplVanity.Gpu;
 
 /// <summary>
-/// The expanded targets of a <see cref="PatternSet"/> flattened for upload: groups keyed by
-/// (position, length) in ascending order, each group's targets sorted ordinal and packed at a
-/// fixed stride equal to their length, so the device can binary-search a group.
+/// The expanded targets of a <see cref="PatternSet"/> flattened for upload: the plain positions
+/// first, keyed by (position, length) in ascending order, then one group per distinct half of a
+/// paired rule in the order the rules were added. Each group's targets are sorted ordinal and
+/// packed at a fixed stride equal to their length, so the device can binary-search a group.
 /// </summary>
 public sealed class TargetTable
 {
