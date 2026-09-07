@@ -5,9 +5,29 @@
 <div class="card-box results">
   <div class="head">
     <div class="card-title">Results <span class="count">@Items.Count</span></div>
-    <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0)" @onclick="Export">Export TSV…</button>
+    @* Greyed out while a selection exists: the bar below is then the place to export from, so this button never changes meaning mid-click. *@
+    <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0 || _selected.Count > 0)" @onclick="() => Export(_items)">Export TSV…</button>
   </div>
   @if (_exportError is not null) { <div class="export-error">@_exportError</div> }
+  @if (Selectable && _selected.Count > 0)
+  {
+    <div class="sel-bar">
+      <b>@_selected.Count selected</b>
+      <span class="acts">
+        <button class="btn-secondary-dark export-selected t" @onclick="() => Export(SelectedItems())">Export selected…</button>
+        @if (OnDeleteSelected.HasDelegate)
+        {
+          <button class="btn-secondary-dark danger delete-selected t" @onclick="() => OnDeleteSelected.InvokeAsync(SelectedItems())">Delete selected</button>
+        }
+        <button class="btn-secondary-dark clear-selection t" @onclick="ClearSelection">Clear selection</button>
+      </span>
+    </div>
+  }
+  @* The host owns its filter row, so the "all shown" checkbox lives with the list it selects. *@
+  @if (Selectable && Items.Count > 0)
+  {
+    <label class="pick-all-label"><input class="pick-all" type="checkbox" checked="@AllPicked" @onchange="e => PickAllShown((bool)e.Value!)" /> select all shown</label>
+  }
   @if (Items.Count == 0)
   {
     <div class="empty-note">No matches yet — start a search and hits appear here as they are verified.</div>
@@ -17,7 +37,8 @@
     <div class="list">
       <Virtualize TItem="SessionResult" Items="_items" Context="item" ItemSize="44" OverscanCount="8">
         @* _animated.Add returns true only the first time a row is seen, so a re-render (e.g. a seed reveal) does not replay the slide-in. *@
-        <div class="result-row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
+        <div class="result-row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(Selectable ? "has-select" : "") @(_selected.ContainsKey(item.Address) ? "picked" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
+          @if (Selectable) { <input class="pick" type="checkbox" checked="@_selected.ContainsKey(item.Address)" @onchange="e => Pick(item, (bool)e.Value!)" /> }
           <span class="mono address">@item.Address</span>
           <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
           <span class="pattern">@item.Pattern <span class="muted">(@item.Position.ToLowerInvariant())</span></span>

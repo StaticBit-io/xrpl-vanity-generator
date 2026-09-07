@@ -8,6 +8,10 @@ public partial class ResultsList : IDisposable
     private readonly HashSet<string> _revealed = new(StringComparer.Ordinal);
     private readonly HashSet<string> _animated = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ITimer> _hideTimers = new(StringComparer.Ordinal);
+
+    // The selection holds the rows themselves, not just their addresses: a row the host's filter
+    // hides is no longer in Items, and the bar promises to export and delete it all the same.
+    private readonly Dictionary<string, SessionResult> _selected = new(StringComparer.Ordinal);
     private List<SessionResult> _items = new();
     private string? _exportError;
     private volatile bool _disposed;
@@ -17,6 +21,17 @@ public partial class ResultsList : IDisposable
     [Parameter] public EventCallback<SessionResult> OnDelete { get; set; }
     [Parameter] public int RevealSeconds { get; set; } = 15;
     [Parameter] public int ClipboardClearSeconds { get; set; } = 30;
+    [Parameter] public bool Selectable { get; set; }
+
+    /// <summary>
+    /// Every address the host holds, filter or no filter. Supplied by a host that filters what it
+    /// passes in <see cref="Items"/> (HistoryPage), so the selection is pruned against what still
+    /// exists rather than against what happens to be on screen. Null means Items is the whole
+    /// universe — the Search page's case, where the two are the same thing.
+    /// </summary>
+    [Parameter] public IReadOnlyCollection<string>? KnownAddresses { get; set; }
+
+    [Parameter] public EventCallback<IReadOnlyList<SessionResult>> OnDeleteSelected { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -50,7 +65,89 @@ public partial class ResultsList : IDisposable
         }
 
         _animated.IntersectWith(present);
+        PruneSelection(present);
     }
+
+    /// <summary>
+    /// Prunes the selection the same way, but against a wider universe when the host supplies one:
+    /// a filtered host removes rows from <see cref="Items"/> for reasons that have nothing to do
+    /// with the row still existing, so pruning against the visible rows would quietly unpick
+    /// everything the user typed past. Reveal state can be pruned against the visible rows because
+    /// hiding a seed costs nothing; a lost selection costs the user the work of making it again.
+    /// </summary>
+    private void PruneSelection(HashSet<string> present)
+    {
+        if (_selected.Count == 0)
+        {
+            return;
+        }
+
+        HashSet<string> universe = KnownAddresses is null
+            ? present
+            : new HashSet<string>(KnownAddresses, StringComparer.Ordinal);
+
+        List<string>? gone = null;
+        foreach (string address in _selected.Keys)
+        {
+            if (!universe.Contains(address))
+            {
+                (gone ??= new List<string>()).Add(address);
+            }
+        }
+
+        if (gone is null)
+        {
+            return;
+        }
+
+        foreach (string address in gone)
+        {
+            _selected.Remove(address);
+        }
+    }
+
+    private bool AllPicked => _items.Count > 0 && _items.All(i => _selected.ContainsKey(i.Address));
+
+    private void Pick(SessionResult item, bool picked)
+    {
+        if (picked)
+        {
+            _selected[item.Address] = item;
+        }
+        else
+        {
+            _selected.Remove(item.Address);
+        }
+    }
+
+    /// <summary>
+    /// "Select all shown" is additive in both directions — it adds the visible rows, and unticking
+    /// it removes only those, leaving whatever the filter is hiding still selected. Emptying the
+    /// selection outright is <see cref="ClearSelection"/>, wired to the bar's own button.
+    /// </summary>
+    private void PickAllShown(bool picked)
+    {
+        foreach (SessionResult item in _items)
+        {
+            if (picked)
+            {
+                _selected[item.Address] = item;
+            }
+            else
+            {
+                _selected.Remove(item.Address);
+            }
+        }
+    }
+
+    private void ClearSelection() => _selected.Clear();
+
+    /// <summary>
+    /// The selected rows in the order <see cref="Items"/> uses (newest first), including the ones
+    /// the host's filter is currently hiding — so the bar's count is exactly what gets exported and
+    /// exactly what gets deleted.
+    /// </summary>
+    private List<SessionResult> SelectedItems() => _selected.Values.OrderByDescending(i => i.FoundAt).ToList();
 
     private void ToggleReveal(string address)
     {
@@ -102,7 +199,8 @@ public partial class ResultsList : IDisposable
         }
     }
 
-    private async Task Export()
+    /// <summary>Takes the rows to write so the header button and the selection bar share one picker, one write and one error path.</summary>
+    private async Task Export(IReadOnlyList<SessionResult> rows)
     {
         _exportError = null;
         try
@@ -114,7 +212,7 @@ public partial class ResultsList : IDisposable
 
             // Items is newest-first in the app; export chronologically (oldest-first), matching
             // the order the CLI's --out would have written.
-            TsvExport.Write(path, Items.OrderBy(i => i.FoundAt).Select(i => (i.Address, i.Seed)));
+            TsvExport.Write(path, rows.OrderBy(i => i.FoundAt).Select(i => (i.Address, i.Seed)));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

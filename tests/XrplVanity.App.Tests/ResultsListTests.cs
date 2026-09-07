@@ -29,6 +29,40 @@ public class ResultsListTests : BunitContext
         return Render<ResultsList>(p => p.Add(x => x.Items, items).Add(x => x.RevealSeconds, 15).Add(x => x.ClipboardClearSeconds, 30));
     }
 
+    /// <summary>Three rows newest-first, the order both the history store and the session view model hand over.</summary>
+    private static SessionResult[] ThreeResults() => new[]
+    {
+        R(3) with { FoundAt = DateTimeOffset.UnixEpoch.AddMinutes(2) },
+        R(2) with { FoundAt = DateTimeOffset.UnixEpoch.AddMinutes(1) },
+        R(1) with { FoundAt = DateTimeOffset.UnixEpoch },
+    };
+
+    private IRenderedComponent<ResultsList> RenderList(
+        SessionResult[] items,
+        bool selectable,
+        Action<IReadOnlyList<SessionResult>>? onDeleteSelected = null,
+        IReadOnlyCollection<string>? knownAddresses = null)
+    {
+        RegisterServices();
+        return Render<ResultsList>(p =>
+        {
+            p.Add(x => x.Items, items)
+                .Add(x => x.Selectable, selectable)
+                .Add(x => x.RevealSeconds, 15)
+                .Add(x => x.ClipboardClearSeconds, 30);
+
+            if (onDeleteSelected is not null)
+            {
+                p.Add(x => x.OnDeleteSelected, onDeleteSelected);
+            }
+
+            if (knownAddresses is not null)
+            {
+                p.Add(x => x.KnownAddresses, knownAddresses);
+            }
+        });
+    }
+
     [Fact]
     public void Seeds_Are_Masked_Until_Revealed_And_Hide_Again_After_The_Timeout()
     {
@@ -180,5 +214,188 @@ public class ResultsListTests : BunitContext
         cut.Instance.Dispose();
 
         _time.Advance(TimeSpan.FromSeconds(16));
+    }
+
+    [Fact]
+    public void Without_Selectable_There_Are_No_Checkboxes()
+    {
+        IRenderedComponent<ResultsList> cut = RenderList(ThreeResults());
+
+        Assert.Empty(cut.FindAll("input.pick"));
+        Assert.Empty(cut.FindAll("input.pick-all"));
+        Assert.Empty(cut.FindAll(".sel-bar"));
+    }
+
+    [Fact]
+    public void Picking_A_Row_Shows_The_Bar_With_The_Count()
+    {
+        IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);
+
+        Assert.Empty(cut.FindAll(".sel-bar"));
+        cut.FindAll("input.pick")[0].Change(true);
+
+        Assert.Contains("1 selected", cut.Find(".sel-bar").TextContent);
+        Assert.True(cut.FindAll(".result-row")[0].ClassList.Contains("picked"));
+    }
+
+    [Fact]
+    public void Pick_All_Selects_Every_Visible_Row_And_Clears_Them_Again()
+    {
+        IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);
+
+        cut.Find("input.pick-all").Change(true);
+        Assert.Contains("3 selected", cut.Find(".sel-bar").TextContent);
+
+        cut.Find("input.pick-all").Change(false);
+        Assert.Empty(cut.FindAll(".sel-bar"));
+    }
+
+    [Fact]
+    public void Unticking_Select_All_Shown_Keeps_A_Selection_The_Filter_Is_Hiding()
+    {
+        // "Select all shown" is additive in both directions: it only ever adds or removes the rows
+        // currently on screen, so narrowing the filter and unticking it cannot silently drop the
+        // rows the filter is hiding. Emptying the whole selection is the bar's own button.
+        SessionResult[] all = ThreeResults();
+        IRenderedComponent<ResultsList> cut = RenderList(
+            all,
+            selectable: true,
+            knownAddresses: all.Select(r => r.Address).ToArray());
+        cut.Find("input.pick-all").Change(true);
+
+        cut.Render(p => p.Add(x => x.Items, new[] { all[0] }));
+        cut.Find("input.pick-all").Change(false);
+
+        Assert.Contains("2 selected", cut.Find(".sel-bar").TextContent);
+    }
+
+    [Fact]
+    public void Clear_Selection_Empties_The_Selection()
+    {
+        SessionResult[] all = ThreeResults();
+        IRenderedComponent<ResultsList> cut = RenderList(
+            all,
+            selectable: true,
+            knownAddresses: all.Select(r => r.Address).ToArray());
+        cut.Find("input.pick-all").Change(true);
+        cut.Render(p => p.Add(x => x.Items, new[] { all[0] }));
+
+        cut.Find("button.clear-selection").Click();
+
+        Assert.Empty(cut.FindAll(".sel-bar"));
+    }
+
+    [Fact]
+    public void A_Selected_Row_That_Leaves_The_List_Is_Dropped_From_The_Selection()
+    {
+        // No KnownAddresses: the Search page hands over everything it has, so the visible rows are
+        // the whole universe and a row that leaves them is genuinely gone.
+        SessionResult[] all = ThreeResults();
+        IRenderedComponent<ResultsList> cut = RenderList(all, selectable: true);
+        cut.Find("input.pick-all").Change(true);
+
+        cut.Render(p => p.Add(x => x.Items, new[] { all[0] }));
+
+        Assert.Contains("1 selected", cut.Find(".sel-bar").TextContent);
+    }
+
+    [Fact]
+    public void A_Selection_Hidden_By_The_Filter_Is_Still_Counted_And_Still_Deleted()
+    {
+        // HistoryPage passes only the rows its filter lets through, plus the unfiltered universe as
+        // KnownAddresses. A hidden row must stay selected, stay in the count, and still be handed to
+        // the delete callback — otherwise the bar would promise more than it deletes.
+        IReadOnlyList<SessionResult>? received = null;
+        SessionResult[] all = ThreeResults();
+        IRenderedComponent<ResultsList> cut = RenderList(
+            all,
+            selectable: true,
+            onDeleteSelected: v => received = v,
+            knownAddresses: all.Select(r => r.Address).ToArray());
+        cut.Find("input.pick-all").Change(true);
+
+        cut.Render(p => p.Add(x => x.Items, new[] { all[1] }));
+
+        Assert.Contains("3 selected", cut.Find(".sel-bar").TextContent);
+        cut.Find("button.delete-selected").Click();
+        Assert.Equal(all.Select(r => r.Address).ToArray(), received!.Select(r => r.Address).ToArray());
+    }
+
+    [Fact]
+    public void A_Selected_Row_That_Leaves_Known_Addresses_Is_Dropped_From_The_Selection()
+    {
+        SessionResult[] all = ThreeResults();
+        IRenderedComponent<ResultsList> cut = RenderList(
+            all,
+            selectable: true,
+            knownAddresses: all.Select(r => r.Address).ToArray());
+        cut.Find("input.pick-all").Change(true);
+
+        // all[2] was deleted elsewhere — gone from the store, so it leaves the selection. all[1] is
+        // only filtered out of sight, so it stays: the two cases must not be confused.
+        cut.Render(p => p
+            .Add(x => x.Items, new[] { all[0] })
+            .Add(x => x.KnownAddresses, new[] { all[0].Address, all[1].Address }));
+
+        Assert.Contains("2 selected", cut.Find(".sel-bar").TextContent);
+    }
+
+    [Fact]
+    public void Export_Selected_Writes_Only_The_Selected_Rows()
+    {
+        string path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".tsv");
+        _dialog.PathToReturn = path;
+        try
+        {
+            SessionResult[] all = ThreeResults();
+            IRenderedComponent<ResultsList> cut = RenderList(all, selectable: true);
+            cut.FindAll("input.pick")[0].Change(true);
+
+            cut.Find("button.export-selected").Click();
+
+            cut.WaitForAssertion(() => Assert.True(File.Exists(path)));
+            string[] lines = File.ReadAllLines(path);
+            Assert.Single(lines);
+            Assert.StartsWith(all[0].Address + "\t", lines[0]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void The_Header_Export_Is_Disabled_While_A_Selection_Exists()
+    {
+        IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);
+        Assert.False(cut.Find("button.export").HasAttribute("disabled"));
+
+        cut.FindAll("input.pick")[0].Change(true);
+
+        Assert.True(cut.Find("button.export").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void Delete_Selected_Hands_Back_Exactly_The_Selected_Items()
+    {
+        IReadOnlyList<SessionResult>? received = null;
+        SessionResult[] all = ThreeResults();
+        IRenderedComponent<ResultsList> cut = RenderList(all, selectable: true, onDeleteSelected: v => received = v);
+        cut.FindAll("input.pick")[0].Change(true);
+        cut.FindAll("input.pick")[2].Change(true);
+
+        cut.Find("button.delete-selected").Click();
+
+        Assert.Equal(new[] { all[0].Address, all[2].Address }, received!.Select(r => r.Address).ToArray());
+    }
+
+    [Fact]
+    public void Without_A_Delete_Selected_Callback_The_Bar_Offers_Only_Export()
+    {
+        IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);
+        cut.FindAll("input.pick")[0].Change(true);
+
+        Assert.Empty(cut.FindAll("button.delete-selected"));
+        Assert.Single(cut.FindAll("button.export-selected"));
     }
 }
