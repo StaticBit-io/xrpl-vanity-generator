@@ -20,7 +20,9 @@ public interface IResultStore
     /// <summary>
     /// Removes every named address in one rewrite. The store re-encrypts and rewrites the whole
     /// file on each change, so deleting a selection through <see cref="Delete"/> would leave one
-    /// crash window per row; this leaves one for the batch.
+    /// crash window per row; this leaves one for the batch. Unlike <see cref="AppendRange"/>,
+    /// a read-only store is reported even when the sequence is empty: a delete is a deliberate
+    /// act and the caller must learn that it did not happen.
     /// </summary>
     void DeleteMany(IEnumerable<string> addresses);
     void Clear();

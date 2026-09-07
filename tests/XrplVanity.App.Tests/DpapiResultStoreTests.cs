@@ -105,6 +105,21 @@ public class DpapiResultStoreTests
     }
 
     [Fact]
+    public void DeleteMany_On_A_Read_Only_Store_Throws_Even_With_Nothing_To_Delete()
+    {
+        RequireWindows();
+        string folder = TempFolder();
+        File.WriteAllBytes(Path.Combine(folder, "results.dat"), new byte[] { 1, 2, 3 });
+        DpapiResultStore store = new(folder);
+
+        // The store reads results.dat lazily, so it only learns it is read-only on first load.
+        Assert.Empty(store.LoadAll());
+        Assert.True(store.IsReadOnly);
+        Assert.Throws<InvalidOperationException>(() => store.DeleteMany(new[] { "rA" }));
+        Assert.Throws<InvalidOperationException>(() => store.DeleteMany(Array.Empty<string>()));
+    }
+
+    [Fact]
     public void A_Failed_Write_Leaves_The_Cache_And_Disk_Untouched_And_Turns_The_Store_Read_Only()
     {
         RequireWindows();
