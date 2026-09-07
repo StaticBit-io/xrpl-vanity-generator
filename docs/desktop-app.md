@@ -33,7 +33,8 @@ The application has three pages:
   above the list adds every row the filter currently shows; unticking it removes only
   those rows from the selection, and it draws as a dash rather than a tick when the
   visible rows are only partly selected. The selection is held by address, so typing in
-  the filter hides rows without unselecting them. Once anything is selected, a bar
+  the filter hides rows without unselecting them, and selected rows are tinted so the
+  selection is legible without reading the checkboxes. Once anything is selected, a bar
   appears below the filter with the count ("3 selected"), `Export selected…`,
   `Delete selected` and `Clear selection`; the header's `Export TSV…` is disabled while
   the bar is showing, and `Clear selection` is what empties the selection outright. One
@@ -276,12 +277,16 @@ storage layer. Each step names what you should see.
     checkbox may show a white or blue box.
 17. **A read-only data folder produces banners, not crashes.** Deny your account write
     access to the data folder (`icacls "<folder>" /deny "%USERNAME%":(W)`), then: on
-    History, press **Clear history** and confirm the dialog, and delete a row through its
-    own dialog — each confirmed action shows a red banner with the reason and leaves the
-    list intact (and, once the store has turned read-only this way, **Clear history**
-    itself disappears from the header); on Search, run a short pattern and confirm the
-    same banner appears above the results list while the hits still accumulate on screen;
-    and confirm the window still closes normally. Restore access with
+    History, delete a row through its dialog — the confirmed action shows a red banner
+    with the reason and leaves the list intact. That first failure turns the store
+    read-only for the rest of the process, which removes every destructive control at
+    once: **Clear history** disappears from the header, the row delete buttons go, and so
+    does **Delete selected**, while the checkboxes and **Export selected…** keep working.
+    Only one of the two delete paths can be checked per session for that reason — to see
+    the **Clear history** banner instead, restart the application with the folder still
+    denied and press it first. On Search, run a short pattern and confirm the same banner
+    appears above the results list while the hits still accumulate on screen; and confirm
+    the window still closes normally. Restore access with
     `icacls "<folder>" /remove:d "%USERNAME%"`.
 18. **The reference-rates link opens in a browser.** On the Search page, click
     **reference rates** in the estimate note: the benchmarks page opens in the default
