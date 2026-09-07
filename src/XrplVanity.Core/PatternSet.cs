@@ -257,7 +257,9 @@ public sealed class PatternSet
         /// </summary>
         public Builder AddPair(string starts, string ends, bool ignoreCase)
         {
-            string display = $"{starts}..{ends}";
+            // Display is built from what the user typed (trimmed), not the normalized halves,
+            // so the reported rule reads back the way they entered it.
+            string display = $"{starts.Trim()}..{ends.Trim()}";
             NormalizedPattern left = PatternNormalizer.Normalize(starts.Trim());
             NormalizedPattern right = PatternNormalizer.Normalize(ends.Trim());
 
