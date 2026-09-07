@@ -9,24 +9,29 @@
     <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0 || (Selectable && _selected.Count > 0))" @onclick="() => Export(_items)">Export TSV…</button>
   </div>
   @if (_exportError is not null) { <div class="export-error">@_exportError</div> }
-  @if (Selectable && _selected.Count > 0)
-  {
-    <div class="sel-bar">
-      <b>@_selected.Count selected</b>
-      <span class="acts">
-        <button class="btn-secondary-dark export-selected t" @onclick="() => Export(SelectedItems())">Export selected…</button>
-        @if (OnDeleteSelected.HasDelegate)
-        {
-          <button class="btn-secondary-dark danger delete-selected t" @onclick="() => OnDeleteSelected.InvokeAsync(SelectedItems())">Delete selected</button>
-        }
-        <button class="btn-secondary-dark clear-selection t" @onclick="ClearSelection">Clear selection</button>
-      </span>
-    </div>
-  }
-  @* The host owns its filter row, so the "all shown" checkbox lives with the list it selects. *@
+  @* The host owns its filter row, so the "all shown" checkbox lives with the list it selects.
+     The row is reserved whenever there is anything to select, and the selection's actions appear
+     inside it rather than as a strip of their own: ticking the first box or clearing the last one
+     must not push the list up or down. *@
   @if (Selectable && Items.Count > 0)
   {
-    <label class="pick-all-label @(SomePicked ? "partial" : "")"><input class="pick-all" type="checkbox" checked="@AllPicked" aria-label="@PickAllLabel" @onchange="e => PickAllShown((bool)e.Value!)" /> select all shown</label>
+    <div class="sel-row">
+      <label class="pick-all-label @(SomePicked ? "partial" : "")"><input class="pick-all" type="checkbox" checked="@AllPicked" aria-label="@PickAllLabel" @onchange="e => PickAllShown((bool)e.Value!)" /> select all shown</label>
+      @if (_selected.Count > 0)
+      {
+        <div class="sel-bar">
+          <b>@_selected.Count selected</b>
+          <span class="acts">
+            <button class="btn-secondary-dark export-selected t" @onclick="() => Export(SelectedItems())">Export selected…</button>
+            @if (OnDeleteSelected.HasDelegate)
+            {
+              <button class="btn-secondary-dark danger delete-selected t" @onclick="() => OnDeleteSelected.InvokeAsync(SelectedItems())">Delete selected</button>
+            }
+            <button class="btn-secondary-dark clear-selection t" @onclick="ClearSelection">Clear selection</button>
+          </span>
+        </div>
+      }
+    </div>
   }
   @if (Items.Count == 0)
   {

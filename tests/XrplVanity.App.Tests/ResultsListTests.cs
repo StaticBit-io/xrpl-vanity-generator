@@ -227,6 +227,24 @@ public class ResultsListTests : BunitContext
     }
 
     [Fact]
+    public void The_Selection_Row_Is_Reserved_Whether_Or_Not_Anything_Is_Selected()
+    {
+        // The actions live inside a row that is always there: ticking the first box or clearing
+        // the last one must not add or remove a strip and shift the list under the pointer.
+        IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);
+
+        Assert.Single(cut.FindAll(".sel-row"));
+
+        cut.FindAll("input.pick")[0].Change(true);
+        Assert.Single(cut.FindAll(".sel-row"));
+        Assert.Single(cut.FindAll(".sel-row .sel-bar"));
+
+        cut.FindAll("input.pick")[0].Change(false);
+        Assert.Single(cut.FindAll(".sel-row"));
+        Assert.Empty(cut.FindAll(".sel-bar"));
+    }
+
+    [Fact]
     public void Picking_A_Row_Shows_The_Bar_With_The_Count()
     {
         IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);

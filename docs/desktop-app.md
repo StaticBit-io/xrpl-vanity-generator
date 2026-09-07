@@ -34,10 +34,12 @@ The application has three pages:
   those rows from the selection, and it draws as a dash rather than a tick when the
   visible rows are only partly selected. The selection is held by address, so typing in
   the filter hides rows without unselecting them, and selected rows are tinted so the
-  selection is legible without reading the checkboxes. Once anything is selected, a bar
-  appears below the filter with the count ("3 selected"), `Export selected…`,
-  `Delete selected` and `Clear selection`; the header's `Export TSV…` is disabled while
-  the bar is showing, and `Clear selection` is what empties the selection outright. One
+  selection is legible without reading the checkboxes. Once anything is selected, the
+  count ("3 selected") and the buttons `Export selected…`, `Delete selected` and
+  `Clear selection` appear on the right of that same "select all shown" row, which is
+  held open whether or not anything is selected so that ticking the first checkbox never
+  shifts the list. The header's `Export TSV…` is disabled while a selection exists, and
+  `Clear selection` is what empties the selection outright. One
   confirmation dialog covers the row delete, `Delete selected` and `Clear history`: it
   names the seed, not the row, as the thing that cannot be recovered. The row and
   selection variants list the addresses being deleted, up to ten, collapsing the rest into
