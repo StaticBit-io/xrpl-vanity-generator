@@ -685,7 +685,7 @@ DEVICE bool matches_any(const u8* body, int bodyLen,
         u32 len = groups[g * 4 + 1];
         u32 off = groups[g * 4 + 2];
         u32 cnt = groups[g * 4 + 3];
-        if (pos == 3 || pos == 4) continue; // a pair half is only ever matched by the pair loop
+        if (pos >= 3) continue; // a pair half is only ever matched by the pair loop; fail closed on any future code
         if ((int)len > bodyLen || cnt == 0 || len == 0) continue;
         if (pos == 0) {
             if (group_has(chars, off, cnt, len, body)) return true;

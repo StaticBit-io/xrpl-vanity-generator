@@ -135,12 +135,13 @@ public class GpuMatcherTests
             .Add(MatchPosition.Starts, "qq", ignoreCase: false)
             .Build();
 
-        // Every interesting case: both halves, one half, neither, halves that touch exactly, and
-        // bodies too short to hold both halves.
+        // Every interesting case: both halves, one half, neither, halves that touch exactly, one
+        // rule's prefix against another rule's suffix, and bodies too short to hold either half.
         List<string> addresses = new()
         {
             "rabQQQQQQQyz", "rabQQQQQQQQQ", "rQQQQQQQQQyz", "rQQQQQQQQQQQ",
             "rCDQQQQQQQWx", "rcdQQQQQQQwx", "rqqQQQQQQQQQ", "rabyz", "rab", "ryz",
+            "rabQQQQQQQwx", "rcdQQQQQQQyz", "rz",
         };
         addresses.AddRange(DeriveAddresses(200, 20260906));
 
