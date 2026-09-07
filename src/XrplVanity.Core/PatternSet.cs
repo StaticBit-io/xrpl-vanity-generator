@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace XrplVanity.Core;
 
@@ -16,15 +17,17 @@ public sealed class PatternSet
     private readonly Bucket[] _starts;
     private readonly Bucket[] _ends;
     private readonly List<string> _contains;
+    private readonly List<Pair> _pairs;
     private readonly List<NormalizedPattern> _unreachable;
     private readonly List<NormalizedPattern> _caseFoldingSkipped;
 
-    private PatternSet(Bucket[] starts, Bucket[] ends, List<string> contains,
+    private PatternSet(Bucket[] starts, Bucket[] ends, List<string> contains, List<Pair> pairs,
         List<NormalizedPattern> unreachable, List<NormalizedPattern> caseFoldingSkipped)
     {
         _starts = starts;
         _ends = ends;
         _contains = contains;
+        _pairs = pairs;
         _unreachable = unreachable;
         _caseFoldingSkipped = caseFoldingSkipped;
     }
@@ -39,7 +42,41 @@ public sealed class PatternSet
     public IReadOnlyList<NormalizedPattern> CaseFoldingSkipped => _caseFoldingSkipped;
 
     /// <summary>True when at least one reachable pattern remains to search for.</summary>
-    public bool HasPatterns => _starts.Length > 0 || _ends.Length > 0 || _contains.Count > 0;
+    public bool HasPatterns =>
+        _starts.Length > 0 || _ends.Length > 0 || _contains.Count > 0 || _pairs.Count > 0;
+
+    /// <summary>
+    /// One rule that requires both halves at once: the body must start with one of
+    /// <see cref="Starts"/> and end with one of <see cref="Ends"/>. Each half holds the
+    /// expanded, normalized variants of that half only, so case folding stays additive
+    /// (4 + 4 variants for "ab" + "yz", not 16 combinations).
+    /// </summary>
+    public sealed class Pair
+    {
+        internal Pair(HashSet<string> starts, HashSet<string> ends, string display)
+        {
+            StartsSet = starts;
+            EndsSet = ends;
+            StartsLookup = starts.GetAlternateLookup<ReadOnlySpan<char>>();
+            EndsLookup = ends.GetAlternateLookup<ReadOnlySpan<char>>();
+            StartsLength = starts.First().Length;
+            EndsLength = ends.First().Length;
+            Display = display;
+        }
+
+        internal HashSet<string> StartsSet { get; }
+        internal HashSet<string> EndsSet { get; }
+        internal HashSet<string>.AlternateLookup<ReadOnlySpan<char>> StartsLookup { get; }
+        internal HashSet<string>.AlternateLookup<ReadOnlySpan<char>> EndsLookup { get; }
+
+        public IReadOnlyCollection<string> Starts => StartsSet;
+        public IReadOnlyCollection<string> Ends => EndsSet;
+        public int StartsLength { get; }
+        public int EndsLength { get; }
+        public string Display { get; }
+    }
+
+    public IReadOnlyList<Pair> Pairs => _pairs;
 
     /// <summary>
     /// Every expanded target string with its position — exactly the set <see cref="TryMatch"/>
@@ -73,6 +110,24 @@ public sealed class PatternSet
     public bool TryMatch(ReadOnlySpan<char> address, out MatchPosition position, out string pattern)
     {
         ReadOnlySpan<char> body = address[1..]; // drop leading 'r'
+
+        foreach (Pair pair in _pairs)
+        {
+            // Halves must not touch or overlap: the body needs room strictly beyond both
+            // halves, so an address exactly as long as Starts+Ends never matches.
+            if (pair.StartsLength + pair.EndsLength >= body.Length)
+            {
+                continue;
+            }
+
+            if (pair.StartsLookup.Contains(body[..pair.StartsLength])
+                && pair.EndsLookup.Contains(body[^pair.EndsLength..]))
+            {
+                position = MatchPosition.Pair;
+                pattern = pair.Display;
+                return true;
+            }
+        }
 
         if (TryMatchAffix(_starts, body, fromStart: true, out pattern))
         {
@@ -145,6 +200,7 @@ public sealed class PatternSet
         private readonly Dictionary<int, HashSet<string>> _starts = new();
         private readonly Dictionary<int, HashSet<string>> _ends = new();
         private readonly List<string> _contains = new();
+        private readonly List<Pair> _pairs = new();
         private readonly List<NormalizedPattern> _unreachable = new();
         private readonly List<NormalizedPattern> _caseFoldingSkipped = new();
 
@@ -194,10 +250,51 @@ public sealed class PatternSet
             return this;
         }
 
+        /// <summary>
+        /// Adds a rule that requires both halves. Either half unreachable or empty after
+        /// normalization makes the whole rule unreachable; case folding is applied and capped
+        /// per half exactly as it is for a single pattern.
+        /// </summary>
+        public Builder AddPair(string starts, string ends, bool ignoreCase)
+        {
+            string display = $"{starts}..{ends}";
+            NormalizedPattern left = PatternNormalizer.Normalize(starts.Trim());
+            NormalizedPattern right = PatternNormalizer.Normalize(ends.Trim());
+
+            if (!left.Reachable || !right.Reachable || left.Value.Length == 0 || right.Value.Length == 0)
+            {
+                _unreachable.Add(new NormalizedPattern($"{left.Value}..{right.Value}", false, display));
+                return this;
+            }
+
+            HashSet<string> leftSet = ExpandHalf(left, ignoreCase);
+            HashSet<string> rightSet = ExpandHalf(right, ignoreCase);
+            _pairs.Add(new Pair(leftSet, rightSet, display));
+            return this;
+        }
+
+        /// <summary>Case variants of one already-normalized half, capped like a single pattern.</summary>
+        private HashSet<string> ExpandHalf(NormalizedPattern normalized, bool ignoreCase)
+        {
+            bool expand = ignoreCase && normalized.Value.Length <= MaxIgnoreCaseLength;
+            if (ignoreCase && !expand)
+            {
+                _caseFoldingSkipped.Add(normalized);
+            }
+
+            HashSet<string> set = new(StringComparer.Ordinal);
+            foreach (string variant in expand ? CaseVariants(normalized.Value) : new[] { normalized.Value })
+            {
+                set.Add(variant);
+            }
+
+            return set;
+        }
+
         public PatternSet Build()
         {
-            return new PatternSet(ToBuckets(_starts), ToBuckets(_ends), _contains, _unreachable,
-                _caseFoldingSkipped);
+            return new PatternSet(ToBuckets(_starts), ToBuckets(_ends), _contains, _pairs,
+                _unreachable, _caseFoldingSkipped);
         }
 
         /// <summary>

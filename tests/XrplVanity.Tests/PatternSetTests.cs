@@ -152,4 +152,89 @@ public class PatternSetTests
         Assert.False(set.TryMatch("rDiskmQdynWqgxoNv4CHsqFHdgsnpJMHGK", out _, out _));
         Assert.Empty(set.EnumerateTargets());
     }
+
+    private static PatternSet Pair(string starts, string ends, bool ignoreCase = false) =>
+        new PatternSet.Builder().AddPair(starts, ends, ignoreCase).Build();
+
+    [Fact]
+    public void A_Pair_Matches_Only_When_Both_Halves_Hold()
+    {
+        PatternSet set = Pair("ab", "yz");
+
+        Assert.True(set.TryMatch("rabQQQQQQQyz", out MatchPosition position, out string pattern));
+        Assert.Equal(MatchPosition.Pair, position);
+        Assert.Equal("ab..yz", pattern);
+
+        Assert.False(set.TryMatch("rabQQQQQQQQQ", out _, out _));   // prefix only
+        Assert.False(set.TryMatch("rQQQQQQQQQyz", out _, out _));   // suffix only
+        Assert.False(set.TryMatch("rQQQQQQQQQQQ", out _, out _));   // neither
+    }
+
+    [Fact]
+    public void A_Pair_Whose_Halves_Do_Not_Fit_The_Body_Does_Not_Match()
+    {
+        PatternSet set = Pair("abcd", "wxyz");
+        Assert.False(set.TryMatch("rabcdwxyz", out _, out _));      // body is 8, halves need 8 — fits exactly
+        Assert.True(set.TryMatch("rabcdQwxyz", out _, out _));      // body is 9
+    }
+
+    [Fact]
+    public void The_Two_Halves_Are_Normalized_Independently()
+    {
+        // l -> L and I -> i, per PatternNormalizer.
+        PatternSet set = Pair("Il", "0O");
+        Assert.True(set.TryMatch("riLQQQQQQQoo", out _, out string pattern));
+        Assert.Equal("Il..0O", pattern);   // Display keeps what the user typed
+    }
+
+    [Fact]
+    public void An_Unreachable_Half_Makes_The_Whole_Rule_Unreachable()
+    {
+        PatternSet set = new PatternSet.Builder().AddPair("ab", "@", ignoreCase: false).Build();
+        Assert.False(set.HasPatterns);
+        NormalizedPattern reported = Assert.Single(set.Unreachable);
+        Assert.Equal("ab..@", reported.Original);
+    }
+
+    [Fact]
+    public void An_Empty_Half_Makes_The_Rule_Unreachable()
+    {
+        PatternSet set = new PatternSet.Builder().AddPair("ab", "   ", ignoreCase: false).Build();
+        Assert.False(set.HasPatterns);
+        Assert.Single(set.Unreachable);
+    }
+
+    [Fact]
+    public void Case_Folding_Expands_Each_Half_On_Its_Own()
+    {
+        PatternSet set = Pair("ab", "yz", ignoreCase: true);
+        PatternSet.Pair pair = Assert.Single(set.Pairs);
+        Assert.Equal(4, pair.Starts.Count);   // ab aB Ab AB
+        Assert.Equal(4, pair.Ends.Count);     // yz yZ Yz YZ
+        Assert.True(set.TryMatch("rABQQQQQQQYz", out _, out _));
+    }
+
+    [Fact]
+    public void A_Half_Longer_Than_The_Case_Folding_Cap_Is_Reported_And_Searched_Case_Sensitively()
+    {
+        string longHalf = new string('a', PatternSet.MaxIgnoreCaseLength + 1);
+        PatternSet set = new PatternSet.Builder().AddPair(longHalf, "yz", ignoreCase: true).Build();
+        PatternSet.Pair pair = Assert.Single(set.Pairs);
+        Assert.Single(pair.Starts);           // not expanded
+        Assert.Equal(4, pair.Ends.Count);     // still expanded
+        Assert.Single(set.CaseFoldingSkipped);
+    }
+
+    [Fact]
+    public void A_Pair_Is_Reported_Before_A_Plain_Pattern_That_Also_Holds()
+    {
+        PatternSet set = new PatternSet.Builder()
+            .AddPair("ab", "yz", ignoreCase: false)
+            .Add(MatchPosition.Starts, "ab", ignoreCase: false)
+            .Build();
+
+        Assert.True(set.TryMatch("rabQQQQQQQyz", out MatchPosition position, out string pattern));
+        Assert.Equal(MatchPosition.Pair, position);
+        Assert.Equal("ab..yz", pattern);
+    }
 }

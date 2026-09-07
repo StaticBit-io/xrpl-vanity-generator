@@ -5,4 +5,5 @@ public enum MatchPosition
     Starts,
     Ends,
     Contains,
+    Pair,
 }
