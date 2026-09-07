@@ -206,6 +206,36 @@ public class PatternSetTests
     }
 
     [Fact]
+    public void Halves_That_Cannot_Both_Fit_In_A_Body_Make_The_Rule_Unreachable()
+    {
+        // No address body is longer than PatternSet.MaxBodyLength, so a rule needing more
+        // than that is provably unsatisfiable and must be reported, not searched forever.
+        string half = new('a', PatternSet.MaxBodyLength / 2 + 1);
+        PatternSet set = new PatternSet.Builder().AddPair(half, half, ignoreCase: false).Build();
+
+        Assert.False(set.HasPatterns);
+        NormalizedPattern reported = Assert.Single(set.Unreachable);
+        Assert.Equal($"{half}..{half}", reported.Original);
+    }
+
+    [Fact]
+    public void Halves_That_Exactly_Fill_A_Body_Stay_Reachable()
+    {
+        string starts = new('a', PatternSet.MaxBodyLength - 1);
+        PatternSet set = new PatternSet.Builder().AddPair(starts, "b", ignoreCase: false).Build();
+
+        Assert.True(set.HasPatterns);
+        Assert.Empty(set.Unreachable);
+    }
+
+    [Fact]
+    public void Add_Rejects_The_Pair_Position()
+    {
+        PatternSet.Builder builder = new();
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Add(MatchPosition.Pair, "ab", ignoreCase: false));
+    }
+
+    [Fact]
     public void Case_Folding_Expands_Each_Half_On_Its_Own()
     {
         PatternSet set = Pair("ab", "yz", ignoreCase: true);

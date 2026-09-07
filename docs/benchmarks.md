@@ -74,8 +74,9 @@ split falls. Worked example, case-sensitive `abc` + `xyz` (`m = 3`, `n = 3`, lea
 character `a`, one of the common 22): `23.338 × 58^5 ≈ 15.3 G` candidates per match —
 the same figure a case-sensitive `--starts abcxyz` would give. This is pinned by a test.
 The halves may touch but never overlap, so a body shorter than *m + n* cannot satisfy the
-rule; a body is 24 to 34 characters, which makes any pair whose halves total more than 34
-unsatisfiable rather than merely expensive.
+rule. A body is the base58 form of a number below `2^192`, and `2^192 < 58^33`, so it never
+exceeds 33 characters; a pair whose halves total more than that is provably unsatisfiable
+and is reported as unreachable instead of being searched for.
 
 **CPU path.** The CLI now counts candidates itself and prints a
 `CPU: searched N candidates in T s (R/s)` line, so its rate is measured directly. An

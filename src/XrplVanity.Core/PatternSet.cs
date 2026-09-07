@@ -14,6 +14,14 @@ public sealed class PatternSet
     /// </summary>
     public const int MaxIgnoreCaseLength = 12;
 
+    /// <summary>
+    /// Longest address body (the characters after the fixed leading 'r') that can exist:
+    /// the body is the base58 form of a number below 2^192, and 2^192 &lt; 58^33, so no body
+    /// has more than 33 digits. A paired rule whose halves together exceed this can never
+    /// match any address.
+    /// </summary>
+    public const int MaxBodyLength = 33;
+
     private readonly Bucket[] _starts;
     private readonly Bucket[] _ends;
     private readonly List<string> _contains;
@@ -243,6 +251,11 @@ public sealed class PatternSet
                     case MatchPosition.Contains:
                         _contains.Add(variant);
                         break;
+                    default:
+                        // MatchPosition.Pair carries two halves and has its own entry point;
+                        // silently dropping it here would lose the rule without a warning.
+                        throw new ArgumentOutOfRangeException(nameof(position), position,
+                            $"Use {nameof(AddPair)} for {nameof(MatchPosition.Pair)}.");
                 }
             }
 
@@ -251,8 +264,9 @@ public sealed class PatternSet
 
         /// <summary>
         /// Adds a rule that requires both halves. Either half unreachable or empty after
-        /// normalization makes the whole rule unreachable; case folding is applied and capped
-        /// per half exactly as it is for a single pattern.
+        /// normalization - or halves that together exceed <see cref="MaxBodyLength"/>, which no
+        /// address could satisfy - makes the whole rule unreachable; case folding is applied and
+        /// capped per half exactly as it is for a single pattern.
         /// </summary>
         public Builder AddPair(string starts, string ends, bool ignoreCase)
         {
@@ -262,7 +276,8 @@ public sealed class PatternSet
             NormalizedPattern left = PatternNormalizer.Normalize(starts.Trim());
             NormalizedPattern right = PatternNormalizer.Normalize(ends.Trim());
 
-            if (!left.Reachable || !right.Reachable || left.Value.Length == 0 || right.Value.Length == 0)
+            if (!left.Reachable || !right.Reachable || left.Value.Length == 0 || right.Value.Length == 0
+                || left.Value.Length + right.Value.Length > MaxBodyLength)
             {
                 _unreachable.Add(new NormalizedPattern($"{left.Value}..{right.Value}", false, display));
                 return this;

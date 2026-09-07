@@ -26,7 +26,8 @@ The application has three pages:
   labels both halves (`starts abc`, `ends xyz`) and costs exactly as much as a single
   `starts` pattern of the combined length, since the estimate multiplies the two
   independent halves. The halves may touch but never overlap, so halves totalling more
-  than 34 characters — the longest address body — can never be satisfied.
+  than 33 characters — the longest address body — are flagged as unreachable rather than
+  searched for.
 - **History** — every result the application has ever stored, with a filter over the
   address and the pattern, per-row delete and a two-step "Clear history".
 - **Settings** — everything in the table below. There is no Save button: each control

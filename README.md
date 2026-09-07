@@ -49,8 +49,9 @@ prefix of *m* characters plus a suffix of *n* characters costs exactly as
 much as a single prefix of *m + n* characters — the cost is set by the
 number of constrained characters, not by how they are split between the two
 ends. The halves may touch but never overlap: an address whose body is
-shorter than *m + n* cannot satisfy the rule, and since a body is 24 to 34
-characters, halves totalling more than 34 match nothing at all.
+shorter than *m + n* cannot satisfy the rule. No body is longer than 33
+characters, so halves totalling more than that are rejected as unreachable
+rather than searched for.
 
 ## Flags
 

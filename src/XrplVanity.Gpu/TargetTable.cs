@@ -52,7 +52,11 @@ public sealed class TargetTable
             {
                 MatchPosition.Starts => PositionStarts,
                 MatchPosition.Ends => PositionEnds,
-                _ => PositionContains,
+                MatchPosition.Contains => PositionContains,
+                // A pair half must never reach the or-loop as a plain group; EnumerateTargets
+                // does not yield one, and this fails closed if that ever changes.
+                _ => throw new ArgumentOutOfRangeException(nameof(patterns), position,
+                    "EnumerateTargets yielded a position the device table cannot represent."),
             };
             (uint, int) key = (code, value.Length);
             if (!grouped.TryGetValue(key, out HashSet<string>? set))
