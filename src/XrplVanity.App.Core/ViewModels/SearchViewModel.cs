@@ -16,6 +16,7 @@ namespace XrplVanity.App.Core.ViewModels;
 public sealed class SearchViewModel : IDisposable
 {
     private static readonly TimeSpan LiveRateAfter = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan CalibrationHardCap = TimeSpan.FromSeconds(60);
 
     private readonly ISettingsStore _settingsStore;
     private readonly IResultStore _resultStore;
@@ -41,6 +42,8 @@ public sealed class SearchViewModel : IDisposable
     private int _dutyPercent;
     private int _cpuThreads;
     private int? _count;
+    private SearchSession? _calibrationSession;
+    private int _calibrationStopArmed;
 
     public SearchViewModel(ISettingsStore settingsStore, IResultStore resultStore, INotificationService notifications, Func<IReadOnlyList<DeviceCatalogEntry>> deviceSource)
     {
@@ -189,14 +192,29 @@ public sealed class SearchViewModel : IDisposable
         {
             if (ExpectedCandidates is null) return "add a pattern to see an estimate";
             double rate = CurrentRate();
-            if (rate <= 0) return "rate unknown until the first run";
+            if (rate <= 0) return "rate unknown — press \"measure speed\" or run a search once";
             return _progress is not null && _progress.Elapsed >= LiveRateAfter && State == SearchState.Searching
                 ? "from the live rate"
                 : "from the last measured rate of the selected targets";
         }
     }
 
-    public bool CanStart => State == SearchState.Idle && StartBlockedReason is null;
+    public bool CanStart => State == SearchState.Idle && !IsCalibrating && StartBlockedReason is null;
+
+    /// <summary>How long <see cref="MeasureSpeed"/> lets a target run once it has reported its first candidate; shortened by tests.</summary>
+    internal TimeSpan CalibrationDuration { get; set; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>True from <see cref="MeasureSpeed"/> until its session's completion has been processed.</summary>
+    public bool IsCalibrating { get; private set; }
+
+    /// <summary>The reason the last calibration produced no usable rate, or null. Rendered under the device rows.</summary>
+    public string? CalibrationFailure { get; private set; }
+
+    /// <summary>
+    /// A calibration measures the selected devices, not a pattern, so — unlike <see cref="CanStart"/> —
+    /// it does not require a reachable pattern.
+    /// </summary>
+    public bool CanMeasureSpeed => State == SearchState.Idle && !IsCalibrating && TargetProblem is null;
 
     /// <summary>
     /// The pattern draft not yet committed to a chip. Setting these does not persist to settings —
@@ -286,7 +304,11 @@ public sealed class SearchViewModel : IDisposable
             lock (_gate)
             {
                 string trimmedEntry = _entryText.Trim();
-                return IsReachableEntry(trimmedEntry) ? $"Press Enter to add \"{trimmedEntry}\" — Start adds it too." : null;
+                if (!IsReachableEntry(trimmedEntry)) return null;
+                string normalized = PatternNormalizer.Normalize(trimmedEntry).Value;
+                return normalized != trimmedEntry
+                    ? $"\"{trimmedEntry}\" is searched as \"{normalized}\" — press Enter to add it, or just press Start."
+                    : $"Press Enter to add \"{trimmedEntry}\" — Start adds it too.";
             }
         }
     }
@@ -495,6 +517,143 @@ public sealed class SearchViewModel : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Runs a short, on-demand benchmark of the selected targets so the estimate has a rate to
+    /// show before the user ever runs a real search. Uses its own <see cref="SearchSession"/>
+    /// (<see cref="_calibrationSession"/>) over an unmatchable pattern (<c>Starts "zzzzzzzz"</c>)
+    /// so nothing is ever reported as found; results, history and notifications are untouched —
+    /// only the rate hints in <see cref="AppSettings"/> are updated, via the same
+    /// <see cref="ApplyRateHints"/> helper <see cref="OnCompleted"/> uses.
+    /// </summary>
+    public void MeasureSpeed()
+    {
+        SearchSession? session = null;
+        try
+        {
+            lock (_gate)
+            {
+                if (!CanMeasureSpeed) return;
+                List<SearchTarget> targets = new();
+                foreach (TargetChoice t in _targets.Where(t => t.Selected))
+                {
+                    targets.Add(t.IsCpu
+                        ? new SearchTarget.Cpu(_cpuThreads)
+                        : new SearchTarget.Device(ParseSelector(t.Id)));
+                }
+
+                PatternSet.Builder builder = new();
+                builder.Add(MatchPosition.Starts, "zzzzzzzz", ignoreCase: false);
+                SearchRequest request = new(builder.Build(), targets, null, _dutyPercent);
+
+                IsCalibrating = true;
+                CalibrationFailure = null;
+                _calibrationStopArmed = 0;
+                session = new SearchSession(request, _ => { });
+                _calibrationSession = session;
+                session.ProgressChanged += OnCalibrationProgress;
+                session.Completion.ContinueWith(OnCalibrationCompleted);
+                session.Start();
+            }
+        }
+        catch (Exception ex)
+        {
+            lock (_gate)
+            {
+                CalibrationFailure = ex.Message;
+                IsCalibrating = false;
+                _calibrationSession = null;
+            }
+
+            session?.Dispose();
+            Changed?.Invoke();
+            return;
+        }
+
+        // Belt-and-braces cap: stops the session even if no target ever reports a candidate
+        // (e.g. a device stuck opening), so a bad run cannot calibrate forever.
+        _ = StopSessionAfterAsync(session, CalibrationHardCap);
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Arms the calibration's stop-after-<see cref="CalibrationDuration"/> countdown on the first
+    /// progress snapshot in which any target reports a candidate — device opening and an OpenCL
+    /// program build happen before that and must not eat into the measured window. Runs on the
+    /// session's ticker thread; <see cref="Interlocked.Exchange(ref int, int)"/> makes the "arm
+    /// once" check safe against the tick that follows arriving before the delay task is scheduled.
+    /// </summary>
+    private void OnCalibrationProgress(SearchProgress progress)
+    {
+        if (Volatile.Read(ref _calibrationStopArmed) != 0) return;
+        if (!progress.Targets.Any(t => t.Candidates > 0)) return;
+        if (Interlocked.Exchange(ref _calibrationStopArmed, 1) != 0) return;
+
+        SearchSession? session = _calibrationSession;
+        if (session is null) return;
+        _ = StopSessionAfterAsync(session, CalibrationDuration);
+    }
+
+    /// <summary>
+    /// A background <see cref="Task.Delay(TimeSpan)"/> rather than a <see cref="System.Threading.Timer"/>:
+    /// the delay's own continuation is what keeps it alive, so there is nothing to dispose, and
+    /// racing it against <paramref name="session"/>'s own <see cref="SearchSession.Completion"/>
+    /// means a session that ends on its own (Stop, a failure, the hard cap) is not kept waiting on
+    /// a stale delay — this returns as soon as either settles.
+    /// </summary>
+    private static async Task StopSessionAfterAsync(SearchSession session, TimeSpan delay)
+    {
+        await Task.WhenAny(session.Completion, Task.Delay(delay)).ConfigureAwait(false);
+        session.Stop();
+    }
+
+    /// <summary>
+    /// The body of the continuation attached to the calibration session's <see cref="SearchSession.Completion"/>.
+    /// Mirrors <see cref="OnSessionCompleted"/>'s fault/cancel handling but never touches <see cref="_results"/>,
+    /// <see cref="LastSummary"/>, the result store or the notifier — a calibration is not a search.
+    /// </summary>
+    private void OnCalibrationCompleted(Task<SearchSummary> task)
+    {
+        SearchSummary? summary = null;
+        string? failure = null;
+        if (task.IsFaulted)
+        {
+            failure = task.Exception!.GetBaseException().Message;
+        }
+        else if (task.IsCanceled)
+        {
+            failure = "calibration cancelled";
+        }
+        else
+        {
+            summary = task.Result;
+        }
+
+        SearchSession? finished;
+        lock (_gate)
+        {
+            finished = _calibrationSession;
+            _calibrationSession = null;
+            IsCalibrating = false;
+        }
+
+        if (summary is not null)
+        {
+            IReadOnlyList<TargetProgress> targets = summary.Final.Targets;
+            ApplyRateHints(targets);
+            bool allFailed = targets.Count > 0 && targets.All(t => t.State == TargetState.Failed);
+            CalibrationFailure = allFailed
+                ? targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no target could be measured"
+                : null;
+        }
+        else
+        {
+            CalibrationFailure = failure;
+        }
+
+        Changed?.Invoke();
+        finished?.Dispose();
+    }
+
     public void Stop()
     {
         lock (_gate)
@@ -529,13 +688,17 @@ public sealed class SearchViewModel : IDisposable
     public void Dispose()
     {
         SearchSession? session;
+        SearchSession? calibration;
         lock (_gate)
         {
             session = _session;
             _session = null;
+            calibration = _calibrationSession;
+            _calibrationSession = null;
         }
 
         session?.Dispose();
+        calibration?.Dispose();
     }
 
     private static DeviceSelector ParseSelector(string id)
@@ -589,6 +752,7 @@ public sealed class SearchViewModel : IDisposable
                 : normalized.Value.Length == 0 ? "empty pattern"
                 : chip.IgnoreCase && normalized.Value.Length > PatternSet.MaxIgnoreCaseLength ? $"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively"
                 : null;
+            chip.Normalized = normalized.Value != chip.Text ? normalized.Value : null;
         }
 
         _patternSet = set;
@@ -737,6 +901,23 @@ public sealed class SearchViewModel : IDisposable
         }
     }
 
+    /// <summary>
+    /// Records the measured rate of every target that ran without failing, shared by
+    /// <see cref="OnCompleted"/> (a real search) and <see cref="OnCalibrationCompleted"/>
+    /// (a <see cref="MeasureSpeed"/> run) so both paths update <see cref="AppSettings.RateHints"/>
+    /// the same way.
+    /// </summary>
+    private void ApplyRateHints(IReadOnlyList<TargetProgress> targets)
+    {
+        Dictionary<string, double> hints = new(_settings.RateHints);
+        foreach (TargetProgress t in targets)
+        {
+            if (t.State != TargetState.Failed && t.RatePerSecond > 0) hints[t.Id] = t.RatePerSecond;
+        }
+
+        SaveSettings(s => s with { RateHints = hints });
+    }
+
     private void OnCompleted(SearchSummary summary)
     {
         FlushPendingMatches();
@@ -756,13 +937,7 @@ public sealed class SearchViewModel : IDisposable
 
         // After the state transition, never before it: a settings write that fails would otherwise
         // fault this continuation and leave the view model stuck in Searching with a dead session.
-        Dictionary<string, double> hints = new(_settings.RateHints);
-        foreach (TargetProgress t in summary.Final.Targets)
-        {
-            if (t.State != TargetState.Failed && t.RatePerSecond > 0) hints[t.Id] = t.RatePerSecond;
-        }
-
-        SaveSettings(s => s with { RateHints = hints });
+        ApplyRateHints(summary.Final.Targets);
 
         if (_settings.NotificationsEnabled)
         {

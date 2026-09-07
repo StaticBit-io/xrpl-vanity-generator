@@ -1,4 +1,5 @@
 .chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 36px; margin-bottom: 12px; }
+.chip-normalized { color: var(--text-secondary); }
 .entry { display: grid; grid-template-columns: 140px 1fr auto auto; gap: 8px; align-items: center; }
 /* The dark control chrome, the mint focus border and the placeholder colour are global now
    (wwwroot/scss/common/_forms.scss); only this component's own layout stays here. */

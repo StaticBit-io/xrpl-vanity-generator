@@ -42,4 +42,26 @@ public class DevicePickerTests : BunitContext
         IRenderedComponent<DevicePicker> cut = Render<DevicePicker>(p => p.Add(x => x.Vm, vm));
         Assert.Contains("No CUDA driver or OpenCL platform found", cut.Find(".banner-yellow").TextContent);
     }
+
+    [Fact]
+    public void The_Measure_Button_Is_Enabled_With_A_Target_Selected_And_Disables_While_Measuring()
+    {
+        SearchViewModel vm = new(new MemorySettingsStore(), new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<DeviceCatalogEntry>());
+        IRenderedComponent<DevicePicker> cut = Render<DevicePicker>(p => p.Add(x => x.Vm, vm));
+
+        IElement measure = cut.Find("button.measure");
+        Assert.Equal("measure speed", measure.TextContent.Trim());
+        Assert.False(measure.HasAttribute("disabled"));
+
+        measure.Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            IElement measuring = cut.Find("button.measure");
+            Assert.Equal("measuring…", measuring.TextContent.Trim());
+            Assert.True(measuring.HasAttribute("disabled"));
+        });
+
+        vm.Dispose();   // stop the still-running calibration instead of waiting it out
+    }
 }

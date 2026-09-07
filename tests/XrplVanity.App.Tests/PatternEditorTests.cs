@@ -78,6 +78,51 @@ public class PatternEditorTests : BunitContext
     }
 
     [Fact]
+    public void A_Chip_Whose_Text_Is_Folded_Shows_The_Normalized_Form()
+    {
+        SearchViewModel vm = Vm();
+        // "Il" folds to "iL" (I -> i, l -> L): reachable, but not what the user typed.
+        vm.AddPattern("Il", XrplVanity.Core.MatchPosition.Starts, false);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+        Assert.Equal("→ iL", cut.Find(".chip-normalized").TextContent.Trim());
+    }
+
+    [Fact]
+    public void A_Chip_That_Needs_No_Folding_Shows_No_Normalized_Marker()
+    {
+        SearchViewModel vm = Vm();
+        vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+        Assert.Empty(cut.FindAll(".chip-normalized"));
+    }
+
+    [Fact]
+    public void The_Hint_Names_The_Normalized_Form_When_Typing_Folds_The_Entry()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("input.pattern").Input("Il");
+
+        cut.WaitForAssertion(() => Assert.Equal(
+            "\"Il\" is searched as \"iL\" — press Enter to add it, or just press Start.",
+            cut.Find(".pattern-hint").TextContent.Trim()));
+    }
+
+    [Fact]
+    public void The_Hint_Keeps_The_Plain_Wording_When_Typing_Needs_No_Folding()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("input.pattern").Input("ab");
+
+        cut.WaitForAssertion(() => Assert.Equal(
+            "Press Enter to add \"ab\" — Start adds it too.",
+            cut.Find(".pattern-hint").TextContent.Trim()));
+    }
+
+    [Fact]
     public void An_Unreachable_Chip_Shows_Its_Warning()
     {
         SearchViewModel vm = Vm();

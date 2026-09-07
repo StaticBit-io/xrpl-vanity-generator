@@ -57,7 +57,7 @@ public class SearchViewModelTests
         Assert.Equal(expected, vm.ExpectedCandidates);
         Assert.InRange(vm.ExpectedCandidates!.Value, 1300, 1400);
         Assert.Null(vm.EstimatedTime);   // no rate yet
-        Assert.Equal("rate unknown until the first run", vm.EstimateNote);
+        Assert.Equal("rate unknown — press \"measure speed\" or run a search once", vm.EstimateNote);
     }
 
     [Fact]
@@ -69,6 +69,33 @@ public class SearchViewModelTests
         PatternChip chip = Assert.Single(vm.Patterns);
         Assert.Equal("cannot occur in an XRPL address", chip.Warning);
         Assert.False(vm.CanStart);
+    }
+
+    [Fact]
+    public void A_Chip_Whose_Text_Is_Folded_Records_The_Normalized_Form()
+    {
+        // "Il" folds to "iL" (I -> i, l -> L): reachable, but not what the user typed.
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("Il", MatchPosition.Starts, false);
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("iL", chip.Normalized);
+    }
+
+    [Fact]
+    public void A_Chip_That_Needs_No_Folding_Has_No_Normalized_Form()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("ab", MatchPosition.Starts, false);
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Null(chip.Normalized);
+    }
+
+    [Fact]
+    public void PatternHint_Names_The_Normalized_Form_When_The_Entry_Folds()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryText = "Il";
+        Assert.Equal("\"Il\" is searched as \"iL\" — press Enter to add it, or just press Start.", vm.PatternHint);
     }
 
     [Fact]
@@ -444,5 +471,67 @@ public class SearchViewModelTests
         WaitUntil(() => vm.State == SearchState.Idle, "idle");
 
         Assert.Null(failure);
+    }
+
+    [Fact]
+    public void MeasureSpeed_Measures_The_Cpu_Without_Touching_Results_History_Or_Notifications()
+    {
+        (SearchViewModel vm, FakeNotifications notes, MemoryResultStore results, MemorySettingsStore settings) = Create();
+        vm.CalibrationDuration = TimeSpan.FromMilliseconds(300);
+        vm.AddPattern("a", MatchPosition.Starts, false);   // present so CanStart is otherwise true
+
+        Assert.True(vm.CanMeasureSpeed);
+        Assert.True(vm.CanStart);
+
+        vm.MeasureSpeed();
+
+        Assert.True(vm.IsCalibrating);
+        Assert.False(vm.CanMeasureSpeed);
+        Assert.False(vm.CanStart);   // Start refuses while a calibration is running
+
+        WaitUntil(() => !vm.IsCalibrating, "calibration to finish");
+
+        Assert.True(settings.Current.RateHints.ContainsKey("cpu"), "rate hint stored");
+        Assert.Null(vm.CalibrationFailure);
+        Assert.Empty(vm.Results);
+        Assert.Null(vm.LastSummary);
+        Assert.Equal(0, results.Appends);
+        Assert.Equal(0, results.AppendRanges);
+        Assert.Empty(notes.Sent);
+        Assert.NotNull(vm.EstimatedTime);   // now computed from the freshly measured hint
+    }
+
+    [Fact]
+    public void Start_During_A_Calibration_Does_Nothing()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.CalibrationDuration = TimeSpan.FromSeconds(5);   // long enough to still be running below
+        vm.AddPattern("a", MatchPosition.Starts, false);
+
+        vm.MeasureSpeed();
+        Assert.True(vm.IsCalibrating);
+
+        vm.Start();
+
+        Assert.Equal(SearchState.Idle, vm.State);
+        Assert.Null(vm.LastSummary);
+
+        vm.Dispose();   // stop the still-running calibration
+    }
+
+    [Fact]
+    public void CanMeasureSpeed_Is_False_While_A_Real_Search_Runs_And_MeasureSpeed_Refuses()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("zzzzzzzz", MatchPosition.Starts, false);
+        vm.Start();
+        WaitUntil(() => vm.State == SearchState.Searching, "searching");
+
+        Assert.False(vm.CanMeasureSpeed);
+        vm.MeasureSpeed();
+        Assert.False(vm.IsCalibrating);   // refused: a real search is running
+
+        vm.Stop();
+        WaitUntil(() => vm.State == SearchState.Idle, "idle");
     }
 }

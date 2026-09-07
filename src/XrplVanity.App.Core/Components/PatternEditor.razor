@@ -7,6 +7,7 @@
       <span class="chip t" @key="chip">
         <span class="chip-pos">@chip.Position.ToString().ToLowerInvariant()</span>
         <span class="mono">@chip.Text</span>
+        @if (chip.Normalized is not null) { <span class="chip-normalized mono" title="0, O, I and l do not exist in the XRPL alphabet, so they are folded onto o, o, i and L">→ @chip.Normalized</span> }
         @if (!chip.IgnoreCase) { <span class="chip-pos" title="case-sensitive">Aa</span> }
         @if (chip.Warning is not null) { <span class="chip-warn">@chip.Warning</span> }
         <button class="remove" title="Remove" @onclick="() => Vm.RemovePattern(chip)">×</button>

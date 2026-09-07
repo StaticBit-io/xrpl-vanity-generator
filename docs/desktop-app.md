@@ -17,6 +17,10 @@ The application has three pages:
   every CUDA and OpenCL device found), see the estimated candidates per match and the
   expected time, set the GPU duty cycle, and watch the live rate, candidate count and
   hits. Every hit lands in the results list with its address, pattern, target and time.
+  The four base58 look-alikes absent from the XRPL alphabet (`0`, `O`, `I`, `l`) are
+  folded onto the letter they are normally mistaken for (`0`/`O` → `o`, `I` → `i`,
+  `l` → `L`) rather than rejected, and the chip shows the folded form next to what you
+  typed.
 - **History** — every result the application has ever stored, with a filter over the
   address and the pattern, per-row delete and a two-step "Clear history".
 - **Settings** — everything in the table below. There is no Save button: each control
@@ -201,45 +205,49 @@ storage layer. Each step names what you should see.
 3. **No-GPU banner.** On a machine with neither an NVIDIA driver nor an OpenCL platform,
    the device list shows only the CPU row and a yellow banner reads "No CUDA driver or
    OpenCL platform found — searching on the CPU". Start stays enabled.
-4. **Start and stop on the CPU.** Add a short pattern, leave only CPU selected, press
+4. **Measure speed.** With a device selected and no search running, press **measure
+   speed** on the Devices card: it reads "measuring…" and disables itself, then returns
+   to "measure speed" and the ESTIMATE card starts showing a time instead of "rate
+   unknown".
+5. **Start and stop on the CPU.** Add a short pattern, leave only CPU selected, press
    Start: the pill turns *Searching*, the rate, candidate and found counters climb, and
    the CPU row reads *running*. Press Stop: the pill returns to *Idle*, the row reads
    *finished*, and the final rate stays on screen.
-5. **Start and stop on the GPU.** Clear the CPU checkbox, select a `cuda` or `opencl`
+6. **Start and stop on the GPU.** Clear the CPU checkbox, select a `cuda` or `opencl`
    device and repeat. The device row shows the device name and its own rate, which should
    be two orders of magnitude above the CPU rate.
-6. **Duty from the tray during a search.** With a GPU search running, open the tray menu
+7. **Duty from the tray during a search.** With a GPU search running, open the tray menu
    and pick a different duty percentage. The GPU duty card on the Search page follows
    immediately and the measured rate scales with it.
-7. **Toast on a hit.** With notifications enabled, each match raises a Windows toast
+8. **Toast on a hit.** With notifications enabled, each match raises a Windows toast
    titled "Match found" showing the address, the pattern and the position — never a seed.
-8. **Toast on completion.** Stopping or completing a search raises a "Search finished"
+9. **Toast on completion.** Stopping or completing a search raises a "Search finished"
    toast with the number of hits and the outcome.
-9. **Close to tray and remembering the choice.** With **Close button** set to "Ask every
-   time", the × opens the prompt; choosing "Minimize to tray" with *Remember my choice*
-   ticked hides the window, keeps the process alive and writes `"CloseBehavior": "MinimizeToTray"`
-   to `settings.json`. The next × hides the window without asking.
-10. **History survives a restart.** Exit from the tray menu, launch again, open History:
+10. **Close to tray and remembering the choice.** With **Close button** set to "Ask every
+    time", the × opens the prompt; choosing "Minimize to tray" with *Remember my choice*
+    ticked hides the window, keeps the process alive and writes `"CloseBehavior": "MinimizeToTray"`
+    to `settings.json`. The next × hides the window without asking.
+11. **History survives a restart.** Exit from the tray menu, launch again, open History:
     every stored result is still there, seeds still masked.
-11. **Clipboard clears.** Copy a seed from a result row, paste it somewhere to confirm it
+12. **Clipboard clears.** Copy a seed from a result row, paste it somewhere to confirm it
     arrived, wait out the "Clear clipboard after copying a seed" delay (30 s by default)
     and paste again: the clipboard is empty. Copying anything else in the meantime keeps
     the newer content.
-12. **Export.** Press **Export TSV…**, save the file and open it in a text editor: one
+13. **Export.** Press **Export TSV…**, save the file and open it in a text editor: one
     line per result, address and seed separated by a tab, in the same format the command
     line tool's `--out` writes.
-13. **Every control is dark.** Open History and Settings and check each form control: the
+14. **Every control is dark.** Open History and Settings and check each form control: the
     filter box, the close-behaviour select, the four number inputs, the notifications
     checkbox and both scrollbars. Nothing may render on a white background, and no
     checkbox may show a white or blue box.
-14. **A read-only data folder produces banners, not crashes.** Deny your account write
+15. **A read-only data folder produces banners, not crashes.** Deny your account write
     access to the data folder (`icacls "<folder>" /deny "%USERNAME%":(W)`), then: on
     History, press **Clear history** twice and delete a row — each shows a red banner with
     the reason and leaves the list intact; on Search, run a short pattern and confirm the
     same banner appears above the results list while the hits still accumulate on screen;
     and confirm the window still closes normally. Restore access with
     `icacls "<folder>" /remove:d "%USERNAME%"`.
-15. **The reference-rates link opens in a browser.** On the Search page, click
+16. **The reference-rates link opens in a browser.** On the Search page, click
     **reference rates** in the estimate note: the benchmarks page opens in the default
     browser and the application window is unchanged — no blank frame inside the app.
 
