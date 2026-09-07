@@ -87,6 +87,24 @@ public sealed class DpapiResultStore : IResultStore
         }
     }
 
+    public void DeleteMany(IEnumerable<string> addresses)
+    {
+        HashSet<string> doomed = new(addresses, StringComparer.Ordinal);
+        lock (_gate)
+        {
+            List<StoredResult> current = EnsureLoaded();
+            ThrowIfReadOnly();
+            if (doomed.Count == 0)
+            {
+                return;
+            }
+
+            List<StoredResult> updated = current.Where(r => !doomed.Contains(r.Address)).ToList();
+            Write(updated);
+            _cache = updated;
+        }
+    }
+
     public void Clear()
     {
         lock (_gate)

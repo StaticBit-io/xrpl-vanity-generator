@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using XrplVanity.App.Core.Storage;
 using Xunit;
@@ -45,6 +46,48 @@ public class DpapiResultStoreTests
         Assert.Single(store.LoadAll());
         store.Clear();
         Assert.Empty(store.LoadAll());
+    }
+
+    [Fact]
+    public void DeleteMany_Removes_Every_Named_Address_And_Keeps_The_Rest()
+    {
+        RequireWindows();
+        string folder = TempFolder();
+        DpapiResultStore store = new(folder);
+        store.Append(new StoredResult("rA", "s1", "a", "Starts", DateTimeOffset.UtcNow, "cpu"));
+        store.Append(new StoredResult("rB", "s2", "b", "Starts", DateTimeOffset.UtcNow, "cpu"));
+        store.Append(new StoredResult("rC", "s3", "c", "Starts", DateTimeOffset.UtcNow, "cpu"));
+
+        store.DeleteMany(new[] { "rA", "rC" });
+
+        Assert.Equal(new[] { "rB" }, store.LoadAll().Select(r => r.Address).ToArray());
+        Assert.Equal(new[] { "rB" }, new DpapiResultStore(folder).LoadAll().Select(r => r.Address).ToArray());
+    }
+
+    [Fact]
+    public void DeleteMany_Ignores_An_Address_That_Is_Not_Stored()
+    {
+        RequireWindows();
+        string folder = TempFolder();
+        DpapiResultStore store = new(folder);
+        store.Append(new StoredResult("rA", "s1", "a", "Starts", DateTimeOffset.UtcNow, "cpu"));
+
+        store.DeleteMany(new[] { "rZ" });
+
+        Assert.Single(store.LoadAll());
+    }
+
+    [Fact]
+    public void DeleteMany_With_Nothing_To_Delete_Leaves_The_Store_Alone()
+    {
+        RequireWindows();
+        string folder = TempFolder();
+        DpapiResultStore store = new(folder);
+        store.Append(new StoredResult("rA", "s1", "a", "Starts", DateTimeOffset.UtcNow, "cpu"));
+
+        store.DeleteMany(Array.Empty<string>());
+
+        Assert.Single(store.LoadAll());
     }
 
     [Fact]

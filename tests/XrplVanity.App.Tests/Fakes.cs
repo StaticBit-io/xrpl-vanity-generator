@@ -66,6 +66,7 @@ public sealed class MemoryResultStore : IResultStore
     private readonly List<StoredResult> _items = new();
     private int _appends;
     private int _appendRanges;
+    private int _deleteManyCalls;
 
     public bool IsReadOnly { get; init; }
     public string? ReadOnlyReason { get; init; }
@@ -78,6 +79,9 @@ public sealed class MemoryResultStore : IResultStore
 
     /// <summary>Batch appends.</summary>
     public int AppendRanges => Volatile.Read(ref _appendRanges);
+
+    /// <summary>Bulk deletes: the History page must take this path, not a loop over Delete.</summary>
+    public int DeleteManyCalls => Volatile.Read(ref _deleteManyCalls);
 
     public IReadOnlyList<StoredResult> LoadAll() { lock (_items) return _items.ToArray(); }
 
@@ -99,6 +103,14 @@ public sealed class MemoryResultStore : IResultStore
     {
         ThrowIfBroken();
         lock (_items) _items.RemoveAll(r => r.Address == address);
+    }
+
+    public void DeleteMany(IEnumerable<string> addresses)
+    {
+        Interlocked.Increment(ref _deleteManyCalls);
+        HashSet<string> doomed = new(addresses, StringComparer.Ordinal);
+        ThrowIfBroken();
+        lock (_items) _items.RemoveAll(r => doomed.Contains(r.Address));
     }
 
     public void Clear()

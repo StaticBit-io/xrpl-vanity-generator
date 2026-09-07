@@ -16,5 +16,12 @@ public interface IResultStore
     /// </summary>
     void AppendRange(IEnumerable<StoredResult> results);
     void Delete(string address);
+
+    /// <summary>
+    /// Removes every named address in one rewrite. The store re-encrypts and rewrites the whole
+    /// file on each change, so deleting a selection through <see cref="Delete"/> would leave one
+    /// crash window per row; this leaves one for the batch.
+    /// </summary>
+    void DeleteMany(IEnumerable<string> addresses);
     void Clear();
 }
