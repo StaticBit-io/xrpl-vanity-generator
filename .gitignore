@@ -17,3 +17,6 @@ app/*.cer
 
 # Subagent working files: ledgers, briefs, reports, review packages.
 .superpowers/
+
+# Worktrees created for feature work.
+.worktrees/
