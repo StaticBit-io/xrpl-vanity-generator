@@ -65,4 +65,45 @@ public class TargetTableTests
 
         Assert.Equal(0, table.GroupCount);
     }
+
+    [Fact]
+    public void A_Pair_Emits_Two_Pair_Only_Groups_And_One_Index_Entry()
+    {
+        PatternSet set = new PatternSet.Builder().AddPair("ab", "yz", ignoreCase: false).Build();
+        TargetTable table = TargetTable.Build(set);
+
+        Assert.Equal(2, table.GroupCount);
+        Assert.Equal(1, table.PairCount);
+        uint startsGroup = table.Pairs[0];
+        uint endsGroup = table.Pairs[1];
+        Assert.Equal(TargetTable.PositionPairStarts, table.Groups[startsGroup * 4]);
+        Assert.Equal(TargetTable.PositionPairEnds, table.Groups[endsGroup * 4]);
+        Assert.Equal(2u, table.Groups[startsGroup * 4 + 1]);
+        Assert.Equal(2u, table.Groups[endsGroup * 4 + 1]);
+    }
+
+    [Fact]
+    public void Two_Pairs_Sharing_A_Half_Share_Its_Group()
+    {
+        PatternSet set = new PatternSet.Builder()
+            .AddPair("ab", "yz", ignoreCase: false)
+            .AddPair("ab", "wx", ignoreCase: false)
+            .Build();
+        TargetTable table = TargetTable.Build(set);
+
+        Assert.Equal(2, table.PairCount);
+        Assert.Equal(table.Pairs[0], table.Pairs[2]);       // the same "ab" group
+        Assert.NotEqual(table.Pairs[1], table.Pairs[3]);
+    }
+
+    [Fact]
+    public void A_Set_Without_Pairs_Has_An_Empty_Pairs_Buffer_And_Unchanged_Groups()
+    {
+        PatternSet set = new PatternSet.Builder().Add(MatchPosition.Starts, "ab", ignoreCase: false).Build();
+        TargetTable table = TargetTable.Build(set);
+
+        Assert.Equal(0, table.PairCount);
+        Assert.Empty(table.Pairs);
+        Assert.Equal(TargetTable.PositionStarts, table.Groups[0]);
+    }
 }
