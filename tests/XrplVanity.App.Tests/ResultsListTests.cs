@@ -270,6 +270,22 @@ public class ResultsListTests : BunitContext
     }
 
     [Fact]
+    public void A_Partial_Selection_Marks_The_Select_All_Box_Without_Ticking_It()
+    {
+        IRenderedComponent<ResultsList> cut = RenderList(ThreeResults(), selectable: true);
+
+        cut.FindAll("input.pick")[0].Change(true);
+
+        Assert.True(cut.Find("label.pick-all-label").ClassList.Contains("partial"));
+        Assert.False(cut.Find("input.pick-all").HasAttribute("checked"));
+        Assert.Contains("1 of 3", cut.Find("input.pick-all").GetAttribute("aria-label"));
+
+        cut.Find("input.pick-all").Change(true);
+
+        Assert.False(cut.Find("label.pick-all-label").ClassList.Contains("partial"));
+    }
+
+    [Fact]
     public void Clear_Selection_Empties_The_Selection()
     {
         SessionResult[] all = ThreeResults();

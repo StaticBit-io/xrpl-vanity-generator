@@ -108,6 +108,13 @@ public partial class ResultsList : IDisposable
 
     private bool AllPicked => _items.Count > 0 && _items.All(i => _selected.ContainsKey(i.Address));
 
+    /// <summary>Some but not all of the visible rows: the checkbox wears a dash rather than a tick.</summary>
+    private bool SomePicked => !AllPicked && _items.Any(i => _selected.ContainsKey(i.Address));
+
+    private string PickAllLabel => SomePicked
+        ? $"Select all shown; {_items.Count(i => _selected.ContainsKey(i.Address))} of {_items.Count} are selected"
+        : "Select all shown";
+
     private void Pick(SessionResult item, bool picked)
     {
         if (picked)

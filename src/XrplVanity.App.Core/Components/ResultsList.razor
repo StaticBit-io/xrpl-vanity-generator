@@ -26,7 +26,7 @@
   @* The host owns its filter row, so the "all shown" checkbox lives with the list it selects. *@
   @if (Selectable && Items.Count > 0)
   {
-    <label class="pick-all-label"><input class="pick-all" type="checkbox" checked="@AllPicked" @onchange="e => PickAllShown((bool)e.Value!)" /> select all shown</label>
+    <label class="pick-all-label @(SomePicked ? "partial" : "")"><input class="pick-all" type="checkbox" checked="@AllPicked" aria-label="@PickAllLabel" @onchange="e => PickAllShown((bool)e.Value!)" /> select all shown</label>
   }
   @if (Items.Count == 0)
   {
