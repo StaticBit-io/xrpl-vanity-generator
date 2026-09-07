@@ -99,6 +99,8 @@ public class HistoryPageTests : BunitContext
 
         Assert.Empty(store.LoadAll());
         Assert.Equal(1, store.DeleteManyCalls);
+        // Everything selected is gone, so the selection and its bar go with it.
+        Assert.Empty(cut.FindAll(".sel-bar"));
     }
 
     /// <summary>
@@ -133,6 +135,8 @@ public class HistoryPageTests : BunitContext
         cut.Find("button.clear").Click();
 
         Assert.Contains("Clear the whole history?", cut.Find(".modal-box h3").TextContent);
+        // The clear variant deliberately lists no addresses: it is not a manifest of everything stored.
+        Assert.Empty(cut.FindAll(".modal-box .what"));
         Assert.Equal(2, store.LoadAll().Count);
         Assert.Equal("Clear history", cut.Find("button.clear").TextContent.Trim());
 

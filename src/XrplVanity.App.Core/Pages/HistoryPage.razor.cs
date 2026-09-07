@@ -59,12 +59,16 @@ public partial class HistoryPage
         : EventCallback.Factory.Create<IReadOnlyList<SessionResult>>(this, AskDeleteSelected);
 
     private void AskDelete(SessionResult item)
-        => _pending = new PendingAction(
+    {
+        // Only the address is captured: a pending action must not hold a seed alive.
+        string address = item.Address;
+        _pending = new PendingAction(
             "Delete this result?",
-            "Its seed is deleted with it. results.dat is the only place the seed exists, so this cannot be undone.",
+            () => "Its seed is deleted with it. results.dat is the only place the seed exists, so this cannot be undone.",
             "Delete",
-            new[] { item.Address },
-            () => Write(() => Store.Delete(item.Address)));
+            new[] { address },
+            () => Write(() => Store.Delete(address)));
+    }
 
     private void AskDeleteSelected(IReadOnlyList<SessionResult> items)
     {
@@ -76,7 +80,7 @@ public partial class HistoryPage
         string[] addresses = items.Select(i => i.Address).ToArray();
         _pending = new PendingAction(
             $"Delete {addresses.Length} result{(addresses.Length == 1 ? string.Empty : "s")}?",
-            "Their seeds are deleted with them. results.dat is the only place those seeds exist, so this cannot be undone.",
+            () => "Their seeds are deleted with them. results.dat is the only place those seeds exist, so this cannot be undone.",
             $"Delete {addresses.Length}",
             addresses,
             () => Write(() => Store.DeleteMany(addresses)));
@@ -85,7 +89,7 @@ public partial class HistoryPage
     private void AskClear()
         => _pending = new PendingAction(
             "Clear the whole history?",
-            $"All {_all.Count} results and their seeds are removed from results.dat. This cannot be undone, and the filter does not narrow it — everything goes.",
+            () => $"All {_all.Count} results and their seeds are removed from results.dat. This cannot be undone, and the filter does not narrow it — everything goes.",
             "Clear history",
             null,
             () => Write(Store.Clear));
@@ -127,7 +131,11 @@ public partial class HistoryPage
         _lastSessionResultCount = Vm.Results.Count;
     }
 
-    /// <summary>What a confirmed dialog will do. Null while no dialog is open.</summary>
-    private sealed record PendingAction(string Title, string Message, string ConfirmLabel,
+    /// <summary>
+    /// What a confirmed dialog will do. Null while no dialog is open. The message is a function
+    /// rather than a string because a search running behind the page keeps adding results: the
+    /// clear dialog's count must be read at render time, not at the moment it opened.
+    /// </summary>
+    private sealed record PendingAction(string Title, Func<string> Message, string ConfirmLabel,
         IReadOnlyList<string>? Addresses, Action Execute);
 }

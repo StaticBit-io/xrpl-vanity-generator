@@ -35,6 +35,6 @@
 </div>
 
 <ConfirmDialog Visible="@(_pending is not null)" Title="@(_pending?.Title ?? string.Empty)"
-               Message="@(_pending?.Message ?? string.Empty)" Addresses="_pending?.Addresses"
+               Message="@(_pending is null ? string.Empty : _pending.Message())" Addresses="_pending?.Addresses"
                ConfirmLabel="@(_pending?.ConfirmLabel ?? "Delete")"
                OnConfirm="Confirm" OnCancel="Cancel" />
