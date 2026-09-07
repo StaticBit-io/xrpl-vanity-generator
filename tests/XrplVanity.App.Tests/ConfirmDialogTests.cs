@@ -42,6 +42,28 @@ public class ConfirmDialogTests : BunitContext
         Assert.Contains("and 14 more", listed);
     }
 
+    [Theory]
+    [InlineData(10, null)]
+    [InlineData(11, "and 1 more")]
+    [InlineData(24, "and 14 more")]
+    public void The_More_Line_Appears_Only_Past_The_Cap(int count, string? expected)
+    {
+        string[] addresses = Enumerable.Range(0, count).Select(i => $"rAddress{i}").ToArray();
+        IRenderedComponent<ConfirmDialog> cut = Render<ConfirmDialog>(p => p
+            .Add(x => x.Visible, true)
+            .Add(x => x.Addresses, addresses));
+
+        string listed = cut.Find(".what").TextContent;
+        if (expected is null)
+        {
+            Assert.DoesNotContain("more", listed);
+        }
+        else
+        {
+            Assert.Contains(expected, listed);
+        }
+    }
+
     [Fact]
     public void Without_Addresses_There_Is_No_List()
     {

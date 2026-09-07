@@ -8,7 +8,6 @@ public partial class ConfirmDialog
     /// <summary>Longer selections are summarised: the dialog is a check, not a manifest.</summary>
     public const int MaxListedAddresses = 10;
 
-    private ElementReference _box;
     private ElementReference _cancel;
     private bool _wasVisible;
 
