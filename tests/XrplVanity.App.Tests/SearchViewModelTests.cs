@@ -438,6 +438,18 @@ public class SearchViewModelTests
     }
 
     [Fact]
+    public void A_Paired_Chip_Reports_The_Case_Fold_Cap_Of_Either_Half()
+    {
+        // The cap is applied per half by PatternSet.Builder, so a long second half must be
+        // reported even when the first half is short enough to fold.
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPair("ab", "cdefghijkmnpqr", ignoreCase: true);
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal($"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively", chip.Warning);
+    }
+
+    [Fact]
     public void A_Paired_Chip_Whose_Halves_Fold_Records_Both_Normalized_Halves()
     {
         (SearchViewModel vm, _, _, _) = Create();
