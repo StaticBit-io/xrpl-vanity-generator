@@ -1,0 +1,266 @@
+<title>History — selection and delete confirmation</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #0D0D0D; --box-bg: #1A1A1A; --chips: #2D2D2D; --dark-gray: #282828;
+    --text: #F9F9F9; --text-secondary: #A8A8A8; --mint: #64CF95; --beige: #EBAF8E;
+    --negative: #D6776A; --yellow: #D3E7AB; --secondary-dark: #202222;
+    --radius-card: 12px; --radius-chip: 10px;
+    --font-text: "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "Cascadia Code", "Consolas", "JetBrains Mono", monospace;
+    --ease: 180ms ease-out;
+    color-scheme: dark;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--font-text); font-size: 14px; margin: 0; }
+  body { padding: 40px 32px 80px; }
+  * { box-sizing: border-box; }
+
+  .doc { max-width: 1180px; margin: 0 auto; }
+  .doc-head { padding-bottom: 28px; border-bottom: 1px solid var(--dark-gray); margin-bottom: 40px; }
+  .doc-head h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .doc-head p { color: var(--text-secondary); margin: 0; max-width: 68ch; line-height: 1.55; }
+  h2.sec { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-secondary); font-weight: 600; margin: 48px 0 14px; display: flex; align-items: baseline; gap: 12px; }
+  h2.sec span { color: var(--text); font-size: 18px; text-transform: none; letter-spacing: -0.01em; }
+  .caption { color: var(--text-secondary); font-size: 13px; line-height: 1.6; max-width: 78ch; margin: 12px 0 0; }
+  .caption b { color: var(--text); font-weight: 500; }
+  .caption code, .mono { font-family: var(--font-mono); }
+  .frames-wrap { overflow-x: auto; padding-bottom: 6px; }
+
+  .win { width: 1100px; height: 560px; background: var(--bg); border: 1px solid var(--dark-gray); border-radius: 10px; overflow: hidden; display: grid; grid-template-rows: 32px 1fr; box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
+  .titlebar { display: flex; align-items: center; justify-content: space-between; padding: 0 0 0 12px; background: #111; border-bottom: 1px solid var(--dark-gray); font-size: 12px; color: var(--text-secondary); }
+  .titlebar .t-left { display: flex; align-items: center; gap: 8px; }
+  .titlebar .t-right span { display: inline-block; width: 46px; height: 32px; text-align: center; line-height: 32px; }
+  .logo-mark { width: 16px; height: 16px; border-radius: 4px; background: #141414; display: inline-grid; place-items: center; }
+  .logo-mark svg { width: 12px; height: 12px; }
+
+  .shell { display: grid; grid-template-columns: 64px 1fr; height: 100%; }
+  .rail { border-right: 1px solid var(--dark-gray); display: flex; flex-direction: column; align-items: center; padding: 14px 0; gap: 6px; }
+  .rail .mono-mark { width: 34px; height: 34px; border-radius: 9px; background: #141414; display: grid; place-items: center; margin-bottom: 14px; }
+  .rail .mono-mark svg { width: 22px; height: 22px; }
+  .nav { width: 52px; padding: 8px 0 6px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-secondary); font-size: 10px; }
+  .nav svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .nav.active { color: var(--mint); background: rgba(100,207,149,0.10); }
+  .content { padding: 18px 22px 20px; overflow: hidden; display: flex; flex-direction: column; gap: 12px; }
+
+  .page-head { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+  .page-head h1 { font-size: 20px; margin: 0; font-weight: 600; display: flex; align-items: center; gap: 12px; }
+  .pill { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--chips); color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+  .btn-secondary-dark { background: var(--secondary-dark); color: var(--text); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 6px 12px; font-family: inherit; font-size: 13px; cursor: pointer; }
+  .btn-secondary-dark.danger { color: var(--negative); }
+  .btn-secondary-dark:disabled { opacity: 0.45; }
+  .btn-danger { background: var(--negative); color: #14100F; border: 0; border-radius: var(--radius-chip); padding: 9px 22px; font-weight: 600; font-family: inherit; font-size: 14px; cursor: pointer; }
+  .btn-quiet { background: var(--secondary-dark); color: var(--text); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 9px 22px; font-weight: 600; font-family: inherit; font-size: 14px; cursor: pointer; }
+  .btn-icon { background: transparent; border: 0; color: var(--text-secondary); padding: 3px 5px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .btn-icon svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+  .card-box { background: var(--box-bg); border-radius: var(--radius-card); padding: 14px 16px; }
+  .muted { color: var(--text-secondary); }
+  .field { background: var(--bg); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 7px 11px; font-size: 13px; }
+  .field.placeholder { color: var(--text-secondary); }
+  .field.focus { border-color: var(--mint); }
+
+  /* the checkbox is drawn, not a real input, so the three states are visible side by side */
+  .cb { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--text-secondary); display: inline-grid; place-items: center; }
+  .cb.on { background: var(--mint); border-color: var(--mint); }
+  .cb.on::after { content: ""; width: 8px; height: 4px; border-left: 2px solid #0D0D0D; border-bottom: 2px solid #0D0D0D; transform: rotate(-45deg) translate(1px, -1px); }
+  .cb.some { border-color: var(--mint); }
+  .cb.some::after { content: ""; width: 8px; height: 2px; background: var(--mint); border-radius: 1px; }
+
+  .filter-row { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; }
+  .sel-bar { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 10px; padding: 7px 10px; border-radius: var(--radius-chip); background: rgba(100,207,149,0.10); font-size: 13px; }
+  .sel-bar b { color: var(--mint); font-weight: 600; }
+  .sel-bar .acts { display: flex; gap: 8px; }
+
+  .rrow { display: grid; grid-template-columns: 24px minmax(290px, 1.2fr) 26px 1fr 80px 70px minmax(140px, 0.8fr) 26px 26px 26px; gap: 8px; align-items: center; height: 40px; border-top: 1px solid var(--dark-gray); font-size: 13px; }
+  .rrow.picked { background: rgba(100,207,149,0.07); }
+  .rrow .seed { color: var(--text-secondary); letter-spacing: 0.06em; }
+  .rrow .target { font-size: 12px; }
+  .list-head { margin-top: 10px; }
+
+  .stage { position: relative; }
+  .stage .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
+  .modal-box { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 440px; }
+  .modal-box h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .modal-box p { margin: 0 0 6px; color: var(--text-secondary); line-height: 1.5; }
+  .modal-box .what { background: var(--bg); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 8px 10px; margin: 10px 0 4px; font-family: var(--font-mono); font-size: 12px; }
+  .modal-box .buttons { display: flex; gap: 10px; margin-top: 16px; }
+  .modal-box .keys { margin-top: 12px; font-size: 12px; }
+
+  .three-up { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .mini { background: var(--bg); border: 1px solid var(--dark-gray); border-radius: var(--radius-card); padding: 18px; }
+  .mini .modal-box { position: static; transform: none; width: auto; }
+</style>
+
+<div class="doc">
+  <div class="doc-head">
+    <h1>History — multi-select, bulk export and delete confirmation</h1>
+    <p>Two changes to the History page. Every result carries a seed that exists nowhere else on
+      disk, so deleting one is unrecoverable: destructive actions now go through a confirmation
+      dialog instead of happening on a single click. And rows can be picked — a few, or all of
+      them — to export or delete together, rather than one at a time.</p>
+  </div>
+
+  <h2 class="sec">01 <span>Nothing selected — the page as it is today, plus a checkbox column</span></h2>
+  <div class="frames-wrap">
+  <div class="win">
+    <div class="titlebar"><div class="t-left"><span class="logo-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></svg></span>XRPL Vanity</div><div class="t-right"><span>—</span><span>☐</span><span>✕</span></div></div>
+    <div class="shell">
+      <aside class="rail">
+        <div class="mono-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><circle cx="128" cy="190" r="12" fill="#EBAF8E"/></svg></div>
+        <div class="nav"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Search</div>
+        <div class="nav active"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>History</div>
+        <div class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2"/></svg>Settings</div>
+      </aside>
+      <div class="content">
+        <div class="page-head"><h1>History <span class="pill">47 stored</span></h1><div><button class="btn-secondary-dark">Export TSV…</button> <button class="btn-secondary-dark danger">Clear history</button></div></div>
+        <div class="card-box" style="flex:1">
+          <div class="filter-row">
+            <span class="cb" title="Select every row the filter shows"></span>
+            <div class="field mono placeholder focus" style="max-width:420px">filter by address or pattern</div>
+            <span class="muted" style="font-size:12px">showing 47 of 47</span>
+          </div>
+          <div class="list-head"></div>
+          <div class="rrow"><span class="cb"></span><span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>fast <span class="muted">(starts)</span></span><span class="muted mono target">cuda:0</span><span class="muted">14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="cb"></span><span class="mono">rDXconnzqB1GXn5b4wF5mdNq2mDHWAjpT</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>conn <span class="muted">(contains)</span></span><span class="muted mono target">cpu</span><span class="muted">14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="cb"></span><span class="mono">rStaticBitxK9pQ2wLm4nR8vT6yU1zA3b</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>staticbit <span class="muted">(starts)</span></span><span class="muted mono target">cuda:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="cb"></span><span class="mono">rabcdE7Hk2LmN9pQrS4tUvW6xYz8A1bC3</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono target">opencl:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow" style="border-bottom:1px solid var(--dark-gray)"><span class="cb"></span><span class="mono">rabcdQ2mX8vB4nJ6kL9pR3sT5uW7yZ1aC</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono target">opencl:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="muted" style="font-size:12px;padding:10px 0 0">Stored in <span class="mono">results.dat</span>, encrypted with Windows DPAPI for this user account. Nothing else on disk contains a seed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <p class="caption">With nothing picked the page reads as it does today: <b>Export TSV…</b> writes every
+    row the filter shows, and <b>Clear history</b> removes everything. The only addition is the
+    checkbox column and the one in the filter row that picks every visible row. The Search page's
+    results list is unchanged — selection belongs to History, where deleting is possible.</p>
+
+  <h2 class="sec">02 <span>Some rows picked — the selection bar takes over the two actions</span></h2>
+  <div class="frames-wrap">
+  <div class="win">
+    <div class="titlebar"><div class="t-left"><span class="logo-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></svg></span>XRPL Vanity</div><div class="t-right"><span>—</span><span>☐</span><span>✕</span></div></div>
+    <div class="shell">
+      <aside class="rail">
+        <div class="mono-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><circle cx="128" cy="190" r="12" fill="#EBAF8E"/></svg></div>
+        <div class="nav"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Search</div>
+        <div class="nav active"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>History</div>
+        <div class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2"/></svg>Settings</div>
+      </aside>
+      <div class="content">
+        <div class="page-head"><h1>History <span class="pill">47 stored</span></h1><div><button class="btn-secondary-dark" disabled>Export TSV…</button> <button class="btn-secondary-dark danger">Clear history</button></div></div>
+        <div class="card-box" style="flex:1">
+          <div class="filter-row">
+            <span class="cb some" title="Some of the visible rows are selected"></span>
+            <div class="field mono placeholder" style="max-width:420px">filter by address or pattern</div>
+            <span class="muted" style="font-size:12px">showing 47 of 47</span>
+          </div>
+          <div class="sel-bar">
+            <b>3 selected</b>
+            <span></span>
+            <span class="acts">
+              <button class="btn-secondary-dark">Export selected…</button>
+              <button class="btn-secondary-dark danger">Delete selected</button>
+              <button class="btn-secondary-dark">Clear selection</button>
+            </span>
+          </div>
+          <div class="rrow picked"><span class="cb on"></span><span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>fast <span class="muted">(starts)</span></span><span class="muted mono target">cuda:0</span><span class="muted">14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="cb"></span><span class="mono">rDXconnzqB1GXn5b4wF5mdNq2mDHWAjpT</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>conn <span class="muted">(contains)</span></span><span class="muted mono target">cpu</span><span class="muted">14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow picked"><span class="cb on"></span><span class="mono">rStaticBitxK9pQ2wLm4nR8vT6yU1zA3b</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>staticbit <span class="muted">(starts)</span></span><span class="muted mono target">cuda:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow picked"><span class="cb on"></span><span class="mono">rabcdE7Hk2LmN9pQrS4tUvW6xYz8A1bC3</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono target">opencl:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow" style="border-bottom:1px solid var(--dark-gray)"><span class="cb"></span><span class="mono">rabcdQ2mX8vB4nJ6kL9pR3sT5uW7yZ1aC</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono target">opencl:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="muted" style="font-size:12px;padding:10px 0 0">Stored in <span class="mono">results.dat</span>, encrypted with Windows DPAPI for this user account. Nothing else on disk contains a seed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <p class="caption">A selection bar appears under the filter and holds the actions that operate on it,
+    so the header buttons never change their meaning mid-click: <b>Export TSV…</b> greys out while a
+    selection exists, because the selection bar is now the place to export from. The header checkbox
+    shows a dash when only part of the visible list is picked. Picked rows are tinted, and the count
+    is the anchor — <b>3 selected</b>, not "some rows". Selection is remembered by address, so
+    typing in the filter hides rows without unpicking them; the bar keeps saying how many are held.</p>
+
+  <h2 class="sec">03 <span>Confirming a delete — one dialog for all three destructive paths</span></h2>
+  <div class="three-up">
+    <div class="mini">
+      <div class="modal-box card-box">
+        <h3>Delete this result?</h3>
+        <p>Its seed is deleted with it. <span class="mono">results.dat</span> is the only place the seed exists, so this cannot be undone.</p>
+        <div class="what">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</div>
+        <div class="buttons"><button class="btn-danger">Delete</button><button class="btn-quiet">Cancel</button></div>
+        <p class="keys muted">Esc cancels · focus starts on Cancel</p>
+      </div>
+    </div>
+    <div class="mini">
+      <div class="modal-box card-box">
+        <h3>Delete 3 results?</h3>
+        <p>Their seeds are deleted with them. <span class="mono">results.dat</span> is the only place those seeds exist, so this cannot be undone.</p>
+        <div class="what">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV<br>rStaticBitxK9pQ2wLm4nR8vT6yU1zA3b<br>rabcdE7Hk2LmN9pQrS4tUvW6xYz8A1bC3</div>
+        <div class="buttons"><button class="btn-danger">Delete 3</button><button class="btn-quiet">Cancel</button></div>
+        <p class="keys muted">Above ten rows the list is truncated with "…and 14 more".</p>
+      </div>
+    </div>
+    <div class="mini">
+      <div class="modal-box card-box">
+        <h3>Clear the whole history?</h3>
+        <p>All 47 results and their seeds are removed from <span class="mono">results.dat</span>. This cannot be undone, and the filter does not narrow it — everything goes.</p>
+        <div class="buttons"><button class="btn-danger">Clear history</button><button class="btn-quiet">Cancel</button></div>
+        <p class="keys muted">Replaces today's "Click again to confirm" button.</p>
+      </div>
+    </div>
+  </div>
+  <p class="caption">The same component in three shapes. The wording always names what is lost — the
+    seed, not the row — because that is the part nothing can bring back. The confirming button is red
+    and states the count; <b>Cancel</b> takes focus so a stray Enter is harmless, and Esc closes.
+    The two-step <b>Clear history</b> button and its five-second timer go away.</p>
+
+  <h2 class="sec">04 <span>The dialog in place</span></h2>
+  <div class="frames-wrap">
+  <div class="win stage">
+    <div class="titlebar"><div class="t-left"><span class="logo-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></svg></span>XRPL Vanity</div><div class="t-right"><span>—</span><span>☐</span><span>✕</span></div></div>
+    <div class="shell">
+      <aside class="rail">
+        <div class="mono-mark"><svg viewBox="0 0 256 256"><path d="M60 78 L128 178 L196 78" fill="none" stroke="#64CF95" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/><circle cx="128" cy="190" r="12" fill="#EBAF8E"/></svg></div>
+        <div class="nav"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Search</div>
+        <div class="nav active"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>History</div>
+        <div class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2"/></svg>Settings</div>
+      </aside>
+      <div class="content">
+        <div class="page-head"><h1>History <span class="pill">47 stored</span></h1><div><button class="btn-secondary-dark" disabled>Export TSV…</button> <button class="btn-secondary-dark danger">Clear history</button></div></div>
+        <div class="card-box" style="flex:1">
+          <div class="filter-row">
+            <span class="cb some"></span>
+            <div class="field mono placeholder" style="max-width:420px">filter by address or pattern</div>
+            <span class="muted" style="font-size:12px">showing 47 of 47</span>
+          </div>
+          <div class="sel-bar"><b>3 selected</b><span></span><span class="acts"><button class="btn-secondary-dark">Export selected…</button><button class="btn-secondary-dark danger">Delete selected</button><button class="btn-secondary-dark">Clear selection</button></span></div>
+          <div class="rrow picked"><span class="cb on"></span><span class="mono">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>fast <span class="muted">(starts)</span></span><span class="muted mono target">cuda:0</span><span class="muted">14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow"><span class="cb"></span><span class="mono">rDXconnzqB1GXn5b4wF5mdNq2mDHWAjpT</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>conn <span class="muted">(contains)</span></span><span class="muted mono target">cpu</span><span class="muted">14:02</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow picked"><span class="cb on"></span><span class="mono">rStaticBitxK9pQ2wLm4nR8vT6yU1zA3b</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>staticbit <span class="muted">(starts)</span></span><span class="muted mono target">cuda:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+          <div class="rrow picked" style="border-bottom:1px solid var(--dark-gray)"><span class="cb on"></span><span class="mono">rabcdE7Hk2LmN9pQrS4tUvW6xYz8A1bC3</span><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span>abcd <span class="muted">(starts)</span></span><span class="muted mono target">opencl:0</span><span class="muted">Sep 3</span><span class="mono seed">••••••••</span><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+    <div class="backdrop"></div>
+    <div class="modal-box card-box">
+      <h3>Delete 3 results?</h3>
+      <p>Their seeds are deleted with them. <span class="mono">results.dat</span> is the only place those seeds exist, so this cannot be undone.</p>
+      <div class="what">rfastPJs4Dz7Q3nmPJvEAEGqJd5HtjQhCV<br>rStaticBitxK9pQ2wLm4nR8vT6yU1zA3b<br>rabcdE7Hk2LmN9pQrS4tUvW6xYz8A1bC3</div>
+      <div class="buttons"><button class="btn-danger">Delete 3</button><button class="btn-quiet">Cancel</button></div>
+    </div>
+  </div>
+  </div>
+  <p class="caption">The dialog is drawn inside the page, like the existing close prompt — not a system
+    message box — so it keeps the palette and cannot appear behind the window. The list beneath stays
+    visible through the backdrop, which is what makes "3 selected" checkable at a glance before
+    confirming.</p>
+
+  <h2 class="sec">05 <span>Read-only store</span></h2>
+  <p class="caption">When <span class="mono">results.dat</span> cannot be written, the red banner already
+    replaces the storage footer and the destructive buttons disappear. That stays: the checkbox column
+    and <b>Export selected…</b> remain — reading and exporting are still safe — while <b>Delete
+    selected</b> and <b>Clear history</b> are gone rather than disabled, since nothing the user could
+    do would make them work.</p>
+</div>
