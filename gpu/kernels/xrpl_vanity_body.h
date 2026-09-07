@@ -644,9 +644,13 @@ KERNEL void k_prf_entropy(GLOBAL const u8* key32, u64 start, GLOBAL u8* out, int
 
 // ---------------------------------------------------------------------------
 // M5: device-side matching over host-sorted target groups.
-// groups: 4 x u32 per group = { position (0 starts, 1 ends, 2 contains), length,
-//         offset into chars, count }. Targets inside a group are sorted ordinal
-//         (unsigned byte order) and packed at stride = length.
+// groups: 4 x u32 per group = { position (0 starts, 1 ends, 2 contains,
+//         3 pair-starts, 4 pair-ends), length, offset into chars, count }.
+//         Targets inside a group are sorted ordinal (unsigned byte order) and
+//         packed at stride = length.
+// pairs:  2 x u32 per paired rule = { starts-half group index, ends-half group
+//         index }. Both halves carry a pair-only position code (3 / 4), which the
+//         or-loop skips, so a half never matches on its own.
 // The predicate below equals XrplVanity.Core.PatternSet.TryMatch's hit / no-hit result.
 // ---------------------------------------------------------------------------
 DEVICE_INLINE int cmp_bytes(GLOBAL const u8* a, const u8* b, int len)
@@ -672,13 +676,16 @@ DEVICE bool group_has(GLOBAL const u8* chars, u32 offset, u32 count, u32 len, co
 }
 
 // body = the address WITHOUT its leading 'r'; bodyLen = its length.
-DEVICE bool matches_any(const u8* body, int bodyLen, GLOBAL const u32* groups, int groupCount, GLOBAL const u8* chars)
+DEVICE bool matches_any(const u8* body, int bodyLen,
+                        GLOBAL const u32* groups, int groupCount, GLOBAL const u8* chars,
+                        GLOBAL const u32* pairs, int pairCount)
 {
     for (int g = 0; g < groupCount; g++) {
         u32 pos = groups[g * 4];
         u32 len = groups[g * 4 + 1];
         u32 off = groups[g * 4 + 2];
         u32 cnt = groups[g * 4 + 3];
+        if (pos == 3 || pos == 4) continue; // a pair half is only ever matched by the pair loop
         if ((int)len > bodyLen || cnt == 0 || len == 0) continue;
         if (pos == 0) {
             if (group_has(chars, off, cnt, len, body)) return true;
@@ -690,18 +697,33 @@ DEVICE bool matches_any(const u8* body, int bodyLen, GLOBAL const u32* groups, i
             }
         }
     }
+
+    for (int p = 0; p < pairCount; p++) {
+        u32 gs = pairs[p * 2];
+        u32 ge = pairs[p * 2 + 1];
+        u32 sl = groups[gs * 4 + 1];
+        u32 el = groups[ge * 4 + 1];
+        // Halves that touch exactly still match; overlapping ones do not, and the guard also
+        // keeps the ends-half read inside a body too short to hold both.
+        if ((int)(sl + el) > bodyLen) continue;
+        if (!group_has(chars, groups[gs * 4 + 2], groups[gs * 4 + 3], sl, body)) continue;
+        if (group_has(chars, groups[ge * 4 + 2], groups[ge * 4 + 3], el, body + bodyLen - (int)el)) return true;
+    }
+
     return false;
 }
 
 // Test entry: n x 36-byte address records ([len][chars...]) -> flags[i] = 1 on a hit.
-KERNEL void k_match_records(GLOBAL const u8* records, int n, GLOBAL const u32* groups, int groupCount, GLOBAL const u8* chars, GLOBAL u8* flags)
+KERNEL void k_match_records(GLOBAL const u8* records, int n,
+                            GLOBAL const u32* groups, int groupCount, GLOBAL const u8* chars,
+                            GLOBAL const u32* pairs, int pairCount, GLOBAL u8* flags)
 {
     int i = GLOBAL_ID();
     if (i >= n) return;
     u8 rec[36];
     for (int j = 0; j < 36; j++) rec[j] = records[i * 36 + j];
     int len = rec[0];
-    flags[i] = (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars)) ? 1 : 0;
+    flags[i] = (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars, pairs, pairCount)) ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -712,6 +734,7 @@ KERNEL void k_match_records(GLOBAL const u8* records, int n, GLOBAL const u32* g
 // ---------------------------------------------------------------------------
 KERNEL void k_search(GLOBAL const u8* key32, u64 start, int n,
                      GLOBAL const u32* groups, int groupCount, GLOBAL const u8* chars,
+                     GLOBAL const u32* pairs, int pairCount,
                      GLOBAL u8* hits, GLOBAL u32* hitCount, int hitCapacity, GLOBAL const u8* table)
 {
     int i = GLOBAL_ID();
@@ -723,7 +746,7 @@ KERNEL void k_search(GLOBAL const u8* key32, u64 start, int n,
     u8 rec[36];
     derive_address(e, rec, table);
     int len = rec[0];
-    if (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars)) {
+    if (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars, pairs, pairCount)) {
         u32 slot = ATOMIC_INC(hitCount);
         if ((int)slot < hitCapacity) {
             GLOBAL u8* h = hits + (u32)slot * 52u;

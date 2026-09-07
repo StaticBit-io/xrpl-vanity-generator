@@ -25,10 +25,12 @@ public sealed class GpuSearchEngine : IDisposable
     private readonly IGpuBuffer _key;
     private readonly IGpuBuffer _groups;
     private readonly IGpuBuffer _chars;
+    private readonly IGpuBuffer _pairs;
     private readonly IGpuBuffer _hits;
     private readonly IGpuBuffer _hitCount;
     private readonly IGpuBuffer _table;
     private readonly int _groupCount;
+    private readonly int _pairCount;
     private readonly CandidateEvaluator _verifier;
     private ulong _counter;
     private bool _disposed;
@@ -44,6 +46,7 @@ public sealed class GpuSearchEngine : IDisposable
 
         _search = device.GetKernel("k_search");
         _groupCount = table.GroupCount;
+        _pairCount = table.PairCount;
 
         _table = device.Alloc(TableBytes);
         device.Launch(device.GetKernel("k_build_base_table"), 256, 128, _table);
@@ -55,6 +58,13 @@ public sealed class GpuSearchEngine : IDisposable
         if (table.Chars.Length > 0)
         {
             _chars.CopyFrom(table.Chars);
+        }
+
+        // Always allocated, even with no paired rules, so the launch signature never varies.
+        _pairs = device.Alloc(Math.Max(4, table.Pairs.Length * 4));
+        if (table.Pairs.Length > 0)
+        {
+            _pairs.CopyFrom(MemoryMarshal.AsBytes(new ReadOnlySpan<uint>(table.Pairs)));
         }
 
         _key = device.Alloc(32);
@@ -83,7 +93,7 @@ public sealed class GpuSearchEngine : IDisposable
         {
             int count = Math.Min(SubLaunchSize, CandidatesPerLaunch - offset);
             _device.Launch(_search, count, BlockSize,
-                _key, start + (ulong)offset, count, _groups, _groupCount, _chars, _hits, _hitCount, HitCapacity, _table);
+                _key, start + (ulong)offset, count, _groups, _groupCount, _chars, _pairs, _pairCount, _hits, _hitCount, HitCapacity, _table);
             _device.Synchronize();
         }
 
@@ -145,6 +155,7 @@ public sealed class GpuSearchEngine : IDisposable
         _hitCount.Dispose();
         _hits.Dispose();
         _key.Dispose();
+        _pairs.Dispose();
         _chars.Dispose();
         _groups.Dispose();
         _table.Dispose();

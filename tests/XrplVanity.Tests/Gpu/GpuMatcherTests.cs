@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using XrplVanity.Core;
@@ -29,6 +30,7 @@ public class GpuMatcherTests
         using IGpuBuffer drec = device.Alloc(records.Length);
         using IGpuBuffer dgroups = device.Alloc(Math.Max(4, table.Groups.Length * 4));
         using IGpuBuffer dchars = device.Alloc(Math.Max(1, table.Chars.Length));
+        using IGpuBuffer dpairs = device.Alloc(Math.Max(4, table.Pairs.Length * 4));
         using IGpuBuffer dflags = device.Alloc(n);
         drec.CopyFrom(records);
         if (table.Groups.Length > 0)
@@ -41,7 +43,12 @@ public class GpuMatcherTests
             dchars.CopyFrom(table.Chars);
         }
 
-        device.Launch(fn, n, 256, drec, n, dgroups, table.GroupCount, dchars, dflags);
+        if (table.Pairs.Length > 0)
+        {
+            dpairs.CopyFrom(MemoryMarshal.AsBytes(new ReadOnlySpan<uint>(table.Pairs)));
+        }
+
+        device.Launch(fn, n, 256, drec, n, dgroups, table.GroupCount, dchars, dpairs, table.PairCount, dflags);
         device.Synchronize();
 
         byte[] flags = new byte[n];
@@ -116,6 +123,35 @@ public class GpuMatcherTests
         Assert.Equal(new byte[] { 1, 0, 0 }, starts);
         Assert.Equal(new byte[] { 0, 1, 1 }, ends);
         Assert.Equal(new byte[] { 1, 1, 1 }, contains);
+    }
+
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void The_Device_Agrees_With_The_Cpu_On_Paired_Patterns(string backend)
+    {
+        PatternSet set = new PatternSet.Builder()
+            .AddPair("ab", "yz", ignoreCase: false)
+            .AddPair("cd", "wx", ignoreCase: true)
+            .Add(MatchPosition.Starts, "qq", ignoreCase: false)
+            .Build();
+
+        // Every interesting case: both halves, one half, neither, halves that touch exactly, and
+        // bodies too short to hold both halves.
+        List<string> addresses = new()
+        {
+            "rabQQQQQQQyz", "rabQQQQQQQQQ", "rQQQQQQQQQyz", "rQQQQQQQQQQQ",
+            "rCDQQQQQQQWx", "rcdQQQQQQQwx", "rqqQQQQQQQQQ", "rabyz", "rab", "ryz",
+        };
+        addresses.AddRange(DeriveAddresses(200, 20260906));
+
+        string[] corpus = addresses.ToArray();
+        byte[] deviceFlags = MatchOnDevice(backend, Records(corpus), corpus.Length, TargetTable.Build(set));
+
+        for (int i = 0; i < corpus.Length; i++)
+        {
+            bool cpu = set.TryMatch(corpus[i], out _, out _);
+            Assert.True(cpu == (deviceFlags[i] == 1), $"index {i} {corpus[i]}: cpu={cpu} gpu={deviceFlags[i]}");
+        }
     }
 
     [Theory]
