@@ -2,21 +2,25 @@
 @inherits ViewModelPage
 @inject IResultStore Store
 
-<header class="page-head">
+@* While a dialog is open the page behind it is inert: the destructive controls it covers —
+   "Clear history" above all — must not stay reachable by keyboard or mouse. *@
+<header class="page-head" inert="@(_pending is not null)">
   <h1>History <span class="pill">@_all.Count stored</span></h1>
   <div class="actions">
-    @if (!Store.IsReadOnly)
+    @if (!Store.IsReadOnly && _all.Count > 0)
     {
       <button class="btn-secondary-dark clear t" @onclick="AskClear">Clear history</button>
     }
   </div>
 </header>
-<div class="content-scroll">
+<div class="content-scroll" inert="@(_pending is not null)">
   @if (Store.IsReadOnly)
   {
     <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
   }
-  @if (_storeError is not null)
+  @* A failed write turns the store read-only and throws with that same reason, so the banner
+     above already carries it; showing both would stack two identical red lines. *@
+  @if (_storeError is not null && !Store.IsReadOnly)
   {
     <Banner Kind="negative" Text="@_storeError" />
   }

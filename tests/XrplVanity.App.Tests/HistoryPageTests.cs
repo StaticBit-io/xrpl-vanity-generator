@@ -145,6 +145,34 @@ public class HistoryPageTests : BunitContext
     }
 
     [Fact]
+    public void An_Open_Dialog_Makes_The_Page_Behind_It_Inert()
+    {
+        // Otherwise Clear history stays reachable by keyboard from inside the delete dialog.
+        MemoryResultStore store = new();
+        SeedTwo(store);
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        Assert.False(cut.Find("header.page-head").HasAttribute("inert"));
+
+        cut.FindAll("button.delete")[0].Click();
+
+        Assert.True(cut.Find("header.page-head").HasAttribute("inert"));
+        Assert.True(cut.Find("div.content-scroll").HasAttribute("inert"));
+
+        cut.Find("button.cancel").Click();
+
+        Assert.False(cut.Find("header.page-head").HasAttribute("inert"));
+    }
+
+    [Fact]
+    public void An_Empty_History_Offers_Nothing_To_Clear()
+    {
+        IRenderedComponent<HistoryPage> cut = RenderPage(new MemoryResultStore());
+
+        Assert.Empty(cut.FindAll("button.clear"));
+    }
+
+    [Fact]
     public void A_Store_That_Throws_On_Delete_Or_Clear_Shows_A_Banner_Instead_Of_Crashing()
     {
         MemoryResultStore store = new() { ReadOnlyReason = "results.dat could not be written" };
