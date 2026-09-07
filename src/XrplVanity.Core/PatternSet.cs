@@ -113,9 +113,8 @@ public sealed class PatternSet
 
         foreach (Pair pair in _pairs)
         {
-            // Halves must not touch or overlap: the body needs room strictly beyond both
-            // halves, so an address exactly as long as Starts+Ends never matches.
-            if (pair.StartsLength + pair.EndsLength >= body.Length)
+            // Halves may touch but must not overlap.
+            if (pair.StartsLength + pair.EndsLength > body.Length)
             {
                 continue;
             }

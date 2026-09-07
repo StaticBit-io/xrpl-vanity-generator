@@ -171,11 +171,12 @@ public class PatternSetTests
     }
 
     [Fact]
-    public void A_Pair_Whose_Halves_Do_Not_Fit_The_Body_Does_Not_Match()
+    public void A_Pair_Matches_When_The_Halves_Touch_And_Not_When_They_Would_Overlap()
     {
         PatternSet set = Pair("abcd", "wxyz");
-        Assert.False(set.TryMatch("rabcdwxyz", out _, out _));      // body is 8, halves need 8 — fits exactly
-        Assert.True(set.TryMatch("rabcdQwxyz", out _, out _));      // body is 9
+        Assert.True(set.TryMatch("rabcdwxyz", out _, out _));       // body 8, halves 4 + 4, they touch exactly
+        Assert.True(set.TryMatch("rabcdQwxyz", out _, out _));      // body 9
+        Assert.False(set.TryMatch("rabcwxyz", out _, out _));       // body 7, the halves cannot both fit
     }
 
     [Fact]
