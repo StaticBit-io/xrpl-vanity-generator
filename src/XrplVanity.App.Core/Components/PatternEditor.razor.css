@@ -1,6 +1,8 @@
 .chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 36px; margin-bottom: 12px; }
 .chip-normalized { color: var(--text-secondary); }
 .entry { display: grid; grid-template-columns: 140px 1fr auto auto; gap: 8px; align-items: center; }
+/* The Pair mode adds a second box: one more equal-width column, the rest of the row unchanged. */
+.pattern-entry.paired { grid-template-columns: 140px 1fr 1fr auto auto; }
 /* The dark control chrome, the mint focus border and the placeholder colour are global now
    (wwwroot/scss/common/_forms.scss); only this component's own layout stays here. */
 .case-label { color: var(--text-secondary); white-space: nowrap; display: flex; gap: 6px; align-items: center; }
@@ -8,6 +10,8 @@
 .pattern-problem { color: var(--yellow); font-size: 12px; margin-top: 6px; }
 .pattern-hint { color: var(--text-secondary); font-size: 12px; margin-top: 6px; }
 @media (max-width: 1000px) {
-  .pattern-entry { grid-template-columns: 1fr 1fr; }
+  /* .paired is repeated here on purpose: a media query adds no specificity, so without it the
+     five-column rule above would keep winning below 1000 px and the row would stop wrapping. */
+  .pattern-entry, .pattern-entry.paired { grid-template-columns: 1fr 1fr; }
   .pattern-entry .pos { grid-column: 1 / -1; }
 }

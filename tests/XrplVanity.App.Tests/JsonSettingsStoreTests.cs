@@ -31,7 +31,7 @@ public class JsonSettingsStoreTests
         {
             DutyPercent = 80,
             CloseBehavior = CloseBehavior.MinimizeToTray,
-            Patterns = new[] { new PatternDraft("abc", "Starts", true) },
+            Patterns = new[] { new PatternDraft("abc", "Starts", true), new PatternDraft("abc", "Pair", true, "xyz") },
             Targets = new[] { "cpu", "cuda:0" },
             CpuThreads = 6,
             Count = 3,
@@ -44,6 +44,20 @@ public class JsonSettingsStoreTests
 
         Assert.Equal(settings, new JsonSettingsStore(folder).Load());
         Assert.False(File.Exists(Path.Combine(folder, "settings.json.tmp")));
+    }
+
+    [Fact]
+    public void A_Pattern_Written_Before_The_Second_Half_Existed_Still_Loads()
+    {
+        string folder = TempFolder();
+        File.WriteAllText(
+            Path.Combine(folder, "settings.json"),
+            "{ \"Patterns\": [ { \"Text\": \"abc\", \"Position\": \"Starts\", \"IgnoreCase\": true } ] }");
+
+        PatternDraft draft = Assert.Single(new JsonSettingsStore(folder).Load().Patterns);
+        Assert.Equal("abc", draft.Text);
+        Assert.Equal("Starts", draft.Position);
+        Assert.Null(draft.EndsText);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+@using XrplVanity.Core
 @inherits ViewModelComponent
 <div class="card-box">
   <div class="card-title">Patterns</div>
@@ -5,8 +6,18 @@
     @foreach (PatternChip chip in Vm.Patterns)
     {
       <span class="chip t" @key="chip">
-        <span class="chip-pos">@chip.Position.ToString().ToLowerInvariant()</span>
-        <span class="mono">@chip.Text</span>
+        @if (chip.Position == MatchPosition.Pair)
+        {
+          <span class="chip-pos">starts</span>
+          <span class="mono">@chip.Text</span>
+          <span class="chip-pos">ends</span>
+          <span class="mono">@chip.EndsText</span>
+        }
+        else
+        {
+          <span class="chip-pos">@chip.Position.ToString().ToLowerInvariant()</span>
+          <span class="mono">@chip.Text</span>
+        }
         @if (chip.Normalized is not null) { <span class="chip-normalized mono" title="0, O, I and l do not exist in the XRPL alphabet, so they are folded onto o, o, i and L">→ @chip.Normalized</span> }
         @if (!chip.IgnoreCase) { <span class="chip-pos" title="case-sensitive">Aa</span> }
         @if (chip.Warning is not null) { <span class="chip-warn">@chip.Warning</span> }
@@ -14,13 +25,22 @@
       </span>
     }
   </div>
-  <div class="entry pattern-entry">
+  <div class="entry pattern-entry @(Vm.EntryPosition == MatchPosition.Pair ? "paired" : null)">
     <select class="pos form-select" @bind="Vm.EntryPosition">
       <option value="Starts">starts with</option>
       <option value="Ends">ends with</option>
       <option value="Contains">contains</option>
+      <option value="Pair">starts and ends with</option>
     </select>
-    <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+    @if (Vm.EntryPosition == MatchPosition.Pair)
+    {
+      <input class="pattern form-control mono" placeholder="starts with…" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+      <input class="pattern-ends form-control mono" placeholder="ends with…" @bind="Vm.EntryEndsText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+    }
+    else
+    {
+      <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+    }
     <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
     <label class="btn-secondary-dark t">
       load list…

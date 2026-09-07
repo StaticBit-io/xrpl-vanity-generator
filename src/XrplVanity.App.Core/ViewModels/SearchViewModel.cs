@@ -35,6 +35,7 @@ public sealed class SearchViewModel : IDisposable
     private AppSettings _settings;
     private PatternSet? _patternSet;
     private string _entryText = string.Empty;
+    private string _entryEndsText = string.Empty;
     private MatchPosition _entryPosition = MatchPosition.Starts;
     private bool _entryIgnoreCase = true;
     private SearchSession? _session;
@@ -60,10 +61,12 @@ public sealed class SearchViewModel : IDisposable
         _count = _settings.Count is int loadedCount && loadedCount < 1 ? null : _settings.Count;
         foreach (PatternDraft draft in _settings.Patterns)
         {
-            if (Enum.TryParse(draft.Position, out MatchPosition position))
-            {
-                _patterns.Add(new PatternChip(draft.Text, position, draft.IgnoreCase));
-            }
+            if (!Enum.TryParse(draft.Position, out MatchPosition position)) continue;
+            // A Pair draft needs both halves. One saved by a build that predates paired patterns
+            // (or corrupted since) carries none, and restoring it would put a chip on screen that
+            // names a rule it cannot express — drop it here, the same way a bad value is clamped.
+            if (position == MatchPosition.Pair && string.IsNullOrWhiteSpace(draft.EndsText)) continue;
+            _patterns.Add(new PatternChip(draft.Text, position, draft.IgnoreCase, draft.EndsText));
         }
 
         RefreshDevices();
@@ -239,6 +242,29 @@ public sealed class SearchViewModel : IDisposable
         }
     }
 
+    /// <summary>
+    /// The second box, shown only while <see cref="EntryPosition"/> is <see cref="MatchPosition.Pair"/>:
+    /// the suffix half of the pending rule. Like <see cref="EntryText"/> it persists nothing until
+    /// the pair is committed as one chip.
+    /// </summary>
+    public string EntryEndsText
+    {
+        get { lock (_gate) return _entryEndsText; }
+        set
+        {
+            string normalized = value ?? string.Empty;
+            bool changed;
+            lock (_gate)
+            {
+                changed = normalized != _entryEndsText;
+                _entryEndsText = normalized;
+            }
+
+            if (!changed) return;
+            Changed?.Invoke();
+        }
+    }
+
     public MatchPosition EntryPosition
     {
         get { lock (_gate) return _entryPosition; }
@@ -286,9 +312,14 @@ public sealed class SearchViewModel : IDisposable
                 if (_patternSet is not null && _patternSet.HasPatterns) return null;
                 string trimmedEntry = _entryText.Trim();
                 if (IsReachableEntry(trimmedEntry)) return null;
-                return trimmedEntry.Length == 0
+                // For a pair the message names the half that is actually at fault: the first box
+                // when it is the unreachable one, the second box otherwise.
+                string offending = _entryPosition == MatchPosition.Pair && IsReachableHalf(trimmedEntry)
+                    ? _entryEndsText.Trim()
+                    : trimmedEntry;
+                return offending.Length == 0
                     ? "Add at least one reachable pattern."
-                    : $"\"{trimmedEntry}\" cannot occur in an XRPL address.";
+                    : $"\"{offending}\" cannot occur in an XRPL address.";
             }
         }
     }
@@ -305,10 +336,20 @@ public sealed class SearchViewModel : IDisposable
             {
                 string trimmedEntry = _entryText.Trim();
                 if (!IsReachableEntry(trimmedEntry)) return null;
+                string typed = trimmedEntry;
                 string normalized = PatternNormalizer.Normalize(trimmedEntry).Value;
-                return normalized != trimmedEntry
-                    ? $"\"{trimmedEntry}\" is searched as \"{normalized}\" — press Enter to add it, or just press Start."
-                    : $"Press Enter to add \"{trimmedEntry}\" — Start adds it too.";
+                if (_entryPosition == MatchPosition.Pair)
+                {
+                    // Both halves are previewed as one "starts..ends" string — the same shape
+                    // PatternSet reports a paired rule under.
+                    string trimmedEnds = _entryEndsText.Trim();
+                    typed = $"{typed}..{trimmedEnds}";
+                    normalized = $"{normalized}..{PatternNormalizer.Normalize(trimmedEnds).Value}";
+                }
+
+                return normalized != typed
+                    ? $"\"{typed}\" is searched as \"{normalized}\" — press Enter to add it, or just press Start."
+                    : $"Press Enter to add \"{typed}\" — Start adds it too.";
             }
         }
     }
@@ -342,12 +383,35 @@ public sealed class SearchViewModel : IDisposable
     }
 
     /// <summary>
+    /// Adds one rule that matches only an address body starting with <paramref name="starts"/> and
+    /// ending with <paramref name="ends"/>. Both halves are required: a blank one adds nothing,
+    /// the way <see cref="AddPattern"/> ignores a blank pattern.
+    /// </summary>
+    public void AddPair(string starts, string ends, bool ignoreCase)
+    {
+        string trimmedStarts = starts.Trim();
+        string trimmedEnds = ends.Trim();
+        if (trimmedStarts.Length == 0 || trimmedEnds.Length == 0) return;
+        lock (_gate)
+        {
+            _patterns.Add(new PatternChip(trimmedStarts, MatchPosition.Pair, ignoreCase, trimmedEnds));
+            RebuildPatternSet();
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    /// <summary>
     /// Commits the pending entry as a chip, the same way pressing Enter in the entry row does.
-    /// Returns false without side effects when the trimmed entry is blank.
+    /// Returns false without side effects when the trimmed entry is blank — or, in
+    /// <see cref="MatchPosition.Pair"/> mode, when either of the two boxes is: the pair commits
+    /// as one chip or not at all.
     /// </summary>
     public bool AddPatternFromEntry()
     {
         string trimmed;
+        string trimmedEnds;
         MatchPosition position;
         bool ignoreCase;
         lock (_gate)
@@ -355,11 +419,24 @@ public sealed class SearchViewModel : IDisposable
             trimmed = _entryText.Trim();
             if (trimmed.Length == 0) return false;
             position = _entryPosition;
+            trimmedEnds = _entryEndsText.Trim();
+            if (position == MatchPosition.Pair && trimmedEnds.Length == 0) return false;
             ignoreCase = _entryIgnoreCase;
             _entryText = string.Empty;
+            // Only in Pair mode: outside it the second box is not on screen, and clearing it would
+            // silently drop a draft the user typed before switching modes.
+            if (position == MatchPosition.Pair) _entryEndsText = string.Empty;
         }
 
-        AddPattern(trimmed, position, ignoreCase);
+        if (position == MatchPosition.Pair)
+        {
+            AddPair(trimmed, trimmedEnds, ignoreCase);
+        }
+        else
+        {
+            AddPattern(trimmed, position, ignoreCase);
+        }
+
         return true;
     }
 
@@ -459,9 +536,9 @@ public sealed class SearchViewModel : IDisposable
     /// </summary>
     public void Start()
     {
-        string pendingEntry;
-        lock (_gate) pendingEntry = _entryText.Trim();
-        if (IsReachableEntry(pendingEntry))
+        bool pendingEntryIsReachable;
+        lock (_gate) pendingEntryIsReachable = IsReachableEntry(_entryText.Trim());
+        if (pendingEntryIsReachable)
         {
             AddPatternFromEntry();
         }
@@ -732,27 +809,93 @@ public sealed class SearchViewModel : IDisposable
         }
     }
 
-    /// <summary>A trimmed entry is reachable when normalizing it yields a non-empty, in-alphabet value.</summary>
-    private static bool IsReachableEntry(string trimmedEntry) =>
-        trimmedEntry.Length > 0 && PatternNormalizer.Normalize(trimmedEntry) is { Reachable: true, Value.Length: > 0 };
+    /// <summary>A trimmed half is reachable when normalizing it yields a non-empty, in-alphabet value.</summary>
+    private static bool IsReachableHalf(string trimmedHalf) =>
+        trimmedHalf.Length > 0 && PatternNormalizer.Normalize(trimmedHalf) is { Reachable: true, Value.Length: > 0 };
+
+    /// <summary>
+    /// The pending entry as a whole. In <see cref="MatchPosition.Pair"/> mode it counts as
+    /// reachable only when both boxes are non-blank and reachable — a half-typed pair is not a
+    /// rule. Reads <c>_entryPosition</c>/<c>_entryEndsText</c>, so callers hold <c>_gate</c>.
+    /// </summary>
+    private bool IsReachableEntry(string trimmedEntry) =>
+        _entryPosition == MatchPosition.Pair
+            ? IsReachableHalf(trimmedEntry) && IsReachableHalf(_entryEndsText.Trim())
+            : IsReachableHalf(trimmedEntry);
+
+    /// <summary>"cannot occur in an XRPL address" / "empty pattern" for one half, or null.</summary>
+    private static string? UnreachableWarning(NormalizedPattern normalized) =>
+        !normalized.Reachable ? "cannot occur in an XRPL address"
+        : normalized.Value.Length == 0 ? "empty pattern"
+        : null;
+
+    /// <summary>The case-folding cap warning for one half, or null. Applied per half for a pair.</summary>
+    private static string? CaseFoldWarning(NormalizedPattern normalized, bool ignoreCase) =>
+        ignoreCase && normalized.Value.Length > PatternSet.MaxIgnoreCaseLength
+            ? $"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively"
+            : null;
+
+    /// <summary>
+    /// A paired chip reports the first half that cannot occur before either half's folding cap:
+    /// an unreachable half drops the whole rule, while the cap only changes how it is searched.
+    /// </summary>
+    private static string? ChipWarning(PatternChip chip)
+    {
+        if (chip.Position != MatchPosition.Pair)
+        {
+            NormalizedPattern single = PatternNormalizer.Normalize(chip.Text);
+            return UnreachableWarning(single) ?? CaseFoldWarning(single, chip.IgnoreCase);
+        }
+
+        if (string.IsNullOrWhiteSpace(chip.EndsText)) return "empty pattern";
+        NormalizedPattern starts = PatternNormalizer.Normalize(chip.Text);
+        NormalizedPattern ends = PatternNormalizer.Normalize(chip.EndsText.Trim());
+        return UnreachableWarning(starts)
+            ?? UnreachableWarning(ends)
+            ?? CaseFoldWarning(starts, chip.IgnoreCase)
+            ?? CaseFoldWarning(ends, chip.IgnoreCase);
+    }
+
+    /// <summary>The folded form of a chip, or null when folding changes nothing.</summary>
+    private static string? ChipNormalized(PatternChip chip)
+    {
+        if (chip.Position != MatchPosition.Pair || string.IsNullOrWhiteSpace(chip.EndsText))
+        {
+            string single = PatternNormalizer.Normalize(chip.Text).Value;
+            return single != chip.Text ? single : null;
+        }
+
+        string trimmedEnds = chip.EndsText.Trim();
+        string typed = $"{chip.Text}..{trimmedEnds}";
+        string folded = $"{PatternNormalizer.Normalize(chip.Text).Value}..{PatternNormalizer.Normalize(trimmedEnds).Value}";
+        return folded != typed ? folded : null;
+    }
 
     private void RebuildPatternSet()
     {
         PatternSet.Builder builder = new();
         foreach (PatternChip chip in _patterns)
         {
-            builder.Add(chip.Position, chip.Text, chip.IgnoreCase);
+            if (chip.Position == MatchPosition.Pair)
+            {
+                // UpdatePattern is public and can flip any chip to Pair, including one that has no
+                // second half; such a chip contributes no rule and says so through its Warning.
+                if (!string.IsNullOrWhiteSpace(chip.EndsText))
+                {
+                    builder.AddPair(chip.Text, chip.EndsText, chip.IgnoreCase);
+                }
+            }
+            else
+            {
+                builder.Add(chip.Position, chip.Text, chip.IgnoreCase);
+            }
         }
 
         PatternSet set = builder.Build();
         foreach (PatternChip chip in _patterns)
         {
-            NormalizedPattern normalized = PatternNormalizer.Normalize(chip.Text);
-            chip.Warning = !normalized.Reachable ? "cannot occur in an XRPL address"
-                : normalized.Value.Length == 0 ? "empty pattern"
-                : chip.IgnoreCase && normalized.Value.Length > PatternSet.MaxIgnoreCaseLength ? $"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively"
-                : null;
-            chip.Normalized = normalized.Value != chip.Text ? normalized.Value : null;
+            chip.Warning = ChipWarning(chip);
+            chip.Normalized = ChipNormalized(chip);
         }
 
         _patternSet = set;
@@ -767,7 +910,7 @@ public sealed class SearchViewModel : IDisposable
         {
             SaveSettings(s => s with
             {
-                Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase)).ToArray(),
+                Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase, p.EndsText)).ToArray(),
                 Targets = _targets.Where(t => t.Selected).Select(t => t.Id).ToArray(),
                 CpuThreads = _cpuThreads,
                 Count = _count,

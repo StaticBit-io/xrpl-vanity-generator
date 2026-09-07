@@ -2,7 +2,13 @@ using XrplVanity.App.Core.Services;
 
 namespace XrplVanity.App.Core.Storage;
 
-public sealed record PatternDraft(string Text, string Position, bool IgnoreCase);
+/// <summary>
+/// One saved pattern chip. <paramref name="EndsText"/> is the second half of a
+/// <c>MatchPosition.Pair</c> draft and null for every other position; it is trailing and optional
+/// so a settings file written before paired patterns existed still deserializes, and a Pair draft
+/// that arrives without it is dropped on restore rather than rebuilt as half a rule.
+/// </summary>
+public sealed record PatternDraft(string Text, string Position, bool IgnoreCase, string? EndsText = null);
 
 public sealed record AppSettings
 {

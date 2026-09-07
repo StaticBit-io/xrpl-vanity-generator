@@ -3,6 +3,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components.Forms;
 using XrplVanity.App.Core.Components;
 using XrplVanity.App.Core.ViewModels;
+using XrplVanity.Core;
 using Xunit;
 
 namespace XrplVanity.App.Tests;
@@ -28,6 +29,83 @@ public class PatternEditorTests : BunitContext
         Assert.False(chip.IgnoreCase);
         Assert.Contains("fast", cut.Find(".chip").TextContent);
         Assert.Equal(string.Empty, cut.Find("input.pattern").GetAttribute("value") ?? string.Empty);
+    }
+
+    [Fact]
+    public void The_Fourth_Mode_Shows_Two_Boxes_And_Adds_A_Paired_Chip()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("select.pos").Change("Pair");
+        Assert.Single(cut.FindAll("input.pattern"));
+        Assert.Single(cut.FindAll("input.pattern-ends"));
+
+        cut.Find("input.pattern").Input("abc");
+        cut.Find("input.pattern-ends").Input("xyz");
+        cut.Find("input.pattern-ends").KeyDown("Enter");
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("abc", chip.Text);
+        Assert.Equal("xyz", chip.EndsText);
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.Contains("abc", cut.Find(".chip").TextContent);
+        Assert.Contains("xyz", cut.Find(".chip").TextContent);
+    }
+
+    [Fact]
+    public void The_Fourth_Mode_Also_Commits_From_The_First_Box()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("select.pos").Change("Pair");
+        cut.Find("input.pattern").Input("abc");
+        cut.Find("input.pattern-ends").Input("xyz");
+        cut.Find("input.pattern").KeyDown("Enter");
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("abc", chip.Text);
+        Assert.Equal("xyz", chip.EndsText);
+    }
+
+    [Fact]
+    public void Only_One_Box_Is_Shown_Outside_The_Fourth_Mode()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        Assert.Empty(cut.FindAll("input.pattern-ends"));
+
+        cut.Find("select.pos").Change("Pair");
+        Assert.Single(cut.FindAll("input.pattern-ends"));
+
+        cut.Find("select.pos").Change("Contains");
+        Assert.Empty(cut.FindAll("input.pattern-ends"));
+    }
+
+    [Fact]
+    public void A_Paired_Chip_Warns_About_The_Half_That_Cannot_Occur()
+    {
+        SearchViewModel vm = Vm();
+        vm.AddPair("abc", "@", ignoreCase: false);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+        Assert.Contains("cannot occur", cut.Find(".chip-warn").TextContent);
+    }
+
+    [Fact]
+    public void A_Paired_Chip_Labels_Both_Halves()
+    {
+        SearchViewModel vm = Vm();
+        vm.AddPair("abc", "xyz", ignoreCase: false);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        string chip = cut.Find(".chip").TextContent;
+        Assert.Contains("starts", chip);
+        Assert.Contains("abc", chip);
+        Assert.Contains("ends", chip);
+        Assert.Contains("xyz", chip);
+        Assert.DoesNotContain("pair", chip);
     }
 
     [Fact]

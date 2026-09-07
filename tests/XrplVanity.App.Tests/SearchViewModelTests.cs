@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
 using XrplVanity.Gpu;
@@ -388,6 +389,213 @@ public class SearchViewModelTests
         PatternChip chip = Assert.Single(vm.Patterns);
         Assert.Equal("a", chip.Text);
         Assert.Single(vm.Results);
+    }
+
+    [Fact]
+    public void AddPair_Adds_A_Paired_Chip_And_Rebuilds_The_Set()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPair("abc", "xyz", ignoreCase: false);
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("abc", chip.Text);
+        Assert.Equal("xyz", chip.EndsText);
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.False(chip.IgnoreCase);
+        Assert.Null(chip.Warning);
+
+        PatternSet.Builder builder = new();
+        builder.AddPair("abc", "xyz", false);
+        Assert.Equal(SearchEstimator.ExpectedCandidatesPerMatch(builder.Build()), vm.ExpectedCandidates);
+    }
+
+    [Fact]
+    public void ExpectedCandidates_For_A_Paired_Rule_Counts_Both_Halves()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPair("abc", "xyz", ignoreCase: false);
+        Assert.InRange(vm.ExpectedCandidates!.Value, 1.5e10, 1.6e10);
+    }
+
+    [Fact]
+    public void A_Paired_Rule_Alone_Makes_CanStart_True()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPair("ab", "cd", ignoreCase: false);
+        Assert.Equal(MatchPosition.Pair, Assert.Single(vm.Patterns).Position);
+        Assert.True(vm.CanStart);
+    }
+
+    [Fact]
+    public void A_Paired_Chip_Warns_About_The_First_Half_That_Cannot_Occur()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPair("abc", "@", ignoreCase: false);
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("cannot occur in an XRPL address", chip.Warning);
+        Assert.False(vm.CanStart);
+    }
+
+    [Fact]
+    public void A_Paired_Chip_Whose_Halves_Fold_Records_Both_Normalized_Halves()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPair("Il", "ab", ignoreCase: false);
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("iL..ab", chip.Normalized);
+    }
+
+    [Fact]
+    public void Flipping_A_Plain_Chip_To_Pair_Warns_Instead_Of_Throwing()
+    {
+        // UpdatePattern is public and can set any chip's Position to Pair; the chip then has no
+        // second half, contributes no rule, and must say so rather than dereference a null.
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false);
+        PatternChip chip = Assert.Single(vm.Patterns);
+
+        vm.UpdatePattern(chip, MatchPosition.Pair, ignoreCase: false);
+
+        Assert.Equal("empty pattern", chip.Warning);
+        Assert.False(vm.CanStart);
+    }
+
+    [Fact]
+    public void EntryEndsText_Round_Trips_And_Raises_Changed_Once_Per_Distinct_Value()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        int changes = 0;
+        vm.Changed += () => Interlocked.Increment(ref changes);
+
+        vm.EntryEndsText = "xyz";
+        vm.EntryEndsText = "xyz";
+
+        Assert.Equal("xyz", vm.EntryEndsText);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void A_Pending_Pair_Is_Reachable_Only_When_Both_Halves_Are()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryPosition = MatchPosition.Pair;
+        vm.EntryText = "abc";
+
+        Assert.Equal("Add at least one reachable pattern.", vm.PatternProblem);
+        Assert.Null(vm.PatternHint);
+        Assert.False(vm.CanStart);
+
+        vm.EntryEndsText = "@";
+        Assert.Equal("\"@\" cannot occur in an XRPL address.", vm.PatternProblem);
+        Assert.Null(vm.PatternHint);
+
+        vm.EntryEndsText = "xyz";
+        Assert.Null(vm.PatternProblem);
+        Assert.Equal("Press Enter to add \"abc..xyz\" — Start adds it too.", vm.PatternHint);
+        Assert.True(vm.CanStart);
+    }
+
+    [Fact]
+    public void The_Pending_Pair_Hint_Previews_Both_Normalized_Halves()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryPosition = MatchPosition.Pair;
+        vm.EntryText = "Il";
+        vm.EntryEndsText = "ab";
+
+        Assert.Equal("\"Il..ab\" is searched as \"iL..ab\" — press Enter to add it, or just press Start.", vm.PatternHint);
+    }
+
+    [Fact]
+    public void AddPatternFromEntry_Commits_Both_Boxes_As_One_Paired_Chip()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryPosition = MatchPosition.Pair;
+        vm.EntryText = "abc";
+        vm.EntryEndsText = "xyz";
+        vm.EntryIgnoreCase = false;
+
+        Assert.True(vm.AddPatternFromEntry());
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("abc", chip.Text);
+        Assert.Equal("xyz", chip.EndsText);
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.Equal(string.Empty, vm.EntryText);
+        Assert.Equal(string.Empty, vm.EntryEndsText);
+    }
+
+    [Fact]
+    public void AddPatternFromEntry_With_A_Blank_Second_Half_Adds_Nothing_And_Returns_False()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryPosition = MatchPosition.Pair;
+        vm.EntryText = "abc";
+
+        Assert.False(vm.AddPatternFromEntry());
+        Assert.Empty(vm.Patterns);
+        Assert.Equal("abc", vm.EntryText);
+    }
+
+    [Fact]
+    public void Start_With_A_Pending_Pair_Commits_Both_Boxes_And_The_Search_Runs()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        vm.EntryPosition = MatchPosition.Pair;
+        vm.EntryText = "a";
+        vm.EntryEndsText = "b";
+        vm.Count = 1;
+
+        Assert.True(vm.CanStart);
+        vm.Start();
+
+        WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("a", chip.Text);
+        Assert.Equal("b", chip.EndsText);
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.Equal(string.Empty, vm.EntryText);
+        Assert.Equal(string.Empty, vm.EntryEndsText);
+        Assert.Single(vm.Results);
+    }
+
+    [Fact]
+    public void A_Paired_Chip_Round_Trips_Through_Settings()
+    {
+        MemorySettingsStore settings = new();
+        MemoryResultStore results = new();
+        FakeNotifications notes = new();
+        SearchViewModel first = new(settings, results, notes, () => Array.Empty<DeviceCatalogEntry>());
+        first.AddPair("abc", "xyz", ignoreCase: false);
+
+        SearchViewModel restored = new(settings, results, notes, () => Array.Empty<DeviceCatalogEntry>());
+
+        PatternChip chip = Assert.Single(restored.Patterns);
+        Assert.Equal("abc", chip.Text);
+        Assert.Equal("xyz", chip.EndsText);
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.False(chip.IgnoreCase);
+        Assert.Null(chip.Warning);
+        Assert.True(restored.CanStart);
+    }
+
+    [Fact]
+    public void A_Pair_Draft_Without_A_Second_Half_Is_Skipped_On_Restore()
+    {
+        // A settings file written by an older build (or corrupted) carries no second half; the
+        // chip is dropped rather than restored as a rule it cannot express.
+        MemorySettingsStore settings = new();
+        settings.Save(new AppSettings
+        {
+            Patterns = new[] { new PatternDraft("abc", "Pair", true), new PatternDraft("ab", "Starts", true) },
+        });
+
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<DeviceCatalogEntry>());
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("ab", chip.Text);
+        Assert.Equal(MatchPosition.Starts, chip.Position);
     }
 
     [Fact]
