@@ -96,6 +96,27 @@ public class CliOptionsTests
         Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--gpu-devices" }));
         Assert.Null(CliOptions.Parse(new[] { "abc" }).GpuDevices);
     }
+
+    [Fact]
+    public void Parses_Starts_Ends_Pairs()
+    {
+        CliOptions options = CliOptions.Parse(new[] { "--starts-ends", "abc:xyz", "--starts-ends", "q:w" });
+        Assert.Equal(2, options.Pairs.Count);
+        Assert.Equal(("abc", "xyz"), options.Pairs[0]);
+        Assert.Equal(("q", "w"), options.Pairs[1]);
+    }
+
+    [Theory]
+    [InlineData("abcxyz")]
+    [InlineData(":xyz")]
+    [InlineData("abc:")]
+    [InlineData("a:b:c")]
+    public void A_Malformed_Starts_Ends_Value_Is_A_Usage_Error(string value)
+    {
+        ArgumentException error = Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--starts-ends", value }));
+        Assert.Contains("--starts-ends", error.Message);
+    }
+
     [Fact]
     public void Gpu_Duty_Defaults_To_100_And_Accepts_1_To_100()
     {

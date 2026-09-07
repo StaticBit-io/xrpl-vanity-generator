@@ -21,6 +21,13 @@ public static class SearchRunner
             builder.Add(position, pattern, ignoreCase: !options.CaseSensitive);
         }
 
+        // Same principle as above: a pair with an unreachable or empty half is not filtered
+        // out here either, so it surfaces through PatternSet.Unreachable and its warning.
+        foreach ((string starts, string ends) in options.Pairs)
+        {
+            builder.AddPair(starts, ends, ignoreCase: !options.CaseSensitive);
+        }
+
         if (options.ListFile is not null)
         {
             foreach (string line in File.ReadLines(options.ListFile))

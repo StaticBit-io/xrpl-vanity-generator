@@ -77,6 +77,10 @@ expect_exit "gpu search" 0 "$RC"
 if [ "$MODE" = gpu ]; then expect_contains "ran on cuda" "GPU: cuda:" "$OUT"; else expect_contains "fell to opencl (no CUDA)" "GPU: opencl:" "$OUT"; fi
 expect_contains "no consistency errors" "consistency errors: 0" "$OUT"; expect_not_contains "no consistency warning" "GPU consistency error" "$OUT"
 
+step "smoke: --starts-ends (paired pattern) on GPU"
+set +e; OUT="$("${CLI[@]}" --gpu --starts-ends a:b --count 1 2>&1)"; RC=$?; set -e
+expect_exit "starts-ends search" 0 "$RC"; expect_contains "address printed" "Address:" "$OUT"
+
 step "smoke: --gpu-devices all"
 set +e; OUT="$("${CLI[@]}" --gpu-devices all --starts ab --count 2 2>&1)"; RC=$?; set -e
 expect_exit "multi-device search" 0 "$RC"; expect_contains "opencl worker ran" "GPU[opencl:0]: searched" "$OUT"; expect_contains "no consistency errors" "consistency errors: 0." "$OUT"

@@ -9,6 +9,7 @@ namespace XrplVanity.Cli;
 public sealed class CliOptions
 {
     public required IReadOnlyList<(MatchPosition Position, string Pattern)> Patterns { get; init; }
+    public required IReadOnlyList<(string Starts, string Ends)> Pairs { get; init; }
     public bool CaseSensitive { get; init; }
     public bool Gpu { get; init; }
     public int Threads { get; init; } = Environment.ProcessorCount;
@@ -26,6 +27,7 @@ public sealed class CliOptions
     public static CliOptions Parse(string[] args)
     {
         List<(MatchPosition, string)> patterns = new();
+        List<(string, string)> pairs = new();
         bool caseSensitive = false;
         bool gpu = false;
         int threads = Environment.ProcessorCount;
@@ -53,6 +55,9 @@ public sealed class CliOptions
                     break;
                 case "--contains":
                     patterns.Add((MatchPosition.Contains, Next(args, ref i, arg)));
+                    break;
+                case "--starts-ends":
+                    pairs.Add(ParsePair(Next(args, ref i, arg)));
                     break;
                 case "--case-sensitive":
                     caseSensitive = true;
@@ -139,6 +144,7 @@ public sealed class CliOptions
         return new CliOptions
         {
             Patterns = patterns,
+            Pairs = pairs,
             CaseSensitive = caseSensitive,
             Gpu = gpu,
             Threads = threads,
@@ -163,6 +169,17 @@ public sealed class CliOptions
         }
 
         return args[++i];
+    }
+
+    private static (string, string) ParsePair(string value)
+    {
+        string[] halves = value.Split(':');
+        if (halves.Length != 2 || halves[0].Trim().Length == 0 || halves[1].Trim().Length == 0)
+        {
+            throw new ArgumentException("Option '--starts-ends' needs PREFIX:SUFFIX, for example abc:xyz.");
+        }
+
+        return (halves[0].Trim(), halves[1].Trim());
     }
 
     private static int NextInt(string[] args, ref int i, string option)

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using XrplVanity.Cli;
@@ -66,5 +67,52 @@ public class CliRuntimeTests
 
         Assert.False(patterns.HasPatterns);
         Assert.Single(patterns.Unreachable);
+    }
+
+    [Fact]
+    public void BuildPatternSet_Turns_A_Pair_Option_Into_A_Paired_Rule()
+    {
+        CliOptions options = CliOptions.Parse(new[] { "--case-sensitive", "--starts-ends", "ab:yz" });
+        PatternSet set = SearchRunner.BuildPatternSet(options);
+        Assert.True(set.TryMatch("rabQQQQQQQyz", out MatchPosition position, out string pattern));
+        Assert.Equal(MatchPosition.Pair, position);
+        Assert.Equal("ab..yz", pattern);
+    }
+
+    [Fact]
+    public void SearchDeterministic_Finds_Match_For_A_Starts_Ends_Pair()
+    {
+        // A one-character prefix and suffix keep the brute-force search below a few thousand
+        // deterministic entropies while still exercising the real derive-then-match path.
+        CliOptions options = CliOptions.Parse(new[] { "--case-sensitive", "--starts-ends", "a:b" });
+        PatternSet patterns = SearchRunner.BuildPatternSet(options);
+        CandidateEvaluator evaluator = new(new BouncyCastleDeriver(), patterns);
+
+        byte[]? winningEntropy = null;
+        for (int i = 0; i < 5000; i++)
+        {
+            byte[] entropy = new byte[16];
+            BitConverter.TryWriteBytes(entropy, i);
+            if (evaluator.TryEvaluate(entropy, out Match candidate))
+            {
+                winningEntropy = entropy;
+                break;
+            }
+        }
+
+        Assert.NotNull(winningEntropy);
+
+        List<byte[]> stream = new()
+        {
+            new byte[16], // all-zero entropy: not expected to match "a"/"b"
+            winningEntropy!,
+        };
+
+        Match? found = SearchRunner.SearchDeterministic(options, stream);
+
+        Assert.NotNull(found);
+        Assert.Equal(MatchPosition.Pair, found!.Value.Position);
+        Assert.StartsWith("a", found.Value.Address[1..], StringComparison.Ordinal);
+        Assert.EndsWith("b", found.Value.Address, StringComparison.Ordinal);
     }
 }
