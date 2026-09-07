@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
 
@@ -5,15 +6,12 @@ namespace XrplVanity.App.Core.Pages;
 
 public partial class HistoryPage
 {
-    private static readonly TimeSpan ClearConfirmWindow = TimeSpan.FromSeconds(5);
-
     private List<StoredResult> _all = new();
+    private string[] _knownAddresses = Array.Empty<string>();
     private string _filter = string.Empty;
     private string? _storeError;
-    private DateTimeOffset? _clearArmedAt;
-    private ITimer? _clearRevertTimer;
     private int _lastSessionResultCount = -1;
-    private volatile bool _disposed;
+    private PendingAction? _pending;
 
     protected override void OnInitialized()
     {
@@ -46,15 +44,70 @@ public partial class HistoryPage
         return matches.Select(r => new SessionResult(r.Address, r.Seed, r.Pattern, r.Position, r.FoundAt, r.Target)).ToList();
     }
 
+    /// <summary>
+    /// A read-only store gets no destructive callbacks at all. The list renders a row's delete
+    /// button and the selection bar's "Delete selected" only when a delegate is attached, so both
+    /// are absent rather than disabled — nothing the user could do would make the write succeed.
+    /// Read on every render because the store turns read-only mid-process, not only at startup.
+    /// </summary>
+    private EventCallback<SessionResult> DeleteCallback => Store.IsReadOnly
+        ? default
+        : EventCallback.Factory.Create<SessionResult>(this, AskDelete);
+
+    private EventCallback<IReadOnlyList<SessionResult>> DeleteSelectedCallback => Store.IsReadOnly
+        ? default
+        : EventCallback.Factory.Create<IReadOnlyList<SessionResult>>(this, AskDeleteSelected);
+
+    private void AskDelete(SessionResult item)
+        => _pending = new PendingAction(
+            "Delete this result?",
+            "Its seed is deleted with it. results.dat is the only place the seed exists, so this cannot be undone.",
+            "Delete",
+            new[] { item.Address },
+            () => Write(() => Store.Delete(item.Address)));
+
+    private void AskDeleteSelected(IReadOnlyList<SessionResult> items)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        string[] addresses = items.Select(i => i.Address).ToArray();
+        _pending = new PendingAction(
+            $"Delete {addresses.Length} result{(addresses.Length == 1 ? string.Empty : "s")}?",
+            "Their seeds are deleted with them. results.dat is the only place those seeds exist, so this cannot be undone.",
+            $"Delete {addresses.Length}",
+            addresses,
+            () => Write(() => Store.DeleteMany(addresses)));
+    }
+
+    private void AskClear()
+        => _pending = new PendingAction(
+            "Clear the whole history?",
+            $"All {_all.Count} results and their seeds are removed from results.dat. This cannot be undone, and the filter does not narrow it — everything goes.",
+            "Clear history",
+            null,
+            () => Write(Store.Clear));
+
+    private void Confirm()
+    {
+        PendingAction? pending = _pending;
+        _pending = null;
+        pending?.Execute();
+    }
+
+    private void Cancel() => _pending = null;
+
     // The store turns read-only mid-process when DPAPI cannot write results.dat, and then throws
-    // on every write. A Blazor event handler is the worst place for that to escape, so both
-    // destructive actions report the reason as a banner and re-read whatever is still on disk.
-    private void Delete(SessionResult item)
+    // on every write. A Blazor event handler is the worst place for that to escape, so every
+    // destructive action reports the reason as a banner and re-reads whatever is still on disk.
+    private void Write(Action action)
     {
         _storeError = null;
         try
         {
-            Store.Delete(item.Address);
+            action();
         }
         catch (InvalidOperationException ex)
         {
@@ -64,83 +117,17 @@ public partial class HistoryPage
         Reload();
     }
 
-    private void OnClearClicked()
-    {
-        DateTimeOffset now = Clock.GetUtcNow();
-        if (_clearArmedAt is DateTimeOffset armedAt && now - armedAt <= ClearConfirmWindow)
-        {
-            _storeError = null;
-            try
-            {
-                Store.Clear();
-            }
-            catch (InvalidOperationException ex)
-            {
-                _storeError = ex.Message;
-            }
-
-            _clearArmedAt = null;
-            StopClearRevertTimer();
-            Reload();
-        }
-        else
-        {
-            _clearArmedAt = now;
-            ArmClearRevertTimer();
-        }
-    }
-
-    /// <summary>Reverts "Click again to confirm" back to "Clear history" once the confirm window lapses unclicked.</summary>
-    private void ArmClearRevertTimer()
-    {
-        StopClearRevertTimer();
-        _clearRevertTimer = Clock.CreateTimer(_ =>
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            try
-            {
-                _ = InvokeAsync(() =>
-                {
-                    if (_disposed)
-                    {
-                        return;
-                    }
-
-                    _clearArmedAt = null;
-                    StateHasChanged();
-                });
-            }
-            catch (ObjectDisposedException)
-            {
-                // The renderer is gone; nothing to refresh.
-            }
-            catch (InvalidOperationException)
-            {
-                // The component is no longer attached to a renderer.
-            }
-        }, null, ClearConfirmWindow, Timeout.InfiniteTimeSpan);
-    }
-
-    private void StopClearRevertTimer()
-    {
-        _clearRevertTimer?.Dispose();
-        _clearRevertTimer = null;
-    }
-
     private void Reload()
     {
         _all = Store.LoadAll().OrderByDescending(r => r.FoundAt).ToList();
+
+        // The list prunes its selection against this, not against the filtered rows it is shown,
+        // so typing in the filter never silently unpicks anything.
+        _knownAddresses = _all.Select(r => r.Address).ToArray();
         _lastSessionResultCount = Vm.Results.Count;
     }
 
-    public override void Dispose()
-    {
-        _disposed = true;
-        StopClearRevertTimer();
-        base.Dispose();
-    }
+    /// <summary>What a confirmed dialog will do. Null while no dialog is open.</summary>
+    private sealed record PendingAction(string Title, string Message, string ConfirmLabel,
+        IReadOnlyList<string>? Addresses, Action Execute);
 }

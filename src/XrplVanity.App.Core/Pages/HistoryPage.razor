@@ -1,14 +1,13 @@
 @page "/history"
 @inherits ViewModelPage
 @inject IResultStore Store
-@inject TimeProvider Clock
 
 <header class="page-head">
   <h1>History <span class="pill">@_all.Count stored</span></h1>
   <div class="actions">
     @if (!Store.IsReadOnly)
     {
-      <button class="btn-secondary-dark clear t" @onclick="OnClearClicked">@(_clearArmedAt is null ? "Clear history" : "Click again to confirm")</button>
+      <button class="btn-secondary-dark clear t" @onclick="AskClear">Clear history</button>
     }
   </div>
 </header>
@@ -24,10 +23,18 @@
   <div class="filter-row">
     <input class="filter form-control mono" placeholder="filter by address or pattern" @bind="_filter" @bind:event="oninput" />
   </div>
-  <ResultsList Items="Filtered()" ShowTarget="true" OnDelete="Delete" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
+  @* KnownAddresses is the unfiltered universe on purpose: a row leaves the selection when it leaves the store, not when the filter hides it. *@
+  <ResultsList Items="Filtered()" ShowTarget="true" Selectable="true" KnownAddresses="_knownAddresses"
+               OnDelete="DeleteCallback" OnDeleteSelected="DeleteSelectedCallback"
+               RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
   @* The mockup replaces this footer with the red banner when results.dat cannot be read. *@
   @if (!Store.IsReadOnly && _storeError is null)
   {
     <div class="storage-note muted">Stored in <span class="mono">results.dat</span>, encrypted with Windows DPAPI for this user account. Nothing else on disk contains a seed.</div>
   }
 </div>
+
+<ConfirmDialog Visible="@(_pending is not null)" Title="@(_pending?.Title ?? string.Empty)"
+               Message="@(_pending?.Message ?? string.Empty)" Addresses="_pending?.Addresses"
+               ConfirmLabel="@(_pending?.ConfirmLabel ?? "Delete")"
+               OnConfirm="Confirm" OnCancel="Cancel" />
