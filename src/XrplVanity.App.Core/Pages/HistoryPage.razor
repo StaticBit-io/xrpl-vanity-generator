@@ -4,7 +4,7 @@
 
 @* While a dialog is open the page behind it is inert: the destructive controls it covers —
    "Clear history" above all — must not stay reachable by keyboard or mouse. *@
-<header class="page-head" inert="@(_pending is not null)">
+<header class="page-head" inert="@(_pending is not null || _qrRows is not null)">
   <h1>History <span class="pill">@_all.Count stored</span></h1>
   <div class="actions">
     @if (!Store.IsReadOnly && _all.Count > 0)
@@ -13,7 +13,7 @@
     }
   </div>
 </header>
-<div class="content-scroll" inert="@(_pending is not null)">
+<div class="content-scroll" inert="@(_pending is not null || _qrRows is not null)">
   @if (Store.IsReadOnly)
   {
     <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
@@ -41,7 +41,7 @@
   </div>
   @* KnownAddresses is the unfiltered universe on purpose: a row leaves the selection when it leaves the store, not when the filter hides it. *@
   <ResultsList Items="Filtered()" ShowTarget="true" Selectable="true" KnownAddresses="_knownAddresses"
-               OnDelete="DeleteCallback" OnDeleteSelected="DeleteSelectedCallback"
+               OnDelete="DeleteCallback" OnDeleteSelected="DeleteSelectedCallback" OnShowQr="rows => _qrRows = rows"
                RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
   @* The mockup replaces this footer with the red banner when results.dat cannot be read. *@
   @if (!Store.IsReadOnly && _storeError is null)
@@ -49,6 +49,8 @@
     <div class="storage-note muted">Stored in <span class="mono">results.dat</span>, encrypted with Windows DPAPI for this user account. Nothing else on disk contains a seed.</div>
   }
 </div>
+
+<QrExportDialog Rows="_qrRows" OnClose="() => _qrRows = null" />
 
 <ConfirmDialog Visible="@(_pending is not null)" Title="@(_pending?.Title ?? string.Empty)"
                Message="@(_pending is null ? string.Empty : _pending.Message())" Addresses="_pending?.Addresses"

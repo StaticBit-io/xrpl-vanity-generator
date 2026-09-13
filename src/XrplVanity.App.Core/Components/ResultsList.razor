@@ -24,6 +24,10 @@
         <b>@_selected.Count selected</b>
         <span class="acts">
           <button class="btn-secondary-dark export-selected t" @onclick="() => Export(SelectedItems())">Export selected…</button>
+          @if (OnShowQr.HasDelegate)
+          {
+            <button class="btn-secondary-dark show-qr-selected t" @onclick="() => OnShowQr.InvokeAsync(SelectedItems())">Show QR…</button>
+          }
           @if (OnDeleteSelected.HasDelegate)
           {
             <button class="btn-secondary-dark danger delete-selected t" @onclick="() => OnDeleteSelected.InvokeAsync(SelectedItems())">Delete selected</button>
@@ -52,6 +56,7 @@
           <span class="mono seed">@(_revealed.Contains(item.Address) ? item.Seed : "••••••••")</span>
           <button class="btn-icon reveal" title="@(_revealed.Contains(item.Address) ? "Hide seed" : "Reveal seed")" @onclick="() => ToggleReveal(item.Address)">👁</button>
           <button class="btn-icon copy-seed" title="Copy seed (clipboard clears after @ClipboardClearSeconds s)" @onclick="() => Clipboard.CopySecretAsync(item.Seed, TimeSpan.FromSeconds(ClipboardClearSeconds))">⧉</button>
+          @if (OnShowQr.HasDelegate) { <button class="btn-icon show-qr" title="Show as QR code" @onclick="() => OnShowQr.InvokeAsync(new[] { item })">▣</button> }
           @if (OnDelete.HasDelegate) { <button class="btn-icon delete" title="Delete" @onclick="() => OnDelete.InvokeAsync(item)">🗑</button> }
         </div>
       </Virtualize>

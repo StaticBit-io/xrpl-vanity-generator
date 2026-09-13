@@ -452,4 +452,46 @@ public class ResultsListTests : BunitContext
         Assert.Empty(cut.FindAll("button.delete-selected"));
         Assert.Single(cut.FindAll("button.export-selected"));
     }
+    [Fact]
+    public void A_Row_Asks_The_Host_To_Show_Its_Own_Wallet()
+    {
+        RegisterServices();
+        List<SessionResult>? asked = null;
+        IRenderedComponent<ResultsList> cut = Render<ResultsList>(p => p
+            .Add(x => x.Items, new[] { R(1), R(2) })
+            .Add(x => x.OnShowQr, (IReadOnlyList<SessionResult> rows) => asked = rows.ToList()));
+
+        cut.FindAll("button.show-qr")[1].Click();
+
+        Assert.Equal("rAddr2", Assert.Single(asked!).Address);
+    }
+
+    [Fact]
+    public void The_Selection_Bar_Asks_For_Every_Selected_Row()
+    {
+        RegisterServices();
+        List<SessionResult>? asked = null;
+        IRenderedComponent<ResultsList> cut = Render<ResultsList>(p => p
+            .Add(x => x.Items, new[] { R(1), R(2) })
+            .Add(x => x.Selectable, true)
+            .Add(x => x.OnShowQr, (IReadOnlyList<SessionResult> rows) => asked = rows.ToList()));
+
+        cut.FindAll("input.pick")[0].Change(true);
+        cut.FindAll("input.pick")[1].Change(true);
+        cut.Find("button.show-qr-selected").Click();
+
+        Assert.Equal(2, asked!.Count);
+    }
+
+    [Fact]
+    public void Without_A_Qr_Callback_Neither_Button_Is_Rendered()
+    {
+        RegisterServices();
+        IRenderedComponent<ResultsList> cut = Render<ResultsList>(p => p
+            .Add(x => x.Items, new[] { R(1) })
+            .Add(x => x.Selectable, true));
+
+        Assert.Empty(cut.FindAll("button.show-qr"));
+        Assert.Empty(cut.FindAll("button.show-qr-selected"));
+    }
 }

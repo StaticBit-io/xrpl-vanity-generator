@@ -330,4 +330,37 @@ public class HistoryPageTests : BunitContext
         Assert.NotNull(cut.Find("button.export-selected"));
         Assert.Empty(cut.FindAll("button.delete-selected"));
     }
+    [Fact]
+    public void The_Qr_Dialog_Opens_From_A_Row_And_Makes_The_Page_Inert()
+    {
+        MemoryResultStore store = new();
+        SeedTwo(store);
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        cut.FindAll("button.show-qr")[0].Click();
+
+        Assert.Single(cut.FindAll(".qr-box"));
+        Assert.True(cut.Find("header.page-head").HasAttribute("inert"));
+        Assert.True(cut.Find(".content-scroll").HasAttribute("inert"));
+
+        cut.Find("button.close").Click();
+
+        Assert.Empty(cut.FindAll(".qr-box"));
+        Assert.False(cut.Find("header.page-head").HasAttribute("inert"));
+    }
+
+    [Fact]
+    public void The_Selection_Bar_Opens_The_Dialog_With_Every_Selected_Row()
+    {
+        MemoryResultStore store = new();
+        SeedTwo(store);
+        IRenderedComponent<HistoryPage> cut = RenderPage(store);
+
+        cut.FindAll("input.pick")[0].Change(true);
+        cut.FindAll("input.pick")[1].Change(true);
+        cut.Find("button.show-qr-selected").Click();
+
+        // Two wallets: the backup format is the only one a single code can carry.
+        Assert.True(cut.Find("button.format-seed").HasAttribute("disabled"));
+    }
 }
