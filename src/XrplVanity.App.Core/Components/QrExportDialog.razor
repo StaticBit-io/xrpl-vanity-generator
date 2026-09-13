@@ -1,0 +1,63 @@
+@inject TimeProvider Clock
+
+@if (Rows is { Count: > 0 })
+{
+  <div class="modal-backdrop"></div>
+  <div class="modal-box card-box qr-box" role="dialog" aria-modal="true" aria-label="Show as QR code" tabindex="-1" @onkeydown="OnKeyDown" @ref="_box">
+    <h3>Show as QR code</h3>
+
+    @* Buttons rather than radios: this application has no other radio group, and a button says
+       plainly that choosing a format throws away whatever code is on screen. *@
+    <div class="formats" role="group" aria-label="Code format">
+      <button class="format-backup t @(_seedOnly ? null : "active")" @onclick="() => SetFormat(false)">StaticBit backup — @Rows.Count @(Rows.Count == 1 ? "wallet" : "wallets")</button>
+      <button class="format-seed t @(_seedOnly ? "active" : null)" disabled="@(Rows.Count != 1)" @onclick="() => SetFormat(true)">Seed only</button>
+    </div>
+    <div class="format-note">
+      @if (Rows.Count != 1)
+      {
+        <text>A bare seed carries one wallet, so that format needs a selection of exactly one wallet.</text>
+      }
+      else if (_seedOnly)
+      {
+        <text>StaticBit does not import a bare seed — it reads this as an address and offers to send. Use it for a wallet that takes a family seed directly.</text>
+      }
+      else
+      {
+        <text>Scanned by StaticBit's restore screen.</text>
+      }
+    </div>
+
+    @if (!_seedOnly)
+    {
+      <div class="password-row">
+        <input class="password form-control" type="password" placeholder="password (optional)" @bind="_password" @bind:event="oninput" />
+        <input class="password-confirm form-control" type="password" placeholder="repeat it" @bind="_passwordConfirm" @bind:event="oninput" />
+      </div>
+    }
+
+    @if (_code is null)
+    {
+      <button class="btn-primary-mint show-code t" disabled="@_building" @onclick="ShowCode">@(_building ? "Building…" : "Show code")</button>
+    }
+    else
+    {
+      <QrCode Text="@_code" />
+      @if (!_seedOnly && _password.Length == 0)
+      {
+        <div class="qr-warning">This code is not encrypted. Anyone who photographs it owns these wallets.</div>
+      }
+      <div class="qr-caption">Scan with StaticBit on your phone.</div>
+    }
+
+    @if (_error is not null) { <div class="qr-error">@_error</div> }
+
+    <div class="stores">
+      <a class="store-ios" href="https://apps.apple.com/us/app/staticbit/id6745529426">App Store</a>
+      <a class="store-android" href="https://play.google.com/store/apps/details?id=io.staticbit.wallet">Google Play</a>
+    </div>
+
+    <div class="buttons">
+      <button class="btn-secondary-dark close t" @ref="_close" @onclick="() => OnClose.InvokeAsync()">Close</button>
+    </div>
+  </div>
+}

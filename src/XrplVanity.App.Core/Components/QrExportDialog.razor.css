@@ -1,0 +1,15 @@
+.qr-box { max-width: 420px; text-align: center; }
+.formats { display: flex; gap: 8px; margin-bottom: 6px; }
+.formats button { flex: 1; background: var(--secondary-dark); color: var(--text-secondary); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 8px 10px; }
+.formats button:hover:not(:disabled) { border-color: var(--text-secondary); color: var(--text); }
+.formats button.active { border-color: var(--mint); color: var(--text); }
+.formats button:disabled { opacity: .45; }
+.format-note { color: var(--text-secondary); font-size: 12px; text-align: left; margin-bottom: 12px; }
+.password-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.qr-warning { color: var(--yellow); font-size: 12px; margin-top: 10px; }
+.qr-caption { color: var(--text-secondary); font-size: 12px; margin-top: 8px; }
+.qr-error { color: var(--negative); font-size: 12px; margin-top: 10px; }
+.stores { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 12px; }
+.stores a { color: var(--text-secondary); text-decoration: none; }
+.stores a:hover { color: var(--mint); }
+.buttons { display: flex; justify-content: flex-end; margin-top: 14px; }
