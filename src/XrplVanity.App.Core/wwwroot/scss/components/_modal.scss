@@ -1,0 +1,9 @@
+// The chrome every dialog shares. Global on purpose: these rules used to live in
+// ConfirmDialog's scoped stylesheet, where Blazor bound them to that one component's scope
+// identifier — a second dialog reusing the same class names got the markup and none of the
+// styling, so it rendered in the normal flow behind an inert page and looked like a dead screen.
+// A dialog's own layout still belongs in its own scoped file; only the frame is here.
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(2px); z-index: 40; }
+.modal-box { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 420px; z-index: 41; }
+.modal-box h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.modal-box p { margin: 0 0 14px; color: var(--text-secondary); line-height: 1.5; }

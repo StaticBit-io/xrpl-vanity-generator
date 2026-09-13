@@ -1,4 +1,5 @@
-.qr-box { max-width: 420px; text-align: center; }
+/* Wider than the shared 420px frame: a level-H code plus its plate needs the room. */
+.qr-box { width: 460px; text-align: center; max-height: 90vh; overflow-y: auto; }
 .formats { display: flex; gap: 8px; margin-bottom: 6px; }
 .formats button { flex: 1; background: var(--secondary-dark); color: var(--text-secondary); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 8px 10px; }
 .formats button:hover:not(:disabled) { border-color: var(--text-secondary); color: var(--text); }
