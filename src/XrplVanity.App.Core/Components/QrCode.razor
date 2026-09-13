@@ -3,5 +3,10 @@
 <div class="qr-plate">
   <svg class="qr" viewBox="0 0 @_modules @_modules" shape-rendering="crispEdges" role="img" aria-label="QR code">
     <path d="@_path" fill="#000000" />
+    @if (_logo is not null)
+    {
+      <rect class="logo-pad" x="@_logo.PadX" y="@_logo.PadX" width="@_logo.PadSize" height="@_logo.PadSize" rx="1" fill="#FFFFFF" />
+      <image href="@LogoUri" x="@_logo.X" y="@_logo.X" width="@_logo.Size" height="@_logo.Size" preserveAspectRatio="xMidYMid meet" />
+    }
   </svg>
 </div>

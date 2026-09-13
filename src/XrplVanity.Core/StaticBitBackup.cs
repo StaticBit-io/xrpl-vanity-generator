@@ -8,8 +8,12 @@ using System.Text.Json.Serialization;
 
 namespace XrplVanity.Core;
 
-/// <summary>One found wallet, in the shape the StaticBit backup payload wants it.</summary>
-public readonly record struct BackupWallet(string Seed, string Address, string? Description);
+/// <summary>
+/// One found wallet, in the shape the StaticBit backup payload wants it. <paramref name="Folder"/>
+/// is a folder <em>name</em>, not an id: the wallet matches it against its own folders without
+/// regard to case and creates one when there is no match, so a name is all this side can know.
+/// </summary>
+public readonly record struct BackupWallet(string Seed, string Address, string? Description, string? Folder = null);
 
 /// <summary>
 /// Builds the backup container the StaticBit wallet's scanner restores from. The format belongs to
@@ -21,6 +25,13 @@ public static class StaticBitBackup
 {
     /// <summary>What one QR code at correction level H holds: 1852 Base45 characters.</summary>
     public const int MaxQrContainerBytes = 1234;
+
+    /// <summary>
+    /// The longest folder name the wallet files a restored wallet into. A longer one is not an
+    /// error there — it is ignored, and the wallet lands in the default folder instead, which is
+    /// worse than being told. Callers cut the name to this before packing.
+    /// </summary>
+    public const int MaxFolderNameLength = 64;
 
     private const byte Version = 1;
     private const byte NoPasswordKdfId = 0;
@@ -140,7 +151,7 @@ public static class StaticBitBackup
         for (int i = 0; i < wallets.Count; i++)
         {
             BackupWallet wallet = wallets[i];
-            entries[i] = new Entry(wallet.Seed, wallet.Address, wallet.Description);
+            entries[i] = new Entry(wallet.Seed, wallet.Address, wallet.Description, wallet.Folder);
         }
 
         return JsonSerializer.Serialize(new Payload(entries), SerializerOptions);
@@ -158,7 +169,8 @@ public static class StaticBitBackup
     private sealed record Entry(
         [property: JsonPropertyName("keyValue"), JsonPropertyOrder(1)] string KeyValue,
         [property: JsonPropertyName("classicAddress"), JsonPropertyOrder(2)] string ClassicAddress,
-        [property: JsonPropertyName("description"), JsonPropertyOrder(5)] string? Description)
+        [property: JsonPropertyName("description"), JsonPropertyOrder(5)] string? Description,
+        [property: JsonPropertyName("folder"), JsonPropertyOrder(6)] string? Folder)
     {
         [JsonPropertyName("keyType"), JsonPropertyOrder(3)] public int KeyType => 1;
 

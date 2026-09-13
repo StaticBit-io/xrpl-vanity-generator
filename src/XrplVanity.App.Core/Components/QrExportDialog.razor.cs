@@ -17,6 +17,9 @@ public partial class QrExportDialog : ComponentBase, IDisposable
     /// <summary>1234 container bytes become 1851 or 1852 Base45 characters at correction level H.</summary>
     private const int MaxCodeCharacters = 1852;
 
+    /// <summary>The StaticBit mark, drawn over the middle of the code when it is short enough.</summary>
+    private const string LogoUri = "_content/XrplVanity.App.Core/images/staticbit-qr-logo.png";
+
     private ElementReference _box;
     private ElementReference _close;
     private ITimer? _hideTimer;
@@ -24,6 +27,7 @@ public partial class QrExportDialog : ComponentBase, IDisposable
     private string? _error;
     private string _password = string.Empty;
     private string _passwordConfirm = string.Empty;
+    private string _folder = string.Empty;
     private bool _seedOnly;
     private bool _building;
     private bool _wasVisible;
@@ -33,6 +37,9 @@ public partial class QrExportDialog : ComponentBase, IDisposable
     [Parameter] public IReadOnlyList<SessionResult>? Rows { get; set; }
 
     [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>A code the backup format produced without a password is the one that needs saying so.</summary>
+    private bool ShowsWarning => _code is not null && !_seedOnly && _password.Length == 0;
 
     protected override void OnParametersSet()
     {
@@ -73,7 +80,7 @@ public partial class QrExportDialog : ComponentBase, IDisposable
         try
         {
             string? password = _password.Length == 0 ? null : _password;
-            BackupWallet[] wallets = ToWallets(Rows, Rows.Count);
+            BackupWallet[] wallets = ToWallets(Rows, Rows.Count, _folder);
 
             // 600 000 PBKDF2 iterations is a visible pause on the render thread; the build runs off it.
             string code = await Task.Run(() => StaticBitBackup.ToQrText(wallets, password));
@@ -110,7 +117,7 @@ public partial class QrExportDialog : ComponentBase, IDisposable
         string? password = _password.Length == 0 ? null : _password;
         for (int count = Rows.Count - 1; count >= 1; count--)
         {
-            if (StaticBitBackup.Pack(ToWallets(Rows, count), password).Length <= StaticBitBackup.MaxQrContainerBytes)
+            if (StaticBitBackup.Pack(ToWallets(Rows, count, _folder), password).Length <= StaticBitBackup.MaxQrContainerBytes)
             {
                 return count;
             }
@@ -119,13 +126,25 @@ public partial class QrExportDialog : ComponentBase, IDisposable
         return 0;
     }
 
-    private static BackupWallet[] ToWallets(IReadOnlyList<SessionResult> rows, int count)
+    /// <summary>
+    /// The rows as backup entries. A blank folder is left out of the payload entirely; one longer
+    /// than the wallet accepts is cut rather than sent whole, because the wallet's answer to a name
+    /// it cannot use is to file the wallet somewhere else without saying so.
+    /// </summary>
+    internal static BackupWallet[] ToWallets(IReadOnlyList<SessionResult> rows, int count, string? folder)
     {
+        string? trimmed = folder?.Trim();
+        if (trimmed is { Length: 0 }) trimmed = null;
+        if (trimmed is { Length: > StaticBitBackup.MaxFolderNameLength })
+        {
+            trimmed = trimmed[..StaticBitBackup.MaxFolderNameLength];
+        }
+
         BackupWallet[] wallets = new BackupWallet[count];
         for (int i = 0; i < count; i++)
         {
             SessionResult row = rows[i];
-            wallets[i] = new BackupWallet(row.Seed, row.Address, row.Pattern);
+            wallets[i] = new BackupWallet(row.Seed, row.Address, row.Pattern, trimmed);
         }
 
         return wallets;
@@ -168,6 +187,7 @@ public partial class QrExportDialog : ComponentBase, IDisposable
         DropCode();
         _password = string.Empty;
         _passwordConfirm = string.Empty;
+        _folder = string.Empty;
         _seedOnly = false;
         _wasVisible = false;
     }

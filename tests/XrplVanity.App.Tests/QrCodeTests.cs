@@ -50,4 +50,46 @@ public class QrCodeTests : BunitContext
 
         Assert.NotEqual(before, cut.Find("svg.qr path").GetAttribute("d"));
     }
+    [Fact]
+    public void A_Logo_Is_Drawn_Over_The_Middle_On_Its_Own_Pad()
+    {
+        IRenderedComponent<QrCode> cut = Render<QrCode>(p => p
+            .Add(x => x.Text, "TNA11B")
+            .Add(x => x.LogoUri, "images/logo.png"));
+
+        Assert.Equal("images/logo.png", cut.Find("svg.qr image").GetAttribute("href"));
+        // A pad under it, so the mark never sits directly on the modules.
+        Assert.Single(cut.FindAll("svg.qr rect.logo-pad"));
+    }
+
+    [Fact]
+    public void Without_A_Logo_Uri_Nothing_Covers_The_Code()
+    {
+        IRenderedComponent<QrCode> cut = Render<QrCode>(p => p.Add(x => x.Text, "TNA11B"));
+
+        Assert.Empty(cut.FindAll("svg.qr image"));
+        Assert.Empty(cut.FindAll("svg.qr rect.logo-pad"));
+    }
+
+    [Fact]
+    public void A_Code_Near_Its_Capacity_Drops_The_Logo_Rather_Than_Its_Error_Correction()
+    {
+        // Past 1763 characters the mark costs more correction than the code can spare; the wallet
+        // drops it at exactly this point too, and neither side ever lowers the level instead.
+        IRenderedComponent<QrCode> cut = Render<QrCode>(p => p
+            .Add(x => x.Text, new string('A', 1764))
+            .Add(x => x.LogoUri, "images/logo.png"));
+
+        Assert.Empty(cut.FindAll("svg.qr image"));
+    }
+
+    [Fact]
+    public void A_Code_Just_Inside_The_Limit_Keeps_The_Logo()
+    {
+        IRenderedComponent<QrCode> cut = Render<QrCode>(p => p
+            .Add(x => x.Text, new string('A', 1763))
+            .Add(x => x.LogoUri, "images/logo.png"));
+
+        Assert.Single(cut.FindAll("svg.qr image"));
+    }
 }

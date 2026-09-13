@@ -54,7 +54,12 @@ The application has three pages:
   a single wallet. A password is optional and encrypts the container; without one the code is
   not encrypted and says so. One code holds 22 wallets, or 21 with a password. Nothing is
   written to disk — the code is inline SVG, never an image file, and it hides itself after 60
-  seconds. Under it are links to the wallet on the App Store and Google Play. The format and
+  seconds, leaving the dialog exactly as tall as it was. An optional folder name travels with the
+  wallets, and the phone files them into a folder of that name, creating it when there is none;
+  a name longer than 64 characters is cut, because the wallet ignores a longer one and files the
+  wallet in the default folder without saying so. The StaticBit mark sits in the middle of the
+  code, and is dropped rather than drawn when the code is long enough to need every bit of its
+  error correction. Under the code are links to the wallet on the App Store and Google Play.
   the container are documented in `docs/2026-09-13-xrpl-vanity-qr-export-design.md`.
 - **History** — every result the application has ever stored, narrowed by two filters
   that work together: a text box over the address and the pattern, and a drop-down over
@@ -249,6 +254,7 @@ registration first (`Remove-AppxPackage -Package io.staticbit.vanity_1.0.0.0_x64
 | [Bootstrap](https://getbootstrap.com/) (`bootstrap.min.css` only) | 5.3.3 | MIT — `src/XrplVanity.App.Core/wwwroot/lib/bootstrap/LICENSE` |
 | [H.NotifyIcon.Maui](https://github.com/HavenDV/H.NotifyIcon) (tray icon and menu) | 2.4.1 | MIT |
 | [QRCoder](https://github.com/codebude/QRCoder) | 1.8.0 | MIT — the module matrix only; this application draws the code as inline SVG itself |
+| StaticBit mark (`images/staticbit-qr-logo.png`) | — | StaticBit's own asset, copied from the wallet's `96_QR.png` |
 
 The fonts and the Bootstrap stylesheet are vendored into the repository so the
 application never fetches anything at run time.
@@ -372,6 +378,13 @@ storage layer. Each step names what you should see.
 26. **A selection that does not fit is refused.** Select forty rows on History and press
     **Show QR…**, then **Show code**: nothing is drawn and the dialog says how many of them
     would fit. Reduce the selection to that number and the code appears.
+27. **The dialog never moves.** With the dialog open, switch between the two formats, press
+    **Show code**, wait out the 60 s and press it again. The box stays exactly where it is and
+    exactly as tall throughout — nothing under the pointer shifts.
+28. **A folder is honoured on the phone.** Type a folder name, show the code and scan it with
+    StaticBit: the restored wallets land in a folder of that name, created if it did not exist.
+    The StaticBit mark is visible in the middle of the code; with twenty wallets selected the
+    code is long enough that the mark is dropped, and it still scans.
 
 Exiting stops the search first and gives the teardown 10 s before the process ends; the
 session's own dispose cap is 30 s, so a session that refuses to settle costs 10 s, not 30.

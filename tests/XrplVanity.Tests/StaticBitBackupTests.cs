@@ -32,6 +32,20 @@ public class StaticBitBackupTests
     }
 
     [Fact]
+    public void A_Folder_Travels_With_The_Wallet_So_The_Phone_Files_It_On_Arrival()
+    {
+        Assert.Contains(
+            "\"folder\":\"Vanity\"",
+            StaticBitBackup.BuildJson(new[] { One with { Folder = "Vanity" } }));
+    }
+
+    [Fact]
+    public void No_Folder_Leaves_The_Field_Out_Entirely()
+    {
+        Assert.DoesNotContain("folder", StaticBitBackup.BuildJson(new[] { One }));
+    }
+
+    [Fact]
     public void A_Wallet_Without_A_Description_Leaves_The_Field_Out_Rather_Than_Writing_Null()
     {
         string json = StaticBitBackup.BuildJson(new[] { One with { Description = null } });

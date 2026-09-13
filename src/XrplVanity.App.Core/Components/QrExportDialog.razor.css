@@ -6,10 +6,19 @@
 .formats button.active { border-color: var(--mint); color: var(--text); }
 .formats button:disabled { opacity: .45; }
 .format-note { color: var(--text-secondary); font-size: 12px; text-align: left; margin-bottom: 12px; }
-.password-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-.qr-warning { color: var(--yellow); font-size: 12px; margin-top: 10px; }
-.qr-caption { color: var(--text-secondary); font-size: 12px; margin-top: 8px; }
-.qr-error { color: var(--negative); font-size: 12px; margin-top: 10px; }
+/* Every one of these boxes is reserved rather than conditional: the dialog is centred, so any
+   change of height moves the whole thing under the pointer. Hidden keeps the box and drops the
+   contents out of the tab order, the way the results list holds its selection bar open. */
+.format-note { min-height: 48px; }
+.backup-fields.hidden { visibility: hidden; }
+.password-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.folder { width: 100%; }
+/* 260px of code plus the plate's 12px padding on each side, and the button stands in the same box. */
+.code-slot { display: flex; align-items: center; justify-content: center; min-height: 284px; margin-top: 12px; }
+.qr-warning { color: var(--yellow); font-size: 12px; margin-top: 10px; min-height: 32px; }
+.qr-caption { color: var(--text-secondary); font-size: 12px; margin-top: 8px; min-height: 16px; }
+.qr-error { color: var(--negative); font-size: 12px; margin-top: 10px; min-height: 32px; }
+.qr-warning.hidden, .qr-caption.hidden, .qr-error.hidden { visibility: hidden; }
 .stores { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 12px; }
 .stores a { color: var(--text-secondary); text-decoration: none; }
 .stores a:hover { color: var(--mint); }

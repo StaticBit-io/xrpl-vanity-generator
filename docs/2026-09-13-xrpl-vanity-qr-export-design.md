@@ -31,15 +31,19 @@ header is the six bytes `"SBW1" | 01 | 00` and the compressed payload follows it
 The plaintext is JSON, camelCase, no indentation, null fields omitted. One entry per wallet:
 
 ```json
-{"wallets":[{"keyValue":"sEd…","classicAddress":"r…","keyType":1,"algorithm":"ed25519","description":"static..bit"}]}
+{"wallets":[{"keyValue":"sEd…","classicAddress":"r…","keyType":1,"algorithm":"ed25519","description":"static..bit","folder":"Vanity"}]}
 ```
 
 `keyType` is a number — `1` is the wallet's `AccountKeyType.Seed`; `0` means a watch-only account
 and would make the wallet refuse to derive. `algorithm` is a free string, `"ed25519"`, which is the
 only kind of key this generator produces (`XrplVanity.Core.Seed` encodes the `sEd…` family seed and
 nothing else). `description` becomes the wallet's label on the phone and carries the pattern that
-matched. `keyValue`, `classicAddress`, `keyType` and `algorithm` are required by the importer;
-everything else may be left out.
+matched. `folder` is optional and is a folder **name**, not an id: the wallet matches it against
+its own folders without regard to case and creates one when nothing matches, so a name is all this
+side can know. It is capped at 64 characters here because a longer one is not refused on that side
+— it is ignored, and the wallet lands in the default folder without saying so. `keyValue`,
+`classicAddress`, `keyType` and `algorithm` are required by the importer; everything else may be
+left out.
 
 The pipeline, in order:
 
@@ -111,6 +115,12 @@ Correction level **H**, and the encoding mode is left to the library. The Base45
 alphanumeric set, so the encoder chooses alphanumeric on its own; forcing UTF-8 would drop it to
 byte mode and cut the capacity by a third.
 
+The StaticBit mark is drawn over the middle of the code — 20% of its width, on a white pad so it
+never sits directly on the modules. A logo is damage the error correction has to absorb, so past
+**1763** characters it is dropped rather than drawn: that is the wallet's own threshold, and
+neither side ever lowers the correction level to make a mark fit. The asset is the wallet's
+`96_QR.png`, copied in as `wwwroot/images/staticbit-qr-logo.png`.
+
 The code is drawn on a light plate regardless of the application's dark theme — a QR code inverted
 against a dark background is not reliably scannable.
 
@@ -148,7 +158,9 @@ against this payload shape with random base58 keys, that is:
 | with `description` | 22 wallets | 21 wallets |
 
 `description` is always written, so the second row is what this application actually offers; the
-first is there to show what the label costs, which is about one wallet.
+first is there to show what the label costs, which is about one wallet. A folder name costs nothing
+measurable on top of that — the same name repeats in every entry, which is exactly what DEFLATE is
+good at — so the two figures hold with or without one.
 
 The implementation asserts these in a test rather than trusting the table: DEFLATE's output depends
 on the exact data, and .NET's `CompressionLevel.Optimal` is not obliged to match the tool the
@@ -159,11 +171,23 @@ Past the limit the dialog refuses and says how many of the selected rows would f
 across several codes is not built, and the correction level is never lowered to make something fit
 — both match the wallet.
 
+## The dialog does not change height
+
+The dialog is centred, so anything that changes its height moves the whole box under the pointer —
+and almost everything in it is conditional: the note is one line or three, the backup's fields are
+meaningless for a bare seed, the code and its warning come and go. Every one of those boxes is
+therefore reserved rather than removed, the way the results list holds its selection bar open: the
+note has a floor of three lines, the password and folder fields stay rendered and go
+`visibility: hidden` in seed mode, and the warning, caption and error lines each keep their space.
+The **Show code** button stands inside the code's own box, so showing a code, letting it hide
+itself and showing it again all happen without a single pixel moving.
+
 ## Behaviour at the edges
 
 - An empty selection cannot open the dialog; the button is disabled, as `Export selected…` is.
 - Switching the format clears a code that is already on screen: the two payloads are different
   secrets and the picture must never lag behind the switch.
+- A folder name is trimmed, and a blank one is left out of the payload rather than written empty.
 - The password and its confirmation must agree before **Show code** does anything; the bare seed
   ignores both fields entirely, since there is nothing to encrypt.
 - Closing the dialog drops the container and the rendered code. Reopening rebuilds them.
@@ -204,6 +228,10 @@ rather than recomputed.
   password.
 - **Capacity**: the container for the numbers in the table above stays within 1234 bytes, and one
   wallet more exceeds it.
+- **The folder**: a name reaches every entry in the payload, a blank one reaches none, and one
+  longer than 64 characters is cut rather than sent whole.
+- **The mark**: it is drawn for a short code, dropped past 1763 characters, and absent when no
+  logo is asked for.
 - **The component**: no code is rendered before **Show code**; the format switch clears a rendered
   code; the bare seed is disabled for a multi-wallet selection and enabled for one; mismatched
   passwords block the build; the code hides itself after its window and comes back on demand; both

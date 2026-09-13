@@ -1,3 +1,4 @@
+@using XrplVanity.Core
 @inject TimeProvider Clock
 
 @if (Rows is { Count: > 0 })
@@ -27,29 +28,33 @@
       }
     </div>
 
-    @if (!_seedOnly)
-    {
+    @* Hidden rather than removed in seed mode, the way the results list reserves its selection bar:
+       the fields keep their box, so nothing in the dialog moves when the format changes, and
+       visibility takes them out of the tab order at the same time. *@
+    <div class="backup-fields @(_seedOnly ? "hidden" : null)">
       <div class="password-row">
         <input class="password form-control" type="password" placeholder="password (optional)" @bind="_password" @bind:event="oninput" />
         <input class="password-confirm form-control" type="password" placeholder="repeat it" @bind="_passwordConfirm" @bind:event="oninput" />
       </div>
-    }
+      <input class="folder form-control" maxlength="@StaticBitBackup.MaxFolderNameLength" placeholder="folder on the phone (optional)" @bind="_folder" @bind:event="oninput" />
+    </div>
 
-    @if (_code is null)
-    {
-      <button class="btn-primary-mint show-code t" disabled="@_building" @onclick="ShowCode">@(_building ? "Building…" : "Show code")</button>
-    }
-    else
-    {
-      <QrCode Text="@_code" />
-      @if (!_seedOnly && _password.Length == 0)
+    @* The button stands where the code will: showing, hiding and showing again all happen inside
+       one box, so the dialog is exactly as tall before the code as after it. *@
+    <div class="code-slot">
+      @if (_code is null)
       {
-        <div class="qr-warning">This code is not encrypted. Anyone who photographs it owns these wallets.</div>
+        <button class="btn-primary-mint show-code t" disabled="@_building" @onclick="ShowCode">@(_building ? "Building…" : "Show code")</button>
       }
-      <div class="qr-caption">Scan with StaticBit on your phone.</div>
-    }
+      else
+      {
+        <QrCode Text="@_code" LogoUri="@LogoUri" />
+      }
+    </div>
 
-    @if (_error is not null) { <div class="qr-error">@_error</div> }
+    <div class="qr-warning @(ShowsWarning ? null : "hidden")">This code is not encrypted. Anyone who photographs it owns these wallets.</div>
+    <div class="qr-caption @(_code is null ? "hidden" : null)">Scan with StaticBit on your phone.</div>
+    <div class="qr-error @(_error is null ? "hidden" : null)">@_error</div>
 
     <div class="stores">
       <a class="store-ios" href="https://apps.apple.com/us/app/staticbit/id6745529426">App Store</a>

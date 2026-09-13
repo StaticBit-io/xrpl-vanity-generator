@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using XrplVanity.App.Core.Components;
 using XrplVanity.App.Core.ViewModels;
+using XrplVanity.Core;
 using Xunit;
 
 namespace XrplVanity.App.Tests;
@@ -89,8 +90,13 @@ public class QrExportDialogTests : BunitContext
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll("svg.qr")));
 
         cut.Find("button.format-seed").Click();
-        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("input.password")));   // the format really changed
-        Assert.Empty(cut.FindAll("svg.qr"));
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Empty(cut.FindAll("svg.qr"));
+            // The fields are hidden, not removed: the dialog must be as tall either way.
+            Assert.Contains("hidden", cut.Find(".backup-fields").GetAttribute("class"));
+        });
     }
 
     [Fact]
@@ -162,5 +168,55 @@ public class QrExportDialogTests : BunitContext
             p => p.Add(x => x.Rows, (IReadOnlyList<SessionResult>?)null));
 
         Assert.Empty(cut.FindAll(".qr-box"));
+    }
+    [Fact]
+    public void A_Folder_Name_Is_Carried_On_Every_Wallet_In_The_Code()
+    {
+        BackupWallet[] wallets = QrExportDialog.ToWallets(new[] { R(1), R(2) }, 2, "Vanity");
+
+        Assert.All(wallets, w => Assert.Equal("Vanity", w.Folder));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void No_Folder_Name_Means_No_Folder_Field(string? folder)
+    {
+        Assert.Null(Assert.Single(QrExportDialog.ToWallets(new[] { R(1) }, 1, folder)).Folder);
+    }
+
+    [Fact]
+    public void A_Folder_Name_Too_Long_For_The_Wallet_Is_Cut_Rather_Than_Silently_Dropped()
+    {
+        // The wallet ignores a name past 64 characters and files the wallet in the default folder
+        // instead — cutting it here at least puts it where the user was aiming.
+        BackupWallet one = Assert.Single(QrExportDialog.ToWallets(new[] { R(1) }, 1, new string('x', 70)));
+
+        Assert.Equal(64, one.Folder!.Length);
+    }
+
+    [Fact]
+    public void The_Backup_Fields_Keep_Their_Box_In_Seed_Mode_So_The_Dialog_Does_Not_Move()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        Assert.DoesNotContain("hidden", cut.Find(".backup-fields").GetAttribute("class"));
+
+        cut.Find("button.format-seed").Click();
+
+        // Still rendered — hidden, not removed: the height of the dialog must not change.
+        Assert.Contains("hidden", cut.Find(".backup-fields").GetAttribute("class"));
+        Assert.Single(cut.FindAll("input.folder"));
+    }
+
+    [Fact]
+    public void The_Code_Carries_The_StaticBit_Mark()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+
+        cut.Find("button.show-code").Click();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains("staticbit-qr-logo.png", cut.FindComponent<QrCode>().Instance.LogoUri));
     }
 }

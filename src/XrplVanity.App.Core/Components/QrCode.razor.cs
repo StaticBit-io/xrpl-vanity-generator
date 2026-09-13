@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Components;
 using QRCoder;
@@ -12,10 +13,26 @@ namespace XrplVanity.App.Core.Components;
 /// </summary>
 public partial class QrCode : ComponentBase
 {
+    /// <summary>
+    /// Past this many characters the mark is dropped instead of drawn. A logo is damage the error
+    /// correction has to absorb, and a code this long has already spent most of what level H gives
+    /// it. The wallet draws the line at the same place, and neither side ever lowers the level to
+    /// make a logo fit.
+    /// </summary>
+    private const int MaxLengthWithLogo = 1763;
+
+    /// <summary>How much of the code's width the mark covers, and how much wider its pad is.</summary>
+    private const double LogoShare = 0.20;
+    private const double PadShare = 0.26;
+
     private string _path = string.Empty;
     private int _modules = 1;
+    private LogoBox? _logo;
 
     [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+
+    /// <summary>Drawn over the middle of the code when the code is short enough to spare it.</summary>
+    [Parameter] public string? LogoUri { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -27,6 +44,24 @@ public partial class QrCode : ComponentBase
 
         _modules = data.ModuleMatrix.Count;
         _path = BuildPath(data.ModuleMatrix);
+        _logo = LogoUri is null || Text.Length > MaxLengthWithLogo ? null : LogoBox.Centred(_modules);
+    }
+
+    /// <summary>The mark and its pad, in module units, so the SVG needs no arithmetic of its own.</summary>
+    private sealed record LogoBox(string X, string Size, string PadX, string PadSize)
+    {
+        public static LogoBox Centred(int modules)
+        {
+            double size = modules * LogoShare;
+            double pad = modules * PadShare;
+            return new LogoBox(
+                Round((modules - size) / 2),
+                Round(size),
+                Round((modules - pad) / 2),
+                Round(pad));
+        }
+
+        private static string Round(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
     private static string BuildPath(List<BitArray> matrix)
