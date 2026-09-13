@@ -1,7 +1,9 @@
 @page "/"
 @inherits ViewModelPage
 
-<header class="page-head">
+@* While the clear dialog is open the page behind it is inert, the way History
+   leaves it: the controls it covers must not answer a stray click or a tab. *@
+<header class="page-head" inert="@_clearPending">
   <h1>XRPL Vanity <StatusPill State="Vm.State" /></h1>
   <div class="actions">
     @if (Vm.State == SearchState.Idle)
@@ -18,14 +20,14 @@
     }
   </div>
 </header>
-<div class="content-scroll">
+<div class="content-scroll" inert="@_clearPending">
   @if (Vm.LastFailure is not null)
   {
     <Banner Kind="negative" Text="@Vm.LastFailure" />
   }
   <div class="search-grid">
     <div class="col">
-      <PatternEditor Vm="Vm" />
+      <PatternEditor Vm="Vm" OnClearRequested="() => _clearPending = true" />
       <EstimateCard Vm="Vm" />
     </div>
     <div class="col">
@@ -44,3 +46,6 @@
     </div>
   </div>
 </div>
+
+<ConfirmDialog Visible="_clearPending" Title="@ClearTitle" Message="@ClearMessage" ConfirmLabel="Clear"
+               OnConfirm="ConfirmClear" OnCancel="() => _clearPending = false" />

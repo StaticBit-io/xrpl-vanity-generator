@@ -71,4 +71,40 @@ public class SearchPageTests : BunitContext
         cut.Find("button.stop").Click();
         cut.WaitForAssertion(() => Assert.Equal("Idle", cut.Find(".pill").TextContent.Trim()), TimeSpan.FromSeconds(30));
     }
+    [Fact]
+    public void Clearing_The_Patterns_Asks_First_And_Cancelling_Keeps_Them()
+    {
+        SearchViewModel vm = Register();
+        vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+        IRenderedComponent<SearchPage> cut = Render<SearchPage>();
+
+        cut.Find("button.clear-patterns").Click();
+
+        Assert.Contains("Clear 1 pattern?", cut.Find(".modal-box h3").TextContent);
+        // The page behind the dialog is inert, the way a History delete leaves it.
+        Assert.True(cut.Find("header.page-head").HasAttribute("inert"));
+        Assert.True(cut.Find(".content-scroll").HasAttribute("inert"));
+
+        cut.Find("button.cancel").Click();
+
+        Assert.Single(vm.Patterns);
+        Assert.Empty(cut.FindAll(".modal-box"));
+        Assert.False(cut.Find("header.page-head").HasAttribute("inert"));
+    }
+
+    [Fact]
+    public void Confirming_The_Clear_Empties_The_Patterns()
+    {
+        SearchViewModel vm = Register();
+        vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+        vm.AddPattern("cd", XrplVanity.Core.MatchPosition.Ends, false);
+        IRenderedComponent<SearchPage> cut = Render<SearchPage>();
+
+        cut.Find("button.clear-patterns").Click();
+        Assert.Contains("Clear 2 patterns?", cut.Find(".modal-box h3").TextContent);
+        cut.Find("button.confirm").Click();
+
+        Assert.Empty(vm.Patterns);
+        Assert.Empty(cut.FindAll(".modal-box"));
+    }
 }

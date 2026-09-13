@@ -1,12 +1,25 @@
+.head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.head .card-title { margin-bottom: 0; }
+.count { color: var(--beige); margin-left: 6px; }
+/* Clear is destructive, so it is tinted the way the History bar tints Delete selected. */
+.head .danger { color: var(--negative); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 36px; margin-bottom: 12px; }
+.chips.scrolling + .chips-row, .chips + .chips-row { margin: -4px 0 12px; }
+/* Expanded, the set scrolls inside the card: six rows of chips is already half the page, and a
+   set of two hundred would push the estimate and the results off it entirely. */
+.chips.scrolling { max-height: 246px; overflow-y: auto; }
+.chips-toggle { background: rgba(0, 0, 0, 0); border: 1px dashed var(--dark-gray); color: var(--text-secondary); border-radius: var(--radius-chip); padding: 6px 10px; }
+.chips-toggle:hover { border-color: var(--text-secondary); color: var(--text); }
 .chip-normalized { color: var(--text-secondary); }
-.entry { display: grid; grid-template-columns: 140px 1fr auto auto; gap: 8px; align-items: center; }
+.entry { display: grid; grid-template-columns: 140px 1fr auto auto auto; gap: 8px; align-items: center; }
 /* The Pair mode adds a second box: one more equal-width column, the rest of the row unchanged. */
-.pattern-entry.paired { grid-template-columns: 140px 1fr 1fr auto auto; }
+.pattern-entry.paired { grid-template-columns: 140px 1fr 1fr auto auto auto; }
 /* The dark control chrome, the mint focus border and the placeholder colour are global now
    (wwwroot/scss/common/_forms.scss); only this component's own layout stays here. */
 .case-label { color: var(--text-secondary); white-space: nowrap; display: flex; gap: 6px; align-items: center; }
 .list-error { color: var(--negative); font-size: 12px; margin-top: 6px; }
+/* Skipped lines and a duplicate typed by hand are not failures: they read like the hint below. */
+.list-note { color: var(--text-secondary); font-size: 12px; margin-top: 6px; }
 .pattern-problem { color: var(--yellow); font-size: 12px; margin-top: 6px; }
 .pattern-hint { color: var(--text-secondary); font-size: 12px; margin-top: 6px; }
 @media (max-width: 1000px) {

@@ -28,6 +28,25 @@ The application has three pages:
   independent halves. The halves may touch but never overlap, so halves totalling more
   than 33 characters — the longest address body — are flagged as unreachable rather than
   searched for.
+  A pattern set can be written to a file with `save list…` and read back with `load
+  list…`. The file is UTF-8 text, one rule per line, fields separated by tabs:
+  `ends<TAB>RRRRRRRR`, a case-sensitive rule adding the same `Aa` marker its chip wears,
+  and a paired rule spelling out both halves as `starts<TAB>static<TAB>ends<TAB>bit`. A
+  line holding a single word and no tab at all is a plain word list entry — the format
+  the command line tool's `--list` reads — and becomes a `starts` rule carrying whatever
+  the `ignore case` box says at the time, so existing word lists keep loading unchanged.
+  Loading adds to the chips already on screen rather than replacing them, and never twice: a
+  line naming a rule the set already holds is skipped, as is a rule typed into the entry box
+  by hand. Two chips are the same rule when their position, their case flag and their
+  — normalized — text agree, so `starts 00000000` and `starts oooooooo` are one rule, and
+  `static` and `STATIC` are one rule only while the case is ignored. Blank lines are skipped,
+  and a line outside the grammar is skipped too; below the entry row a grey note says what
+  the load passed over (`34 duplicates skipped. 2 lines could not be read and were skipped.`).
+  The card header counts the chips and carries **Clear**, which empties the set behind the
+  same confirmation dialog History uses. Past twelve chips the set is cut down to the first
+  ten with a `+N more` button after them; expanded, it shows everything and scrolls inside the
+  card rather than pushing the estimate and the results off the page. The expanded state is
+  not remembered between runs.
 - **History** — every result the application has ever stored, narrowed by two filters
   that work together: a text box over the address and the pattern, and a drop-down over
   the pattern column alone. The drop-down lists every stored pattern once per position it
@@ -307,6 +326,27 @@ storage layer. Each step names what you should see.
 19. **The reference-rates link opens in a browser.** On the Search page, click
     **reference rates** in the estimate note: the benchmarks page opens in the default
     browser and the application window is unchanged — no blank frame inside the app.
+20. **Save a pattern list and load it back.** Build a set that mixes the positions — one
+    `starts`, one `ends`, one `contains` and one `starts and ends with`, at least one of
+    them case-sensitive — then press **save list…** and save the file. Open it in a text
+    editor: one tab-separated line per chip, the paired rule spelling out both halves.
+    Remove every chip (**save list…** goes disabled once the last one is gone), press
+    **load list…** and choose the same file: every chip returns with its position and its
+    `Aa` marker, whichever way the `ignore case` box is set.
+21. **Loading a list twice changes nothing the second time.** With the file from step 20 still
+    on disk and its chips on screen, press **load list…** and choose it again: no chip is
+    added, and the grey note below the entry row reads `4 duplicates skipped.` Type one of the
+    same patterns into the entry box and press Enter: the note reads `That pattern is already
+    in the list.` and no chip appears.
+22. **A long set folds itself away.** Load a word list of forty or more words: the card shows
+    ten chips and a `+30 more` button, and the ESTIMATE card below is still on screen without
+    scrolling. Press the button: every chip appears, the area scrolls inside the card, and the
+    button reads `show less`.
+23. **Clear asks first.** Press **Clear** in the Patterns header: the dialog reads
+    `Clear 40 patterns?`, the page behind it does not answer clicks, and Escape or `Cancel`
+    leaves every chip in place. Press it again and confirm: the card empties, Start goes back
+    to disabled with "Add at least one reachable pattern.", and both **Clear** and
+    **save list…** go disabled.
 
 Exiting stops the search first and gives the teardown 10 s before the process ends; the
 session's own dispose cap is 30 s, so a session that refuses to settle costs 10 s, not 30.

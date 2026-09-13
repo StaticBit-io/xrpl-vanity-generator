@@ -214,7 +214,7 @@ public partial class ResultsList : IDisposable
         {
             // The picker itself can fail (no owner window yet, a shell extension refusing the
             // dialog), so it belongs inside the same guard as the write.
-            string? path = await Dialog.PickSaveTsvAsync("xrpl-vanity.tsv");
+            string? path = await Dialog.PickSaveAsync("xrpl-vanity.tsv", "Tab-separated values", ".tsv");
             if (path is null) return;
 
             // Items is newest-first in the app; export chronologically (oldest-first), matching

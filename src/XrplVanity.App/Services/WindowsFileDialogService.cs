@@ -13,7 +13,7 @@ public sealed class WindowsFileDialogService : IFileDialogService
         _windowService = windowService;
     }
 
-    public async Task<string?> PickSaveTsvAsync(string suggestedName)
+    public async Task<string?> PickSaveAsync(string suggestedName, string label, string extension)
     {
         if (_windowService.Handle == IntPtr.Zero)
         {
@@ -26,9 +26,9 @@ public sealed class WindowsFileDialogService : IFileDialogService
         {
             SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
             SuggestedFileName = suggestedName,
-            DefaultFileExtension = ".tsv",
+            DefaultFileExtension = extension,
         };
-        picker.FileTypeChoices.Add("Tab-separated values", new List<string> { ".tsv" });
+        picker.FileTypeChoices.Add(label, new List<string> { extension });
 
         // A WinUI picker has no window of its own; it has to be told which one owns it.
         WinRT.Interop.InitializeWithWindow.Initialize(picker, _windowService.Handle);

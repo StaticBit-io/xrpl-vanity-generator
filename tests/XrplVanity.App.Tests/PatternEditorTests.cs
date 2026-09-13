@@ -1,6 +1,8 @@
 using System.Reflection;
+using System.Text;
 using Bunit;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.Extensions.DependencyInjection;
 using XrplVanity.App.Core.Components;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
@@ -10,6 +12,13 @@ namespace XrplVanity.App.Tests;
 
 public class PatternEditorTests : BunitContext
 {
+    private readonly FakeFileDialog _dialog = new();
+
+    public PatternEditorTests()
+    {
+        Services.AddSingleton<Core.Services.IFileDialogService>(_dialog);
+    }
+
     private static SearchViewModel Vm() => new(new MemorySettingsStore(), new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
 
     [Fact]
@@ -264,6 +273,256 @@ public class PatternEditorTests : BunitContext
 
         Assert.Contains("Could not read the list", cut.Find(".list-error").TextContent);
         Assert.Empty(vm.Patterns);
+    }
+
+    [Fact]
+    public void Save_Writes_Every_Chip_In_The_Full_Format()
+    {
+        string path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".txt");
+        _dialog.PathToReturn = path;
+        try
+        {
+            SearchViewModel vm = Vm();
+            vm.AddPair("static", "bit", ignoreCase: true);
+            vm.AddPattern("RRRRRRRR", MatchPosition.Ends, ignoreCase: true);
+            vm.AddPattern("ALTCONN", MatchPosition.Starts, ignoreCase: false);
+            IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+            cut.Find("button.save-list").Click();
+
+            cut.WaitForAssertion(() => Assert.True(File.Exists(path)));
+            Assert.Equal(
+                "starts\tstatic\tends\tbit\nends\tRRRRRRRR\nstarts\tALTCONN\tAa\n",
+                File.ReadAllText(path).Replace("\r\n", "\n"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void What_Save_Writes_Loads_Back_As_The_Same_Chips()
+    {
+        string path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".txt");
+        _dialog.PathToReturn = path;
+        try
+        {
+            SearchViewModel saved = Vm();
+            saved.AddPair("static", "bit", ignoreCase: false);
+            saved.AddPattern("RRRRRRRR", MatchPosition.Ends, ignoreCase: true);
+            saved.AddPattern("fast", MatchPosition.Contains, ignoreCase: false);
+            IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, saved));
+            cut.Find("button.save-list").Click();
+            cut.WaitForAssertion(() => Assert.True(File.Exists(path)));
+
+            SearchViewModel loaded = Vm();
+            // The entry checkbox says the opposite of every saved chip, so a per-chip flag that
+            // failed to survive the file would come back wrong rather than coincidentally right.
+            Assert.Equal(new ListLoadResult(3, 0, 0), loaded.AddPatternsFromList(File.ReadAllLines(path), ignoreCase: true));
+
+            Assert.Equal(
+                saved.Patterns.Select(c => (c.Text, c.EndsText, c.Position, c.IgnoreCase)),
+                loaded.Patterns.Select(c => (c.Text, c.EndsText, c.Position, c.IgnoreCase)));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Save_Is_Disabled_Until_There_Is_A_Chip_To_Save()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+        Assert.True(cut.Find("button.save-list").HasAttribute("disabled"));
+
+        vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false);
+
+        cut.WaitForAssertion(() => Assert.False(cut.Find("button.save-list").HasAttribute("disabled")));
+    }
+
+    [Fact]
+    public void A_Cancelled_Save_Writes_Nothing_And_Shows_No_Error()
+    {
+        _dialog.PathToReturn = null;
+        SearchViewModel vm = Vm();
+        vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("button.save-list").Click();
+
+        Assert.Empty(cut.FindAll(".list-error"));
+    }
+
+    [Fact]
+    public void A_Save_Failure_Is_Shown_Instead_Of_Thrown()
+    {
+        // A directory that does not exist: the write throws DirectoryNotFoundException (an IOException).
+        _dialog.PathToReturn = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), "patterns.txt");
+        SearchViewModel vm = Vm();
+        vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("button.save-list").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Could not save the list", cut.Find(".list-error").TextContent));
+    }
+
+    [Fact]
+    public async Task Lines_The_List_Grammar_Rejects_Are_Reported()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        InputFileChangeEventArgs args = new(new[] { new StringBrowserFile("ends\tbit\nsideways\tstatic\nstarts\ta\tends\n") });
+        MethodInfo onListChosen = typeof(PatternEditor).GetMethod("OnListChosen", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        await cut.InvokeAsync(() => (Task)onListChosen.Invoke(cut.Instance, new object[] { args })!);
+        cut.Render();
+
+        Assert.Contains("2 lines could not be read", cut.Find(".list-note").TextContent);
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("bit", chip.Text);
+    }
+
+    [Fact]
+    public async Task Lines_Naming_A_Rule_Already_In_The_Set_Are_Reported_As_Duplicates()
+    {
+        SearchViewModel vm = Vm();
+        vm.AddPattern("bit", MatchPosition.Ends, ignoreCase: true);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        await LoadList(cut, "ends\tbit\nstarts\tstatic\nends\tbit\n");
+
+        Assert.Contains("2 duplicates skipped", cut.Find(".list-note").TextContent);
+        Assert.Equal(2, vm.Patterns.Count);
+    }
+
+    [Fact]
+    public void Entering_A_Rule_The_Set_Already_Holds_Says_So_Instead_Of_Doubling_It()
+    {
+        SearchViewModel vm = Vm();
+        vm.AddPattern("fast", MatchPosition.Contains, ignoreCase: true);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("select.pos").Change("Contains");
+        cut.Find("input.pattern").Input("FAST");
+        cut.Find("input.pattern").KeyDown("Enter");
+
+        Assert.Contains("already in the list", cut.Find(".list-note").TextContent);
+        Assert.Single(vm.Patterns);
+    }
+
+    [Fact]
+    public void The_Card_Title_Counts_The_Chips()
+    {
+        SearchViewModel vm = Vm();
+        vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false);
+        vm.AddPattern("cd", MatchPosition.Ends, ignoreCase: false);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        Assert.Equal("2", cut.Find(".card-title .count").TextContent.Trim());
+    }
+
+    [Fact]
+    public void Clear_Is_Disabled_Without_Chips_And_Only_Asks_The_Host_To_Clear()
+    {
+        SearchViewModel vm = Vm();
+        int asked = 0;
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p
+            .Add(x => x.Vm, vm)
+            .Add(x => x.OnClearRequested, () => asked++));
+        Assert.True(cut.Find("button.clear-patterns").HasAttribute("disabled"));
+
+        vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false);
+        cut.WaitForAssertion(() => Assert.False(cut.Find("button.clear-patterns").HasAttribute("disabled")));
+        cut.Find("button.clear-patterns").Click();
+
+        // The editor never clears the set itself: the page owns the confirmation.
+        Assert.Equal(1, asked);
+        Assert.Single(vm.Patterns);
+    }
+
+    [Fact]
+    public void A_Short_Set_Shows_Every_Chip_And_Offers_No_Toggle()
+    {
+        SearchViewModel vm = Vm();
+        AddChips(vm, 12);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        Assert.Equal(12, cut.FindAll(".chip").Count);
+        Assert.Empty(cut.FindAll("button.chips-toggle"));
+    }
+
+    [Fact]
+    public void A_Long_Set_Shows_The_First_Ten_And_Counts_The_Rest()
+    {
+        SearchViewModel vm = Vm();
+        AddChips(vm, 40);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        Assert.Equal(10, cut.FindAll(".chip").Count);
+        Assert.Equal("+30 more", cut.Find("button.chips-toggle").TextContent.Trim());
+    }
+
+    [Fact]
+    public void Expanding_Shows_Every_Chip_And_Offers_To_Collapse_Again()
+    {
+        SearchViewModel vm = Vm();
+        AddChips(vm, 40);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("button.chips-toggle").Click();
+
+        Assert.Equal(40, cut.FindAll(".chip").Count);
+        Assert.Equal("show less", cut.Find("button.chips-toggle").TextContent.Trim());
+    }
+
+    [Fact]
+    public void A_Set_That_Shrinks_Below_The_Threshold_Loses_The_Toggle()
+    {
+        SearchViewModel vm = Vm();
+        AddChips(vm, 40);
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+        cut.Find("button.chips-toggle").Click();
+
+        vm.ClearPatterns();
+
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("button.chips-toggle")));
+        Assert.Empty(cut.FindAll(".chip"));
+    }
+
+    private static void AddChips(SearchViewModel vm, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            vm.AddPattern($"pattern{i}", MatchPosition.Starts, ignoreCase: true);
+        }
+    }
+
+    private static async Task LoadList(IRenderedComponent<PatternEditor> cut, string content)
+    {
+        InputFileChangeEventArgs args = new(new[] { new StringBrowserFile(content) });
+        MethodInfo onListChosen = typeof(PatternEditor).GetMethod("OnListChosen", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        await cut.InvokeAsync(() => (Task)onListChosen.Invoke(cut.Instance, new object[] { args })!);
+        cut.Render();
+    }
+
+    private sealed class StringBrowserFile : IBrowserFile
+    {
+        private readonly byte[] _content;
+
+        public StringBrowserFile(string content) => _content = Encoding.UTF8.GetBytes(content);
+
+        public string Name => "patterns.txt";
+        public DateTimeOffset LastModified => DateTimeOffset.UtcNow;
+        public long Size => _content.Length;
+        public string ContentType => "text/plain";
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default) =>
+            new MemoryStream(_content);
     }
 
     private sealed class ThrowingBrowserFile : IBrowserFile

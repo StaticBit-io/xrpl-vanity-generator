@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using XrplVanity.App.Core.Components;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
@@ -389,6 +389,153 @@ public class SearchViewModelTests
         PatternChip chip = Assert.Single(vm.Patterns);
         Assert.Equal("a", chip.Text);
         Assert.Single(vm.Results);
+    }
+
+    [Fact]
+    public void The_Same_Rule_Added_Twice_Stays_One_Chip()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        Assert.True(vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false));
+        Assert.False(vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false));
+
+        Assert.Single(vm.Patterns);
+    }
+
+    [Fact]
+    public void Two_Spellings_Of_One_Base58_Look_Alike_Are_The_Same_Rule()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        // The normalizer folds 0 onto o, so both chips would search for exactly the same thing.
+        Assert.True(vm.AddPattern("00000000", MatchPosition.Starts, ignoreCase: true));
+        Assert.False(vm.AddPattern("oooooooo", MatchPosition.Starts, ignoreCase: true));
+
+        Assert.Single(vm.Patterns);
+    }
+
+    [Fact]
+    public void Case_Alone_Separates_Two_Rules_Only_When_The_Case_Matters()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        Assert.True(vm.AddPattern("static", MatchPosition.Starts, ignoreCase: true));
+        Assert.False(vm.AddPattern("STATIC", MatchPosition.Starts, ignoreCase: true));
+
+        // Case-sensitively the two are different searches, and both are also narrower than the
+        // case-insensitive rule already there.
+        Assert.True(vm.AddPattern("static", MatchPosition.Starts, ignoreCase: false));
+        Assert.True(vm.AddPattern("STATIC", MatchPosition.Starts, ignoreCase: false));
+
+        Assert.Equal(3, vm.Patterns.Count);
+    }
+
+    [Fact]
+    public void A_Pair_Is_A_Duplicate_Only_When_Both_Halves_Match()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        Assert.True(vm.AddPair("abc", "xyz", ignoreCase: false));
+        Assert.False(vm.AddPair("abc", "xyz", ignoreCase: false));
+        Assert.True(vm.AddPair("abc", "zzz", ignoreCase: false));
+
+        Assert.Equal(2, vm.Patterns.Count);
+    }
+
+    [Fact]
+    public void The_Same_Word_At_Two_Positions_Stays_Two_Rules()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        Assert.True(vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false));
+        Assert.True(vm.AddPattern("ab", MatchPosition.Ends, ignoreCase: false));
+
+        Assert.Equal(2, vm.Patterns.Count);
+    }
+
+    [Fact]
+    public void Loading_The_Same_List_Twice_Adds_Nothing_The_Second_Time()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+        string[] list = { "starts\tstatic\tends\tbit", "ends\tRRRRRRRR", "contains\tfast\tAa" };
+
+        ListLoadResult first = vm.AddPatternsFromList(list, ignoreCase: true);
+        ListLoadResult second = vm.AddPatternsFromList(list, ignoreCase: true);
+
+        Assert.Equal(new ListLoadResult(3, 0, 0), first);
+        Assert.Equal(new ListLoadResult(0, 3, 0), second);
+        Assert.Equal(3, vm.Patterns.Count);
+    }
+
+    [Fact]
+    public void A_List_That_Repeats_Itself_Loads_Each_Rule_Once()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        ListLoadResult result = vm.AddPatternsFromList(
+            new[] { "static", "static", "sideways\tx", "ledger" },
+            ignoreCase: true);
+
+        Assert.Equal(new ListLoadResult(2, 1, 1), result);
+        Assert.Equal(2, vm.Patterns.Count);
+    }
+
+    [Fact]
+    public void ClearPatterns_Empties_The_Set_And_Blocks_Start_Again()
+    {
+        (SearchViewModel vm, _, _, MemorySettingsStore settings) = Create();
+        vm.AddPattern("ab", MatchPosition.Starts, ignoreCase: false);
+        Assert.True(vm.CanStart);
+
+        vm.ClearPatterns();
+
+        Assert.Empty(vm.Patterns);
+        Assert.False(vm.CanStart);
+        Assert.Equal("Add at least one reachable pattern.", vm.StartBlockedReason);
+        Assert.Empty(settings.Current.Patterns);
+    }
+
+    [Fact]
+    public void A_List_In_The_Full_Format_Restores_Positions_Pairs_And_Case()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        ListLoadResult result = vm.AddPatternsFromList(
+            new[] { "starts\tstatic\tends\tbit", "ends\tRRRRRRRR", "contains\tALTCONN\tAa", "" },
+            ignoreCase: true);
+
+        Assert.Equal(new ListLoadResult(3, 0, 0), result);
+        Assert.Collection(
+            vm.Patterns,
+            c => { Assert.Equal("static", c.Text); Assert.Equal("bit", c.EndsText); Assert.Equal(MatchPosition.Pair, c.Position); Assert.True(c.IgnoreCase); },
+            c => { Assert.Equal("RRRRRRRR", c.Text); Assert.Equal(MatchPosition.Ends, c.Position); Assert.True(c.IgnoreCase); },
+            c => { Assert.Equal("ALTCONN", c.Text); Assert.Equal(MatchPosition.Contains, c.Position); Assert.False(c.IgnoreCase); });
+    }
+
+    [Fact]
+    public void A_Plain_Word_List_Still_Loads_As_Starts_Chips_With_The_Entry_Case()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        ListLoadResult result = vm.AddPatternsFromList(new[] { "static", "  ledger  ", "" }, ignoreCase: false);
+
+        Assert.Equal(new ListLoadResult(2, 0, 0), result);
+        Assert.Collection(
+            vm.Patterns,
+            c => { Assert.Equal("static", c.Text); Assert.Equal(MatchPosition.Starts, c.Position); Assert.False(c.IgnoreCase); },
+            c => { Assert.Equal("ledger", c.Text); Assert.Equal(MatchPosition.Starts, c.Position); Assert.False(c.IgnoreCase); });
+    }
+
+    [Fact]
+    public void Lines_Outside_The_Grammar_Are_Skipped_And_Counted()
+    {
+        (SearchViewModel vm, _, _, _) = Create();
+
+        ListLoadResult result = vm.AddPatternsFromList(new[] { "sideways\tstatic", "ends\tbit", "starts\ta\tends" }, ignoreCase: true);
+
+        Assert.Equal(new ListLoadResult(1, 0, 2), result);
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal("bit", chip.Text);
     }
 
     [Fact]

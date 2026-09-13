@@ -34,4 +34,27 @@ public sealed class PatternChip
     /// A paired chip records both halves as <c>starts..ends</c>, the form <c>PatternSet</c> reports.
     /// </summary>
     public string? Normalized { get; internal set; }
+
+    /// <summary>
+    /// What makes two chips the same rule, so a set never holds one twice. Built from the
+    /// normalized halves rather than the typed ones — <c>starts 00000000</c> and
+    /// <c>starts oooooooo</c> search for exactly the same thing — and folds case only for a chip
+    /// that ignores it, since a case-sensitive rule is narrower than its case-insensitive twin and
+    /// the two belong in the set together.
+    /// </summary>
+    public string Identity
+    {
+        get
+        {
+            string text = Fold(Text, IgnoreCase);
+            string ends = EndsText is null ? string.Empty : Fold(EndsText.Trim(), IgnoreCase);
+            return $"{Position}|{IgnoreCase}|{text}|{ends}";
+        }
+    }
+
+    private static string Fold(string value, bool ignoreCase)
+    {
+        string normalized = PatternNormalizer.Normalize(value).Value;
+        return ignoreCase ? normalized.ToLowerInvariant() : normalized;
+    }
 }

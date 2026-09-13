@@ -131,7 +131,7 @@ public sealed class MemoryResultStore : IResultStore
 public sealed class FakeFileDialog : IFileDialogService
 {
     public string? PathToReturn { get; set; }
-    public Task<string?> PickSaveTsvAsync(string suggestedName) => Task.FromResult(PathToReturn);
+    public Task<string?> PickSaveAsync(string suggestedName, string label, string extension) => Task.FromResult(PathToReturn);
 }
 
 public sealed class FakeWindowService : IWindowService

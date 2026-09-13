@@ -1,9 +1,17 @@
 @using XrplVanity.Core
 @inherits ViewModelComponent
+@inject IFileDialogService Dialog
+@{
+  IReadOnlyList<PatternChip> chips = Vm.Patterns;
+  bool collapsed = !_expanded && chips.Count > CollapseThreshold;
+}
 <div class="card-box">
-  <div class="card-title">Patterns</div>
-  <div class="chips">
-    @foreach (PatternChip chip in Vm.Patterns)
+  <div class="head">
+    <div class="card-title">Patterns <span class="count">@chips.Count</span></div>
+    <button class="clear-patterns btn-secondary-dark danger t" disabled="@(chips.Count == 0)" @onclick="() => OnClearRequested.InvokeAsync()">Clear</button>
+  </div>
+  <div class="chips @(_expanded ? "scrolling" : null)">
+    @foreach (PatternChip chip in collapsed ? chips.Take(CollapsedChips) : chips)
     {
       <span class="chip t" @key="chip">
         @if (chip.Position == MatchPosition.Pair)
@@ -25,6 +33,15 @@
       </span>
     }
   </div>
+  @* A long set is cut to two rows or so; expanded, the area scrolls rather than pushing the cards
+     below it off the page. The toggle sits outside that area on purpose: inside it, "show less"
+     would scroll away with the chips and a long set could only be folded from its very bottom. *@
+  @if (chips.Count > CollapseThreshold)
+  {
+    <div class="chips-row">
+      <button class="chips-toggle t" @onclick="() => _expanded = !_expanded">@(collapsed ? $"+{chips.Count - CollapsedChips} more" : "show less")</button>
+    </div>
+  }
   <div class="entry pattern-entry @(Vm.EntryPosition == MatchPosition.Pair ? "paired" : null)">
     <select class="pos form-select" @bind="Vm.EntryPosition">
       <option value="Starts">starts with</option>
@@ -46,10 +63,15 @@
       load list…
       <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
     </label>
+    <button class="save-list btn-secondary-dark t" disabled="@(chips.Count == 0)" @onclick="OnSaveList">save list…</button>
   </div>
   @if (_listError is not null)
   {
     <div class="list-error">@_listError</div>
+  }
+  @if (_listNote is not null)
+  {
+    <div class="list-note">@_listNote</div>
   }
   @if (Vm.PatternProblem is not null)
   {

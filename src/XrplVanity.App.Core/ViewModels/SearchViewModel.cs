@@ -368,18 +368,20 @@ public sealed class SearchViewModel : IDisposable
 
     public string? StartBlockedReason => PatternProblem ?? TargetProblem;
 
-    public void AddPattern(string text, MatchPosition position, bool ignoreCase)
+    /// <summary>Returns false when the pattern is blank or already in the set (see <see cref="PatternChip.Identity"/>).</summary>
+    public bool AddPattern(string text, MatchPosition position, bool ignoreCase)
     {
         string trimmed = text.Trim();
-        if (trimmed.Length == 0) return;
+        if (trimmed.Length == 0) return false;
         lock (_gate)
         {
-            _patterns.Add(new PatternChip(trimmed, position, ignoreCase));
+            if (!TryAdd(new PatternChip(trimmed, position, ignoreCase), KnownIdentities())) return false;
             RebuildPatternSet();
         }
 
         PersistDraft();
         Changed?.Invoke();
+        return true;
     }
 
     /// <summary>
@@ -387,26 +389,27 @@ public sealed class SearchViewModel : IDisposable
     /// ending with <paramref name="ends"/>. Both halves are required: a blank one adds nothing,
     /// the way <see cref="AddPattern"/> ignores a blank pattern.
     /// </summary>
-    public void AddPair(string starts, string ends, bool ignoreCase)
+    public bool AddPair(string starts, string ends, bool ignoreCase)
     {
         string trimmedStarts = starts.Trim();
         string trimmedEnds = ends.Trim();
-        if (trimmedStarts.Length == 0 || trimmedEnds.Length == 0) return;
+        if (trimmedStarts.Length == 0 || trimmedEnds.Length == 0) return false;
         lock (_gate)
         {
-            _patterns.Add(new PatternChip(trimmedStarts, MatchPosition.Pair, ignoreCase, trimmedEnds));
+            if (!TryAdd(new PatternChip(trimmedStarts, MatchPosition.Pair, ignoreCase, trimmedEnds), KnownIdentities())) return false;
             RebuildPatternSet();
         }
 
         PersistDraft();
         Changed?.Invoke();
+        return true;
     }
 
     /// <summary>
     /// Commits the pending entry as a chip, the same way pressing Enter in the entry row does.
     /// Returns false without side effects when the trimmed entry is blank — or, in
     /// <see cref="MatchPosition.Pair"/> mode, when either of the two boxes is: the pair commits
-    /// as one chip or not at all.
+    /// as one chip or not at all. Also false when the rule is already in the set.
     /// </summary>
     public bool AddPatternFromEntry()
     {
@@ -428,16 +431,45 @@ public sealed class SearchViewModel : IDisposable
             if (position == MatchPosition.Pair) _entryEndsText = string.Empty;
         }
 
-        if (position == MatchPosition.Pair)
+        // The result is the add's own: a rule the set already holds commits nothing, and the
+        // editor says so rather than leaving the user looking for a chip that never appeared.
+        return position == MatchPosition.Pair
+            ? AddPair(trimmed, trimmedEnds, ignoreCase)
+            : AddPattern(trimmed, position, ignoreCase);
+    }
+
+    /// <summary>
+    /// The identities already in the set, for a caller about to append. Built once per operation
+    /// so loading a 20 000-word list stays linear rather than comparing every line against every
+    /// chip. The caller holds <c>_gate</c>.
+    /// </summary>
+    private HashSet<string> KnownIdentities()
+    {
+        HashSet<string> known = new(StringComparer.Ordinal);
+        foreach (PatternChip existing in _patterns) known.Add(existing.Identity);
+        return known;
+    }
+
+    /// <summary>Appends the chip unless <paramref name="known"/> already holds its rule, keeping the set in step.</summary>
+    private bool TryAdd(PatternChip chip, HashSet<string> known)
+    {
+        if (!known.Add(chip.Identity)) return false;
+        _patterns.Add(chip);
+        return true;
+    }
+
+    /// <summary>Drops every chip. The pending entry is left alone: it was never part of the set.</summary>
+    public void ClearPatterns()
+    {
+        lock (_gate)
         {
-            AddPair(trimmed, trimmedEnds, ignoreCase);
-        }
-        else
-        {
-            AddPattern(trimmed, position, ignoreCase);
+            if (_patterns.Count == 0) return;
+            _patterns.Clear();
+            RebuildPatternSet();
         }
 
-        return true;
+        PersistDraft();
+        Changed?.Invoke();
     }
 
     public void RemovePattern(PatternChip chip)
@@ -465,15 +497,35 @@ public sealed class SearchViewModel : IDisposable
         Changed?.Invoke();
     }
 
-    /// <summary>Adds every non-blank line of a word list as a Starts chip.</summary>
-    public void AddPatternsFromList(IEnumerable<string> lines, bool ignoreCase)
+    /// <summary>
+    /// Adds every line a pattern list holds, in the grammar <see cref="PatternListFormat"/> defines
+    /// — a plain word among them still becoming a Starts chip carrying <paramref name="ignoreCase"/>.
+    /// Blank lines are skipped; returns how many non-blank lines fell outside the grammar, for the
+    /// caller to report.
+    /// </summary>
+    public ListLoadResult AddPatternsFromList(IEnumerable<string> lines, bool ignoreCase)
     {
+        int added = 0;
+        int duplicates = 0;
+        int rejected = 0;
         lock (_gate)
         {
+            HashSet<string> known = KnownIdentities();
             foreach (string line in lines)
             {
-                string word = line.Trim();
-                if (word.Length > 0) _patterns.Add(new PatternChip(word, MatchPosition.Starts, ignoreCase));
+                if (line.Trim().Length == 0) continue;
+                if (!PatternListFormat.TryParse(line, ignoreCase, out PatternChip chip))
+                {
+                    rejected++;
+                }
+                else if (TryAdd(chip, known))
+                {
+                    added++;
+                }
+                else
+                {
+                    duplicates++;
+                }
             }
 
             RebuildPatternSet();
@@ -481,6 +533,7 @@ public sealed class SearchViewModel : IDisposable
 
         PersistDraft();
         Changed?.Invoke();
+        return new ListLoadResult(added, duplicates, rejected);
     }
 
     public void SetTargetSelected(string id, bool selected)
