@@ -14,6 +14,7 @@ public partial class HistoryPage
     private string? _storeError;
     private int _lastSessionResultCount = -1;
     private PendingAction? _pending;
+    private IReadOnlyList<SessionResult>? _qrRows;
 
     protected override void OnInitialized()
     {

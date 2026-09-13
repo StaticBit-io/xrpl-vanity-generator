@@ -3,6 +3,7 @@ namespace XrplVanity.App.Core.Pages;
 public partial class SearchPage
 {
     private bool _clearPending;
+    private IReadOnlyList<ViewModels.SessionResult>? _qrRows;
 
     private string ClearTitle
     {

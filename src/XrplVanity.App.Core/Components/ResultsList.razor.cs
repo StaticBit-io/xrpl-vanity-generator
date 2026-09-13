@@ -33,6 +33,13 @@ public partial class ResultsList : IDisposable
 
     [Parameter] public EventCallback<IReadOnlyList<SessionResult>> OnDeleteSelected { get; set; }
 
+    /// <summary>
+    /// Asked to show these rows as a QR code. The dialog belongs to the page: everything inside
+    /// .content-scroll is covered by the inert attribute the page sets, so a dialog rendered from
+    /// here would go inert along with the page behind it.
+    /// </summary>
+    [Parameter] public EventCallback<IReadOnlyList<SessionResult>> OnShowQr { get; set; }
+
     protected override void OnParametersSet()
     {
         _items = Items.ToList();

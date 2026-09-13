@@ -4,10 +4,10 @@
 .list { overflow-y: auto; }
 /* The column template lives in --cols so the selection column can be prefixed once, in a single
    rule, instead of turning the four has-target/has-delete variants into eight. */
-.result-row { --cols: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px; display: grid; grid-template-columns: var(--cols); gap: 8px; align-items: center; height: 44px; border-top: 1px solid var(--dark-gray); }
-.result-row.has-target { --cols: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px; }
-.result-row.has-delete { --cols: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px 28px; }
-.result-row.has-target.has-delete { --cols: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px 28px; }
+.result-row { --cols: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px 28px; display: grid; grid-template-columns: var(--cols); gap: 8px; align-items: center; height: 44px; border-top: 1px solid var(--dark-gray); }
+.result-row.has-target { --cols: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px 28px; }
+.result-row.has-delete { --cols: minmax(280px, 1.2fr) 28px 1fr auto minmax(120px, 0.8fr) 28px 28px 28px 28px; }
+.result-row.has-target.has-delete { --cols: minmax(280px, 1.2fr) 28px 1fr auto auto minmax(120px, 0.8fr) 28px 28px 28px 28px; }
 .result-row.has-select { grid-template-columns: 24px var(--cols); }
 .result-row.picked { background: rgba(100, 207, 149, 0.07); }
 .result-row > * { min-width: 0; overflow-wrap: anywhere; }
@@ -30,7 +30,7 @@
 /* The size is stated rather than inherited from the user agent: the dash above is centred on it. */
 .pick, .pick-all { accent-color: var(--mint); margin: 0; width: 13px; height: 13px; }
 @media (max-width: 1000px) {
-  .result-row, .result-row.has-target { --cols: minmax(230px, 1fr) 28px 120px 120px 28px 28px; }
-  .result-row.has-delete, .result-row.has-target.has-delete { --cols: minmax(230px, 1fr) 28px 120px 120px 28px 28px 28px; }
+  .result-row, .result-row.has-target { --cols: minmax(230px, 1fr) 28px 120px 120px 28px 28px 28px; }
+  .result-row.has-delete, .result-row.has-target.has-delete { --cols: minmax(230px, 1fr) 28px 120px 120px 28px 28px 28px 28px; }
   .result-row .target, .result-row .time { display: none; }
 }

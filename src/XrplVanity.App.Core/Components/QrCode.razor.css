@@ -1,0 +1,6 @@
+/* The white plate is not decoration: the modules are drawn black, and on this application's dark
+   background a code without it is invisible as well as unscannable. The padding is the quiet zone,
+   stated here rather than assumed of the encoder's matrix. The code is not a picture to be lifted
+   out of the window, so it does not select either. */
+.qr-plate { background: #FFFFFF; border-radius: var(--radius-chip); padding: 12px; width: max-content; margin: 0 auto; -webkit-user-select: none; user-select: none; }
+.qr { display: block; width: 260px; height: 260px; }
