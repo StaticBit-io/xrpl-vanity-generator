@@ -54,7 +54,8 @@ The application has three pages:
   a single wallet. A password is optional and encrypts the container; without one the code is
   not encrypted and says so. One code holds 22 wallets, or 21 with a password. Nothing is
   written to disk — the code is inline SVG, never an image file, and it hides itself after 60
-  seconds, leaving the dialog exactly as tall as it was. An optional folder name travels with the
+  seconds. The dialog sits near the top of the window and grows downwards as the code appears, so
+  it is never taller than it needs and nothing already read moves. An optional folder name travels with the
   wallets, and the phone files them into a folder of that name, creating it when there is none;
   a name longer than 64 characters is cut, because the wallet ignores a longer one and files the
   wallet in the default folder without saying so. The StaticBit mark sits in the middle of the
@@ -378,9 +379,10 @@ storage layer. Each step names what you should see.
 26. **A selection that does not fit is refused.** Select forty rows on History and press
     **Show QR…**, then **Show code**: nothing is drawn and the dialog says how many of them
     would fit. Reduce the selection to that number and the code appears.
-27. **The dialog never moves.** With the dialog open, switch between the two formats, press
-    **Show code**, wait out the 60 s and press it again. The box stays exactly where it is and
-    exactly as tall throughout — nothing under the pointer shifts.
+27. **The dialog fits and nothing above the change moves.** Open it: the title, both format
+    buttons and **Close** are all on screen at once, with no scrollbar. Switch formats, press
+    **Show code**, wait out the 60 s and press it again — the dialog grows and shrinks downwards
+    from its top edge, and the title and the format buttons never shift.
 28. **A folder is honoured on the phone.** Type a folder name, show the code and scan it with
     StaticBit: the restored wallets land in a folder of that name, created if it did not exist.
     The StaticBit mark is visible in the middle of the code; with twenty wallets selected the

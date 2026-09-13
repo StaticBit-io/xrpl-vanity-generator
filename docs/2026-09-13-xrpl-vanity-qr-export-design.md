@@ -171,16 +171,22 @@ Past the limit the dialog refuses and says how many of the selected rows would f
 across several codes is not built, and the correction level is never lowered to make something fit
 — both match the wallet.
 
-## The dialog does not change height
+## The dialog grows downwards
 
-The dialog is centred, so anything that changes its height moves the whole box under the pointer —
-and almost everything in it is conditional: the note is one line or three, the backup's fields are
-meaningless for a bare seed, the code and its warning come and go. Every one of those boxes is
-therefore reserved rather than removed, the way the results list holds its selection bar open: the
-note has a floor of three lines, the password and folder fields stay rendered and go
-`visibility: hidden` in seed mode, and the warning, caption and error lines each keep their space.
-The **Show code** button stands inside the code's own box, so showing a code, letting it hide
-itself and showing it again all happen without a single pixel moving.
+Almost everything in the dialog is conditional — the note is one line or three, the backup's
+fields are meaningless for a bare seed, the code and its warning come and go — and a centred box
+moves as a whole every time any of that changes.
+
+The answer is not to reserve the room. Reserving it makes the dialog permanently as tall as its
+tallest state, which here is 700px of mostly empty box that does not fit the window: it gains a
+scrollbar, and the format buttons or the Close button are off screen when it opens. That was
+tried, and it was worse than the problem.
+
+Instead the dialog is anchored 24px from the top rather than centred. Content then extends
+downwards, so a row that appears pushes down only what is below it and everything already read
+stays where it was, and each state is exactly as tall as it needs: measured at 248px for a bare
+seed, 320px for the backup form, 619px once a code is on screen, none of them scrolling in a
+720px window.
 
 ## Behaviour at the edges
 

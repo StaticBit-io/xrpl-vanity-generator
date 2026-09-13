@@ -1,24 +1,24 @@
-/* Wider than the shared 420px frame: a level-H code plus its plate needs the room. */
-.qr-box { width: 460px; text-align: center; max-height: 90vh; overflow-y: auto; }
+/* Wider than the shared 420px frame: a level-H code plus its plate needs the room. And pinned to
+   the top rather than centred, which is what lets everything below be sized by its content: the
+   dialog grows downwards when the code appears, so nothing the reader has already looked at moves.
+   Centring it instead would mean reserving room for the code before there is one, and an empty box
+   that tall does not fit the window. */
+.qr-box { width: 460px; text-align: center; top: 24px; transform: translateX(-50%); max-height: calc(100vh - 48px); overflow-y: auto; }
 .formats { display: flex; gap: 8px; margin-bottom: 6px; }
 .formats button { flex: 1; background: var(--secondary-dark); color: var(--text-secondary); border: 1px solid var(--dark-gray); border-radius: var(--radius-chip); padding: 8px 10px; }
 .formats button:hover:not(:disabled) { border-color: var(--text-secondary); color: var(--text); }
 .formats button.active { border-color: var(--mint); color: var(--text); }
 .formats button:disabled { opacity: .45; }
 .format-note { color: var(--text-secondary); font-size: 12px; text-align: left; margin-bottom: 12px; }
-/* Every one of these boxes is reserved rather than conditional: the dialog is centred, so any
-   change of height moves the whole thing under the pointer. Hidden keeps the box and drops the
-   contents out of the tab order, the way the results list holds its selection bar open. */
-.format-note { min-height: 48px; }
-.backup-fields.hidden { visibility: hidden; }
+/* Nothing here reserves space it is not using: the dialog is anchored at the top, so a row that
+   appears pushes what is below it down and leaves everything above it exactly where it was. */
+.backup-fields.hidden, .qr-warning.hidden, .qr-caption.hidden, .qr-error.hidden { display: none; }
 .password-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .folder { width: 100%; }
-/* 260px of code plus the plate's 12px padding on each side, and the button stands in the same box. */
-.code-slot { display: flex; align-items: center; justify-content: center; min-height: 284px; margin-top: 12px; }
-.qr-warning { color: var(--yellow); font-size: 12px; margin-top: 10px; min-height: 32px; }
-.qr-caption { color: var(--text-secondary); font-size: 12px; margin-top: 8px; min-height: 16px; }
-.qr-error { color: var(--negative); font-size: 12px; margin-top: 10px; min-height: 32px; }
-.qr-warning.hidden, .qr-caption.hidden, .qr-error.hidden { visibility: hidden; }
+.code-slot { display: flex; align-items: center; justify-content: center; margin-top: 12px; }
+.qr-warning { color: var(--yellow); font-size: 12px; margin-top: 10px; }
+.qr-caption { color: var(--text-secondary); font-size: 12px; margin-top: 8px; }
+.qr-error { color: var(--negative); font-size: 12px; margin-top: 10px; }
 .stores { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 12px; }
 .stores a { color: var(--text-secondary); text-decoration: none; }
 .stores a:hover { color: var(--mint); }

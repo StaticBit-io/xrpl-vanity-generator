@@ -94,7 +94,7 @@ public class QrExportDialogTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             Assert.Empty(cut.FindAll("svg.qr"));
-            // The fields are hidden, not removed: the dialog must be as tall either way.
+            // A bare seed has no password and no folder, so those fields go.
             Assert.Contains("hidden", cut.Find(".backup-fields").GetAttribute("class"));
         });
     }
@@ -197,15 +197,15 @@ public class QrExportDialogTests : BunitContext
     }
 
     [Fact]
-    public void The_Backup_Fields_Keep_Their_Box_In_Seed_Mode_So_The_Dialog_Does_Not_Move()
+    public void The_Backup_Fields_Belong_To_The_Backup_Format_Alone()
     {
         IRenderedComponent<QrExportDialog> cut = Open(R(1));
         Assert.DoesNotContain("hidden", cut.Find(".backup-fields").GetAttribute("class"));
 
         cut.Find("button.format-seed").Click();
 
-        // Still rendered — hidden, not removed: the height of the dialog must not change.
         Assert.Contains("hidden", cut.Find(".backup-fields").GetAttribute("class"));
+        // The folder field belongs to the container, which a bare seed does not have.
         Assert.Single(cut.FindAll("input.folder"));
     }
 
