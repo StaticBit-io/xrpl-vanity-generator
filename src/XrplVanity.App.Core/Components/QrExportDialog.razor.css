@@ -22,4 +22,4 @@
 .stores { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 12px; }
 .stores a { color: var(--text-secondary); text-decoration: none; }
 .stores a:hover { color: var(--mint); }
-.buttons { display: flex; justify-content: flex-end; margin-top: 14px; }
+.buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }

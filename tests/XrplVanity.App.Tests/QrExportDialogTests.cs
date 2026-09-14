@@ -219,4 +219,57 @@ public class QrExportDialogTests : BunitContext
         cut.WaitForAssertion(() =>
             Assert.Contains("staticbit-qr-logo.png", cut.FindComponent<QrCode>().Instance.LogoUri));
     }
+    [Fact]
+    public void A_Code_On_Screen_Puts_The_Form_Away()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        Assert.DoesNotContain("hidden", cut.Find(".backup-fields").GetAttribute("class"));
+        Assert.Empty(cut.FindAll("button.change-code"));
+
+        cut.Find("button.show-code").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            // The fields no longer decide anything: the code is already built from them.
+            Assert.Contains("hidden", cut.Find(".backup-fields").GetAttribute("class"));
+            Assert.Single(cut.FindAll("button.change-code"));
+        });
+    }
+
+    [Fact]
+    public void Change_Brings_The_Form_Back_With_What_Was_Typed_Still_In_It()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        cut.Find("input.password").Input("one");
+        cut.Find("input.password-confirm").Input("one");
+        cut.Find("input.folder").Input("Vanity");
+        cut.Find("button.show-code").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("svg.qr")));
+
+        cut.Find("button.change-code").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Empty(cut.FindAll("svg.qr"));
+            Assert.DoesNotContain("hidden", cut.Find(".backup-fields").GetAttribute("class"));
+            Assert.Equal("Vanity", cut.Find("input.folder").GetAttribute("value"));
+            Assert.Single(cut.FindAll("button.show-code"));
+        });
+    }
+
+    [Fact]
+    public void A_Changed_Password_Builds_A_Different_Code()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        cut.Find("button.show-code").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("svg.qr")));
+        string first = cut.FindComponent<QrCode>().Instance.Text;
+
+        cut.Find("button.change-code").Click();
+        cut.Find("input.password").Input("correct horse");
+        cut.Find("input.password-confirm").Input("correct horse");
+        cut.Find("button.show-code").Click();
+
+        cut.WaitForAssertion(() => Assert.NotEqual(first, cut.FindComponent<QrCode>().Instance.Text));
+    }
 }

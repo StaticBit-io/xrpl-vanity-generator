@@ -28,10 +28,10 @@
       }
     </div>
 
-    @* Hidden rather than removed in seed mode, the way the results list reserves its selection bar:
-       the fields keep their box, so nothing in the dialog moves when the format changes, and
-       visibility takes them out of the tab order at the same time. *@
-    <div class="backup-fields @(_seedOnly ? "hidden" : null)">
+    @* The password and the folder belong to the backup format, and only while there is no code:
+       once one is built they decide nothing, and leaving them on screen invites edits that go
+       nowhere. Change puts them back. *@
+    <div class="backup-fields @(_seedOnly || _code is not null ? "hidden" : null)">
       <div class="password-row">
         <input class="password form-control" type="password" placeholder="password (optional)" @bind="_password" @bind:event="oninput" />
         <input class="password-confirm form-control" type="password" placeholder="repeat it" @bind="_passwordConfirm" @bind:event="oninput" />
@@ -62,6 +62,10 @@
     </div>
 
     <div class="buttons">
+      @if (_code is not null && !_seedOnly)
+      {
+        <button class="btn-secondary-dark change-code t" @onclick="DropCode">Change</button>
+      }
       <button class="btn-secondary-dark close t" @ref="_close" @onclick="() => OnClose.InvokeAsync()">Close</button>
     </div>
   </div>

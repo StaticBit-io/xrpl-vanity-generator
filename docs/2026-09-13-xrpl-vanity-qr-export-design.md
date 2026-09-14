@@ -93,9 +93,14 @@ would make itself inert along with the page behind it. `ResultsList` therefore r
 carrying the rows, exactly as `PatternEditor` raises its request to clear the pattern set, and the
 page owns the dialog and the state behind it.
 
-The dialog's order is deliberate. The format switch and an optional password come first, and
-nothing secret is drawn until **Show code** is pressed: the same shape as the wallet, where the
-code appears only after the user asks for it.
+The dialog's order is deliberate. The format switch, an optional password and an optional folder
+name come first, and nothing secret is drawn until **Show code** is pressed: the same shape as the
+wallet, where the code appears only after the user asks for it.
+
+Once a code exists those fields are put away and a **Change** button appears beside **Close**.
+They decide nothing any more — the code is already built from them — and leaving them on screen
+invites edits that go nowhere. **Change** drops the code and brings the form back with what was
+typed still in it, so a different password or folder is two clicks away.
 
 Below the code sit the caption "Scan with StaticBit on your phone." and two links:
 

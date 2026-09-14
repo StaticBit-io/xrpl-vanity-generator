@@ -52,7 +52,10 @@ The application has three pages:
   offers two payloads: the StaticBit backup container, which the StaticBit wallet restores from
   by scanning, and the bare `sEd…` seed, which it does not import and which is offered only for
   a single wallet. A password is optional and encrypts the container; without one the code is
-  not encrypted and says so. One code holds 22 wallets, or 21 with a password. Nothing is
+  not encrypted and says so. Once the code is on screen the password and folder boxes are put
+  away and a **Change** button appears next to **Close**: it drops the code and brings the form
+  back, still filled in, so another password or folder takes two clicks. One code holds 22 wallets,
+  or 21 with a password. Nothing is
   written to disk — the code is inline SVG, never an image file, and it hides itself after 60
   seconds. The dialog sits near the top of the window and grows downwards as the code appears, so
   it is never taller than it needs and nothing already read moves. An optional folder name travels with the
@@ -379,10 +382,12 @@ storage layer. Each step names what you should see.
 26. **A selection that does not fit is refused.** Select forty rows on History and press
     **Show QR…**, then **Show code**: nothing is drawn and the dialog says how many of them
     would fit. Reduce the selection to that number and the code appears.
-27. **The dialog fits and nothing above the change moves.** Open it: the title, both format
-    buttons and **Close** are all on screen at once, with no scrollbar. Switch formats, press
-    **Show code**, wait out the 60 s and press it again — the dialog grows and shrinks downwards
-    from its top edge, and the title and the format buttons never shift.
+27. **The dialog fits, and the form gives way to the code.** Open it: the title, both format
+    buttons and **Close** are all on screen at once, with no scrollbar. Press **Show code** — the
+    password and folder boxes go, **Change** appears beside **Close**, and the dialog has grown
+    downwards without moving the title or the format buttons. Press **Change**: the code goes, the
+    form is back with what was typed still in it. Type a different password and show the code
+    again — it is a different code. Wait out the 60 s instead and the form returns the same way.
 28. **A folder is honoured on the phone.** Type a folder name, show the code and scan it with
     StaticBit: the restored wallets land in a folder of that name, created if it did not exist.
     The StaticBit mark is visible in the middle of the code; with twenty wallets selected the
