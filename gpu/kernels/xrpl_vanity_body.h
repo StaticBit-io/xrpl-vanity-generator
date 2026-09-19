@@ -21,10 +21,6 @@ CONSTANT_TABLE u32 P_LIMBS[8] = {
     0xffffffedu, 0xffffffffu, 0xffffffffu, 0xffffffffu,
     0xffffffffu, 0xffffffffu, 0xffffffffu, 0x7fffffffu,
 };
-CONSTANT_TABLE u32 P_MINUS_2_LIMBS[8] = {
-    0xffffffebu, 0xffffffffu, 0xffffffffu, 0xffffffffu,
-    0xffffffffu, 0xffffffffu, 0xffffffffu, 0x7fffffffu,
-};
 
 DEVICE_INLINE void fe_zero(Fe* r) { for (int i = 0; i < 8; i++) r->v[i] = 0; }
 DEVICE_INLINE void fe_one(Fe* r)  { fe_zero(r); r->v[0] = 1; }
@@ -122,20 +118,47 @@ DEVICE void fe_mul(Fe* r, const Fe* a, const Fe* b)
 
 DEVICE_INLINE void fe_sqr(Fe* r, const Fe* a) { fe_mul(r, a, a); }
 
-// r = base^exp, exp given as 8 little-endian limbs; square-and-multiply, MSB first.
-DEVICE void fe_pow(Fe* r, const Fe* base, CONSTANT const u32* exp)
+// r = a^-1 = a^(p-2) (Fermat), by the ref10 addition chain. Squaring the bits of
+// p-2 = 2^255 - 21 costs 256 squarings and 253 multiplications, because all but
+// three of its bits are set; the chain below reaches the same exponent in 254 and
+// 11. That halves the inversion, and one inversion is half of the 991 field
+// multiplications a single address derivation spends. Each block leaves
+// a^(2^k - 1) in a temporary and squares it k times to build the next one. a = 0
+// still maps to 0, exactly as the exponentiation did.
+DEVICE void fe_inv(Fe* r, const Fe* a)
 {
-    Fe acc;
-    fe_one(&acc);
-    for (int i = 255; i >= 0; i--) {
-        fe_sqr(&acc, &acc);
-        if ((exp[i >> 5] >> (i & 31)) & 1u) fe_mul(&acc, &acc, base);
-    }
-    fe_copy(r, &acc);
+    Fe t0, t1, t2, t3;
+    fe_sqr(&t0, a);                                   // a^2
+    fe_sqr(&t1, &t0); fe_sqr(&t1, &t1);               // a^8
+    fe_mul(&t1, a, &t1);                              // a^9
+    fe_mul(&t0, &t0, &t1);                            // a^11
+    fe_sqr(&t2, &t0);                                 // a^22
+    fe_mul(&t1, &t1, &t2);                            // a^(2^5 - 1)
+    fe_sqr(&t2, &t1);
+    for (int i = 1; i < 5; i++) fe_sqr(&t2, &t2);
+    fe_mul(&t1, &t2, &t1);                            // a^(2^10 - 1)
+    fe_sqr(&t2, &t1);
+    for (int i = 1; i < 10; i++) fe_sqr(&t2, &t2);
+    fe_mul(&t2, &t2, &t1);                            // a^(2^20 - 1)
+    fe_sqr(&t3, &t2);
+    for (int i = 1; i < 20; i++) fe_sqr(&t3, &t3);
+    fe_mul(&t2, &t3, &t2);                            // a^(2^40 - 1)
+    fe_sqr(&t2, &t2);
+    for (int i = 1; i < 10; i++) fe_sqr(&t2, &t2);
+    fe_mul(&t1, &t2, &t1);                            // a^(2^50 - 1)
+    fe_sqr(&t2, &t1);
+    for (int i = 1; i < 50; i++) fe_sqr(&t2, &t2);
+    fe_mul(&t2, &t2, &t1);                            // a^(2^100 - 1)
+    fe_sqr(&t3, &t2);
+    for (int i = 1; i < 100; i++) fe_sqr(&t3, &t3);
+    fe_mul(&t2, &t3, &t2);                            // a^(2^200 - 1)
+    fe_sqr(&t2, &t2);
+    for (int i = 1; i < 50; i++) fe_sqr(&t2, &t2);
+    fe_mul(&t1, &t2, &t1);                            // a^(2^250 - 1)
+    fe_sqr(&t1, &t1);
+    for (int i = 1; i < 5; i++) fe_sqr(&t1, &t1);     // a^(2^255 - 2^5)
+    fe_mul(r, &t1, &t0);                              // a^(2^255 - 21) = a^(p-2)
 }
-
-// r = a^-1 = a^(p-2) (Fermat). a must be non-zero.
-DEVICE void fe_inv(Fe* r, const Fe* a) { fe_pow(r, a, P_MINUS_2_LIMBS); }
 
 DEVICE_INLINE void fe_from_bytes(Fe* r, const u8* in32)
 {
