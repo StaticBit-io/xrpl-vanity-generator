@@ -5,8 +5,9 @@ produced each figure. Use this page to set expectations and to compare a change 
 a recorded baseline. It is not a guarantee: throughput depends on the GPU, the driver, the
 CPU that re-verifies hits, and how often the pattern matches.
 
-All figures were measured between 2026-09-03 and 2026-09-04 on the commits noted in each
-section. Rates are candidates (derived addresses) per second.
+Figures were measured between 2026-09-03 and 2026-09-04, and the GPU rates were measured
+again on 2026-09-19 after the field arithmetic changed; each section names the commit it
+belongs to. Rates are candidates (derived addresses) per second.
 
 ## Reference machine
 
@@ -90,6 +91,21 @@ second of process start-up. Two runs are reported.
 **Earlier figures.** Where a figure was recorded in a design document during the work
 (the "Measured" sections of the documents under `docs/`), it is quoted with its source.
 
+**Comparing two variants.** A rate from one session cannot be compared against a rate from
+another. Two runs of one unchanged configuration on this machine, in sessions minutes apart,
+read 25,680,843/s and 23,461,480/s — a 9% spread from clock and thermal drift alone, which
+is wider than most changes worth making. Every A/B figure on this page therefore comes from
+interleaving the variants inside one session, rebuilding between them, three runs each, and
+comparing the means. Absolute numbers carry that same session error; ratios measured this way
+do not.
+
+**Check the card is idle first.** `nvidia-smi` reporting utilisation above a few percent
+before a run means something else holds the GPU, and the result will be roughly halved with
+no sign of it in the output. The desktop app is the usual culprit: a search running in
+`XrplVanity.App` held this card at 80% and 191 W, and the CLI then measured 10.5M/s where the
+same build reaches 19.4M/s on an idle card. Nothing the CLI prints distinguishes that from a
+regression.
+
 ## CPU path
 
 Windows, 12 worker threads (the default), commit 8b66560.
@@ -108,7 +124,8 @@ candidates itself — it comes in well below the earlier wall-clock estimate abo
 
 ## Single GPU device
 
-Windows, commit 8b66560, 2026-09-04.
+Windows, commit 8b66560, 2026-09-04. This is the baseline **before** the field-arithmetic
+work of 2026-09-19; for current numbers see "Field arithmetic" below.
 
 | Backend | Kernel benchmark test | CLI end-to-end, rare hits (`--case-sensitive --starts abcd --count 30`) | CLI end-to-end, frequent hits (`--starts abc`, case-insensitive; Plan C record) |
 | --- | --- | --- | --- |
@@ -132,9 +149,51 @@ cache) takes about one second; a cold compile took 30–40 s (recorded in
 `2026-09-03-xrpl-vanity-gpu-opencl-design.md`). The CUDA path loads precompiled PTX and
 starts in under a second.
 
+### Field arithmetic (2026-09-19)
+
+Deriving one address spent 991 field multiplications: 480 in the windowed scalar
+multiplication and 511 in `pt_compress`, of which a single inversion was 509. Three changes
+to that layer landed on 2026-09-19. Each row interleaves its two variants in one session,
+three runs each, `--case-sensitive --starts abcd --count 30`.
+
+| Change | Commit | cuda before | cuda after | Gain |
+| --- | --- | --- | --- | --- |
+| `fe_inv` by the ref10 addition chain (254 squarings, 11 multiplications) instead of square-and-multiply over the 253 set bits of `p-2` | d80033e | 19,369,291/s | 23,609,683/s | +21.9% |
+| A dedicated `fe_sqr` (36 limb products) instead of `fe_mul(r, a, a)` (64) | 7f00855 | 24,208,894/s | 25,680,843/s | +6.1% |
+| One inversion per batch of four candidates, by Montgomery's trick | 7f00855 | 23,823,698/s | 26,347,019/s | +10.6% |
+
+End to end, against the state before all three:
+
+| Backend | Before (commit fe09a92) | After (commit 7f00855) | Gain |
+| --- | --- | --- | --- |
+| `cuda` | 19,011,013/s | 26,914,202/s | +41.6% |
+| `opencl` | 20,780,039/s | 26,841,033/s | +29.2% |
+
+The backends now land within 0.3% of each other, where they used to differ by 9%, so the
+bottleneck has moved off the field arithmetic. The next candidate is `fe_mul`'s serial carry
+chain across eight saturated 32-bit limbs, which a redundant representation (ten limbs of
+about 25.5 bits, as ref10 uses) would break up — not measured, and a rewrite of the layer.
+
+Two results here are worth more than the rates:
+
+- **The batch size is a cliff, not a curve.** Amortising one inversion over eight candidates
+  is 45% fewer field multiplications on paper and 28% *slower* on the card. Eight sets of
+  (X, Y, Z) plus the prefix products come to a kilobyte per thread; past four that leaves
+  registers for local memory and occupancy collapses. Measured on `cuda`: N=2 25.4M/s,
+  N=4 26.2M/s, N=8 17.9M/s. A loop bound that handles a ragged tail costs a further 6% at any
+  N, because a dynamic bound makes those arrays dynamically indexed and forces them out of
+  registers on its own. `SEARCH_BATCH` is therefore 4, and the kernel requires whole batches.
+- **An operation count predicts the sign, not the size.** The addition chain returned two
+  thirds of the gain its operation count implied (1.33x predicted, 1.22x measured); the batch
+  inversion returned under a third (1.36x predicted, 1.11x measured). The dedicated squaring
+  is worth +6.1% alone but +2.6% once the batch amortises the inversion, because that leaves
+  about 80 squarings per candidate instead of 270.
+
 ## Multiple devices
 
-`--gpu-devices` runs one engine per device; `--count` is shared and exact.
+`--gpu-devices` runs one engine per device; `--count` is shared and exact. These figures
+predate the 2026-09-19 field-arithmetic work and were not re-measured; what the section pins
+(two engines on one card gain nothing) does not depend on the per-device rate.
 
 | Configuration | Result | Source |
 | --- | --- | --- |
@@ -182,7 +241,9 @@ backend, Windows, 2026-09-05.
 Throughput follows the duty: `--gpu --gpu-duty 80 --case-sensitive --starts abcd --count 5`
 reported 13,465,682/s (24,117,248 candidates in 1.8 s) against 19,400,000/s at full
 duty, and `--gpu-devices all --gpu-duty 50` reported 12,648,676/s aggregate. The rate
-line counts the pauses as search time, so it reflects what the user actually gets.
+line counts the pauses as search time, so it reflects what the user actually gets. Both the
+duty figures and the full-duty reference predate the 2026-09-19 field-arithmetic work; what
+the section pins is the proportionality, which does not depend on the base rate.
 
 ## Not measured
 
@@ -194,6 +255,12 @@ line counts the pauses as search time, so it reflects what the user actually get
 - Sustained throughput over minutes or hours (every run above lasts seconds; thermal
   throttling was observed once during earlier CPU spikes and is why A/B comparisons were
   interleaved).
+- Multi-device and duty-cycle rates after the 2026-09-19 field-arithmetic work (only the
+  single-device CLI rates were re-measured).
+- A redundant limb representation for `fe_mul` (ten limbs of about 25.5 bits), which would
+  break the serial carry chain eight saturated 32-bit limbs impose.
+- Batch sizes between the powers of two: `SEARCH_BATCH` must divide `SubLaunchSize`, so it is
+  a power of two, and 8 already regressed.
 
 ## Reproduce
 
@@ -202,6 +269,12 @@ the way.
 
 ```bash
 dotnet build XrplVanity.sln -c Release
+```
+
+Confirm nothing else is using the GPU first — a busy card halves the result silently:
+
+```bash
+nvidia-smi --query-gpu=utilization.gpu,power.draw --format=csv,noheader
 ```
 
 Single device, rare hits (the numbers in "Single GPU device"):
