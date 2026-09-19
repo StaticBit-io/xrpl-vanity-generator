@@ -76,21 +76,10 @@ DEVICE_INLINE void fe_sub(Fe* r, const Fe* a, const Fe* b)
     for (int i = 0; i < 8; i++) r->v[i] = t[i];
 }
 
-// r = a * b mod p. Computes into a local first, so r may alias a or b.
-DEVICE void fe_mul(Fe* r, const Fe* a, const Fe* b)
+// Folds a 16-limb product into a canonical field element: 2^256 == 38 (mod p).
+// Every limb of t must already be masked to 32 bits.
+DEVICE_INLINE void fe_reduce_wide(Fe* r, const u64* t)
 {
-    u64 t[16];
-    for (int i = 0; i < 16; i++) t[i] = 0;
-    for (int i = 0; i < 8; i++) {
-        u64 carry = 0;
-        for (int j = 0; j < 8; j++) {
-            u64 p = (u64)a->v[i] * (u64)b->v[j] + t[i + j] + carry;
-            t[i + j] = p & U64_C(0xffffffff);
-            carry = p >> 32;
-        }
-        t[i + 8] += carry;
-    }
-    // Fold the high 256 bits: 2^256 == 38 (mod p).
     u32 s[9];
     u64 carry = 0;
     for (int i = 0; i < 8; i++) {
@@ -116,7 +105,60 @@ DEVICE void fe_mul(Fe* r, const Fe* a, const Fe* b)
     fe_copy(r, &o);
 }
 
-DEVICE_INLINE void fe_sqr(Fe* r, const Fe* a) { fe_mul(r, a, a); }
+// r = a * b mod p. Reduces through a local, so r may alias a or b.
+DEVICE void fe_mul(Fe* r, const Fe* a, const Fe* b)
+{
+    u64 t[16];
+    for (int i = 0; i < 16; i++) t[i] = 0;
+    for (int i = 0; i < 8; i++) {
+        u64 carry = 0;
+        for (int j = 0; j < 8; j++) {
+            u64 p = (u64)a->v[i] * (u64)b->v[j] + t[i + j] + carry;
+            t[i + j] = p & U64_C(0xffffffff);
+            carry = p >> 32;
+        }
+        t[i + 8] += carry;
+    }
+    fe_reduce_wide(r, t);
+}
+
+// r = a^2 mod p. A general multiply spends 64 limb products; a square needs 36, since
+// a_i*a_j and a_j*a_i are one product counted twice. The upper triangle is summed once,
+// the whole 16-limb sum is doubled, then the eight diagonal squares are added in.
+// Every limb read back is masked to 32 bits, so the accumulator stays inside u64: the
+// worst case is (2^32-1)^2 + 2*(2^32-1) = 2^64-1 exactly, the same bound fe_mul relies
+// on. Reduces through a local, so r may alias a.
+DEVICE void fe_sqr(Fe* r, const Fe* a)
+{
+    u64 t[16];
+    for (int i = 0; i < 16; i++) t[i] = 0;
+    for (int i = 0; i < 8; i++) {
+        u64 carry = 0;
+        for (int j = i + 1; j < 8; j++) {
+            u64 p = (u64)a->v[i] * (u64)a->v[j] + t[i + j] + carry;
+            t[i + j] = p & U64_C(0xffffffff);
+            carry = p >> 32;
+        }
+        t[i + 8] += carry;
+    }
+    u64 c = 0;
+    for (int i = 0; i < 16; i++) {
+        u64 d = (t[i] << 1) | c;
+        t[i] = d & U64_C(0xffffffff);
+        c = d >> 32;
+    }
+    u64 carry = 0;
+    for (int i = 0; i < 8; i++) {
+        u64 sq = (u64)a->v[i] * (u64)a->v[i];
+        u64 acc = t[2 * i] + (sq & U64_C(0xffffffff)) + carry;
+        t[2 * i] = acc & U64_C(0xffffffff);
+        carry = acc >> 32;
+        acc = t[2 * i + 1] + (sq >> 32) + carry;
+        t[2 * i + 1] = acc & U64_C(0xffffffff);
+        carry = acc >> 32;
+    }
+    fe_reduce_wide(r, t);
+}
 
 // r = a^-1 = a^(p-2) (Fermat), by the ref10 addition chain. Squaring the bits of
 // p-2 = 2^255 - 21 costs 256 squarings and 253 multiplications, because all but
@@ -599,7 +641,9 @@ KERNEL void k_base58(GLOBAL const u8* in, GLOBAL u8* out, int n)
 // ---------------------------------------------------------------------------
 DEVICE void scalarmult_base_windowed(Pt* r, const u8* a, GLOBAL const u8* table);
 
-DEVICE void derive_address(const u8* entropy16, u8* out36, GLOBAL const u8* table)
+// Seed to Edwards point. XRPL takes the first half of SHA-512(seed16) as the RFC 8032
+// seed; RFC 8032 clamps the first half of SHA-512 of that as the scalar.
+DEVICE void derive_point(const u8* entropy16, Pt* P, GLOBAL const u8* table)
 {
     u8 h1[64];
     sha512(entropy16, 16, h1);                 // seed32 = h1[0..32]  (XRPL)
@@ -608,12 +652,21 @@ DEVICE void derive_address(const u8* entropy16, u8* out36, GLOBAL const u8* tabl
     u8 a[32];
     for (int j = 0; j < 32; j++) a[j] = h2[j];
     a[0] &= 248; a[31] &= 127; a[31] |= 64;
+    scalarmult_base_windowed(P, a, table);
+}
 
-    Pt P;
-    scalarmult_base_windowed(&P, a, table);
+// The affine half of the derivation: zi must be Z^-1 for the projective point (X, Y, Z).
+// The inversion sits outside so that k_search can amortise one over a whole batch; a
+// caller deriving a single address inverts for itself.
+DEVICE void address_from_point(const Fe* X, const Fe* Y, const Fe* zi, u8* out36)
+{
+    Fe x, y;
+    fe_mul(&x, X, zi);
+    fe_mul(&y, Y, zi);
     u8 pub[33];
     pub[0] = 0xED;
-    pt_compress(pub + 1, &P);
+    fe_to_bytes(pub + 1, &y);
+    pub[32] |= (u8)((x.v[0] & 1u) << 7);       // RFC 8032 s5.1.2: sign of x in the top bit
 
     u8 s[32];
     sha256(pub, 33, s);
@@ -629,6 +682,15 @@ DEVICE void derive_address(const u8* entropy16, u8* out36, GLOBAL const u8* tabl
     int len = base58_encode(payload, 25, addr);
     out36[0] = (u8)len;
     for (int j = 0; j < 35; j++) out36[1 + j] = (j < len) ? (u8)addr[j] : 0;
+}
+
+DEVICE void derive_address(const u8* entropy16, u8* out36, GLOBAL const u8* table)
+{
+    Pt P;
+    derive_point(entropy16, &P, table);
+    Fe zi;
+    fe_inv(&zi, &P.Z);
+    address_from_point(&P.X, &P.Y, &zi, out36);
 }
 
 // Verification mode: n x 16-byte entropies -> n x 36-byte address records.
@@ -755,26 +817,72 @@ KERNEL void k_match_records(GLOBAL const u8* records, int n,
 // (entropy16 || address record36) behind an atomic counter. Slots beyond
 // hitCapacity are dropped; the host reads hitCount to detect the overflow.
 // ---------------------------------------------------------------------------
+// Montgomery's trick: one inversion serves SEARCH_BATCH candidates instead of one, at
+// three extra multiplications each. The inversion is 267 of the 747 field
+// multiplications a lone candidate costs, so spreading it over a batch is the largest
+// saving left in the derivation. Each thread derives its batch's points, inverts the
+// whole column of Z at once, then finishes and matches them.
+//
+// SEARCH_BATCH must equal GpuSearchEngine.CandidateBatch, which divides the launch into
+// threads; KernelSourceTests pins the two together, because a mismatch would silently
+// skip or repeat candidates rather than fail.
+#define SEARCH_BATCH 4
+
 KERNEL void k_search(GLOBAL const u8* key32, u64 start, int n,
                      GLOBAL const u32* groups, int groupCount, GLOBAL const u8* chars,
                      GLOBAL const u32* pairs, int pairCount,
                      GLOBAL u8* hits, GLOBAL u32* hitCount, int hitCapacity, GLOBAL const u8* table)
 {
-    int i = GLOBAL_ID();
-    if (i >= n) return;
+    // n is always a whole number of batches (KernelSourceTests pins SubLaunchSize % batch),
+    // so the group is never ragged and the loop bounds stay compile-time constant. That
+    // matters: a dynamic bound would make the per-candidate arrays below dynamically
+    // indexed, which forces them out of registers and into local memory.
+    int base = GLOBAL_ID() * SEARCH_BATCH;
+    if (base >= n) return;
+    const int cnt = SEARCH_BATCH;
+
     u8 key[32];
     for (int j = 0; j < 32; j++) key[j] = key32[j];
-    u8 e[16];
-    prf_entropy(key, start + (u64)i, e);
-    u8 rec[36];
-    derive_address(e, rec, table);
-    int len = rec[0];
-    if (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars, pairs, pairCount)) {
-        u32 slot = ATOMIC_INC(hitCount);
-        if ((int)slot < hitCapacity) {
-            GLOBAL u8* h = hits + (u32)slot * 52u;
-            for (int j = 0; j < 16; j++) h[j] = e[j];
-            for (int j = 0; j < 36; j++) h[16 + j] = rec[j];
+
+    Fe px[SEARCH_BATCH], py[SEARCH_BATCH], pz[SEARCH_BATCH], prefix[SEARCH_BATCH];
+    for (int k = 0; k < cnt; k++) {
+        u8 e[16];
+        prf_entropy(key, start + (u64)base + (u64)k, e);
+        Pt P;
+        derive_point(e, &P, table);
+        px[k] = P.X; py[k] = P.Y; pz[k] = P.Z;
+    }
+
+    // prefix[k] = pz[0] * ... * pz[k-1], and running ends as the product of them all.
+    // Z is never zero for a point on this curve, so the product is invertible.
+    Fe running;
+    fe_one(&running);
+    for (int k = 0; k < cnt; k++) {
+        prefix[k] = running;
+        fe_mul(&running, &running, &pz[k]);
+    }
+    Fe inv;
+    fe_inv(&inv, &running);
+    for (int k = cnt - 1; k >= 0; k--) {
+        Fe zi;
+        fe_mul(&zi, &inv, &prefix[k]);
+        fe_mul(&inv, &inv, &pz[k]);
+        pz[k] = zi;                            // pz[k] now holds Z^-1 for candidate k
+    }
+
+    for (int k = 0; k < cnt; k++) {
+        u8 rec[36];
+        address_from_point(&px[k], &py[k], &pz[k], rec);
+        int len = rec[0];
+        if (len >= 1 && matches_any(rec + 2, len - 1, groups, groupCount, chars, pairs, pairCount)) {
+            u32 slot = ATOMIC_INC(hitCount);
+            if ((int)slot < hitCapacity) {
+                u8 e[16];
+                prf_entropy(key, start + (u64)base + (u64)k, e);   // rare; cheaper than carrying it
+                GLOBAL u8* h = hits + (u32)slot * 52u;
+                for (int j = 0; j < 16; j++) h[j] = e[j];
+                for (int j = 0; j < 36; j++) h[16 + j] = rec[j];
+            }
         }
     }
 }
