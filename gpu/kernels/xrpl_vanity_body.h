@@ -12,8 +12,13 @@ KERNEL void k_add_arrays(GLOBAL const u32* a, GLOBAL const u32* b, GLOBAL u32* o
 
 // ---------------------------------------------------------------------------
 // M1: field arithmetic mod p = 2^255 - 19
-// Representation: 8 x 32-bit little-endian limbs. Every function below that
-// produces a field element returns it CANONICAL (fully reduced, < p).
+// Representation: 8 x 32-bit little-endian limbs. Every function below that produces a
+// field element returns a value CONGRUENT to the result and strictly below 2^256 - it is
+// NOT necessarily reduced. Reducing after every operation cost a quarter of the kernel's
+// run time, so reduction happens only where a canonical value is actually observed:
+// fe_to_bytes, and the two places that test the sign of x. 2^256 == 38 (mod p), so a carry
+// out of the top limb folds back in instead of being lost; two fold passes always suffice,
+// which GpuFieldTests.Operations_Accept_Unreduced_Inputs pins.
 // ---------------------------------------------------------------------------
 typedef struct { u32 v[8]; } Fe;
 
@@ -52,28 +57,41 @@ DEVICE_INLINE void fe_add(Fe* r, const Fe* a, const Fe* b)
         r->v[i] = (u32)c;
         c >>= 32;
     }
-    // a, b < p  =>  a + b < 2p < 2^256, so no carry escapes; one subtraction canonicalises.
-    fe_cond_sub_p(r);
+    // The inputs are only known to be below 2^256, so the sum can carry out of the top limb.
+    // 2^256 == 38 (mod p): add the carry back. That can carry once more (both inputs near
+    // 2^256 - 1), never twice, so two passes are enough.
+    for (int pass = 0; pass < 2; pass++) {
+        u64 add = U64_C(38) * c;
+        c = 0;
+        for (int i = 0; i < 8 && add; i++) {
+            u64 acc = (u64)r->v[i] + add;
+            r->v[i] = (u32)acc;
+            add = acc >> 32;
+        }
+        c = add;
+    }
 }
 
 DEVICE_INLINE void fe_sub(Fe* r, const Fe* a, const Fe* b)
 {
-    u32 t[8];
     u64 borrow = 0;
     for (int i = 0; i < 8; i++) {
         u64 d = (u64)a->v[i] - (u64)b->v[i] - borrow;
-        t[i] = (u32)d;
+        r->v[i] = (u32)d;
         borrow = (d >> 63) & U64_C(1);
     }
-    if (borrow) {
-        u64 c = 0;
-        for (int i = 0; i < 8; i++) {
-            c += (u64)t[i] + (u64)P_LIMBS[i];
-            t[i] = (u32)c;
-            c >>= 32;
+    // A borrow out of the top limb means the result is 2^256 too large; subtracting 38
+    // restores it, and that can borrow once more but never twice. Mirror of fe_add.
+    for (int pass = 0; pass < 2; pass++) {
+        u64 subtrahend = U64_C(38) * borrow;
+        borrow = 0;
+        for (int i = 0; i < 8 && subtrahend; i++) {
+            u64 d = (u64)r->v[i] - subtrahend;
+            r->v[i] = (u32)d;
+            subtrahend = (d >> 63) & U64_C(1);
         }
+        borrow = subtrahend;
     }
-    for (int i = 0; i < 8; i++) r->v[i] = t[i];
 }
 
 // Folds a 16-limb product into a canonical field element: 2^256 == 38 (mod p).
@@ -101,7 +119,6 @@ DEVICE_INLINE void fe_reduce_wide(Fe* r, const u64* t)
         o.v[i] = (u32)acc;
         add2 = acc >> 32;
     }
-    fe_canon(&o);
     fe_copy(r, &o);
 }
 
@@ -210,21 +227,29 @@ DEVICE_INLINE void fe_from_bytes(Fe* r, const u8* in32)
     fe_canon(r);
 }
 
+// Reads a field element the base table holds. Everything fe_to_bytes writes is already
+// canonical, because every operation that produces a field element returns it canonical, so
+// the load needs no reduction. This runs 192 times per derived address (64 table lookups of
+// three elements each), which is why it does not pay for a fe_canon it cannot need.
 DEVICE_INLINE void fe_from_bytes_g(Fe* r, GLOBAL const u8* in32)
 {
     for (int i = 0; i < 8; i++) {
         r->v[i] = (u32)in32[4 * i] | ((u32)in32[4 * i + 1] << 8) | ((u32)in32[4 * i + 2] << 16) | ((u32)in32[4 * i + 3] << 24);
     }
-    fe_canon(r);
 }
 
+// The one place an unreduced representative becomes a number. Everything upstream is free
+// to carry any congruent value below 2^256, so the reduction belongs here.
 DEVICE_INLINE void fe_to_bytes(u8* out32, const Fe* a)
 {
+    Fe t;
+    fe_copy(&t, a);
+    fe_canon(&t);
     for (int i = 0; i < 8; i++) {
-        out32[4 * i]     = (u8)(a->v[i]);
-        out32[4 * i + 1] = (u8)(a->v[i] >> 8);
-        out32[4 * i + 2] = (u8)(a->v[i] >> 16);
-        out32[4 * i + 3] = (u8)(a->v[i] >> 24);
+        out32[4 * i]     = (u8)(t.v[i]);
+        out32[4 * i + 1] = (u8)(t.v[i] >> 8);
+        out32[4 * i + 2] = (u8)(t.v[i] >> 16);
+        out32[4 * i + 3] = (u8)(t.v[i] >> 24);
     }
 }
 
@@ -249,6 +274,7 @@ KERNEL void k_fe_op(GLOBAL const u32* a, GLOBAL const u32* b, GLOBAL u32* out, i
         }
         default: fe_copy(&r, &x); fe_canon(&r); break;
     }
+    fe_canon(&r);   // the test compares values; the representation is free between operations
     for (int k = 0; k < 8; k++) out[i * 8 + k] = r.v[k];
 }
 
@@ -326,6 +352,7 @@ DEVICE void pt_compress(u8* out32, const Pt* p)
     fe_mul(&x, &p->X, &zi);
     fe_mul(&y, &p->Y, &zi);
     fe_to_bytes(out32, &y);
+    fe_canon(&x);                              // the low bit only means anything once reduced
     out32[31] |= (u8)((x.v[0] & 1u) << 7);
 }
 
@@ -666,6 +693,7 @@ DEVICE void address_from_point(const Fe* X, const Fe* Y, const Fe* zi, u8* out36
     u8 pub[33];
     pub[0] = 0xED;
     fe_to_bytes(pub + 1, &y);
+    fe_canon(&x);                              // the low bit only means anything once reduced
     pub[32] |= (u8)((x.v[0] & 1u) << 7);       // RFC 8032 s5.1.2: sign of x in the top bit
 
     u8 s[32];

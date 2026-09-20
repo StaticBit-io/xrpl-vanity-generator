@@ -6,8 +6,8 @@ a recorded baseline. It is not a guarantee: throughput depends on the GPU, the d
 CPU that re-verifies hits, and how often the pattern matches.
 
 Figures were measured between 2026-09-03 and 2026-09-04, and the GPU rates were measured
-again on 2026-09-19 after the field arithmetic changed; each section names the commit it
-belongs to. Rates are candidates (derived addresses) per second.
+again on 2026-09-19 and 2026-09-20 as the field arithmetic changed; each section names the
+commit it belongs to. Rates are candidates (derived addresses) per second.
 
 ## Reference machine
 
@@ -125,7 +125,7 @@ candidates itself — it comes in well below the earlier wall-clock estimate abo
 ## Single GPU device
 
 Windows, commit 8b66560, 2026-09-04. This is the baseline **before** the field-arithmetic
-work of 2026-09-19; for current numbers see "Field arithmetic" below.
+work of 2026-09-19 and 2026-09-20; for current numbers see "Canonicalisation" below.
 
 | Backend | Kernel benchmark test | CLI end-to-end, rare hits (`--case-sensitive --starts abcd --count 30`) | CLI end-to-end, frequent hits (`--starts abc`, case-insensitive; Plan C record) |
 | --- | --- | --- | --- |
@@ -188,6 +188,83 @@ Two results here are worth more than the rates:
   inversion returned under a third (1.36x predicted, 1.11x measured). The dedicated squaring
   is worth +6.1% alone but +2.6% once the batch amortises the inversion, because that leaves
   about 80 squarings per candidate instead of 270.
+
+### Canonicalisation (2026-09-20)
+
+The field layer reduced every value it produced. That invariant is stated at the top of the M1
+section, and `fe_reduce_wide`, `fe_add` and `fe_sub` all enforced it, which came to roughly
+1,760 `fe_cond_sub_p` calls per derived address:
+
+| Source | `fe_cond_sub_p` calls per candidate |
+| --- | --- |
+| `fe_mul` / `fe_sqr` (551 × 2) | 1102 |
+| `fe_add` / `fe_sub` (~276 × 1) | 276 |
+| `fe_from_bytes_g` on base-table loads (192 × 2) | 384 |
+| **Total** | **~1762** |
+
+Replacing `fe_canon` with a no-op — incorrect, and measured only to price the invariant — ran
+**26.4% faster on cuda and 22.9% on opencl**. Reducing, not `fe_mul`'s serial carry chain, was
+the largest cost in the layer. Two changes spent that:
+
+| Change | Commit | Harness | cuda before | cuda after | Gain |
+| --- | --- | --- | --- | --- | --- |
+| The base table only ever holds canonical values, so loading it stops reducing | c5438fa | throughput test | 27,454,891/s | 28,947,021/s | +5.4% |
+| Field elements stay unreduced; reduction moves to `fe_to_bytes` and the two sign-of-x tests | 0a702ae | throughput test | 27,422,321/s | 32,085,178/s | +17.0% |
+
+End to end for both, by the CLI, three interleaved runs per variant,
+`--case-sensitive --starts abcd --count 30`:
+
+| Backend | Before (commit 7f00855) | After (commit 0a702ae) | Gain |
+| --- | --- | --- | --- |
+| `cuda` | 25,523,634/s | 32,375,668/s | +26.9% |
+| `opencl` | 26,516,075/s | 32,211,960/s | +21.5% |
+
+The `cuda` before-figures spread 24.4M to 26.4M across the three runs, wider than usual; the
+after-figures sat inside 2%. The ratio comes from the interleaving, which is what that
+technique is for, but treat the absolute before-number as the loosest on this page.
+
+The invariant is now weaker and cheaper: a field element is any 8-limb value below 2^256
+congruent to its value, and about four reductions per candidate survive, all of them where a
+number is actually observed. `fe_mul` and `fe_sqr` needed no change — their accumulator bound,
+`(2^32-1)^2 + 2*(2^32-1) = 2^64-1`, holds for arbitrary limbs and never relied on the inputs
+being reduced.
+
+Two things this cost that the operation count would not have shown:
+
+- **The carry fold runs twice, not once.** `fe_add` and `fe_sub` fold a carry out of the top
+  limb back with ×38, and that fold can itself carry — two inputs near `2^256 - 1` do it — but
+  never a third time. A Python model of the limb arithmetic over the edge cases and 3,000
+  random pairs found this; the first draft folded once, and would have been wrong for those
+  inputs while passing every test that existed, because nothing had ever handed the field layer
+  an unreduced value. `GpuFieldTests.Operations_Accept_Unreduced_Inputs` now does.
+- **The ceiling was real but not reachable in full.** The no-op probe said 26.4% was there and
+  22.9% arrived, which is 87% of it. The rest is the surviving reductions plus the two-pass fold
+  costing more than the single conditional subtraction it replaced.
+
+Re-running the no-op probe against this kernel now lands inside the noise (33.4M/s against
+33.7M/s on cuda; on opencl the probe measured *slower* than the real thing, which it cannot be).
+The reduction cost is spent.
+
+### Where the next gain would have to come from
+
+`fe_mul` multiplies eight saturated 32-bit limbs with a serial carry chain 64 steps long. A
+redundant representation — ten limbs of alternating 26 and 25 bits, signed, as ref10 uses —
+removes the chain, because each of the ten output limbs accumulates independently, and removes
+canonicalisation by construction.
+
+It was **not** built, and the reason is on this page rather than in a commit message. Before the
+canonicalisation work it looked like the obvious next step; after it, the measurement above says
+the reduction cost is already spent, so a redundant representation would only earn whatever the
+multiply's *structure* is worth. That is unknown and may be negative: it trades 64 limb products
+for 100, and buys instruction-level parallelism, which a GPU already has less need of than a CPU
+because it hides latency with threads instead. Against that sits about 500 lines across the whole
+field layer, a base-table entry that grows from 96 to 120 bytes, and a matching host constant.
+
+The groundwork, if it is ever picked up, is in
+`docs/2026-09-19-xrpl-vanity-field-representation-plan.md`: the re-encoded curve constants, the
+fact that the point arithmetic never touches the representation and so would need no edits, and
+the one behavioural break to plan for — ref10's `frombytes` masks bit 255 instead of folding it,
+so `2^255` would load as `0` rather than `19`.
 
 ## Multiple devices
 
@@ -258,7 +335,8 @@ the section pins is the proportionality, which does not depend on the base rate.
 - Multi-device and duty-cycle rates after the 2026-09-19 field-arithmetic work (only the
   single-device CLI rates were re-measured).
 - A redundant limb representation for `fe_mul` (ten limbs of about 25.5 bits), which would
-  break the serial carry chain eight saturated 32-bit limbs impose.
+  break the serial carry chain eight saturated 32-bit limbs impose. Deliberately not built;
+  see "Where the next gain would have to come from" above for the measurement that stopped it.
 - Batch sizes between the powers of two: `SEARCH_BATCH` must divide `SubLaunchSize`, so it is
   a power of two, and 8 already regressed.
 
