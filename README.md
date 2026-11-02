@@ -63,6 +63,7 @@ rather than searched for.
 | `--ends P...` | — | patterns to match at address end |
 | `--contains P...` | — | patterns to match anywhere |
 | `--starts-ends PREFIX:SUFFIX` | — | requires both a prefix and a suffix on the same address (repeatable) |
+| `--near-starts-ends PREFIX:SUFFIX` | — | as `--starts-ends`, but the prefix may begin at the 2nd or 3rd address character (repeatable) |
 | `--list FILE [minLen]` | — | load `starts` patterns from a word list, optional min length filter (default 4) |
 | `--case-sensitive` | off (case-insensitive) | match the pattern exactly as typed; by default every case combination is matched |
 | `--threads N` | `ProcessorCount` | number of worker threads (CPU path only; ignored with `--gpu`) |
@@ -110,9 +111,12 @@ and 2^192 is only about 23.3 times 58^32. Any other first character (`X`,
 8-character prefix normally would. The third character has no such bias.
 `--near-start XRPLFILE` also accepts the pattern one character later
 (`r?XRPLFiLE...`), which finds it about 24 times sooner; for a first
-character that can follow the `r` it gains only about 1.4 times. The desktop
-app offers the same choice as the "2nd or 3rd char" box and suggests it on
-any chip that would gain at least 2 times.
+character that can follow the `r` it gains only about 1.4 times.
+`--near-starts-ends XRPL:FILE` does the same for the prefix half of a pair
+(`r?XRPL...FiLE`) and gains the same factor; the suffix stays at the end.
+The desktop app offers the same choice as the "2nd or 3rd char" box in both
+`starts with` and `starts and ends with` modes, and suggests it on any chip
+that would gain at least 2 times.
 
 ## Exit codes
 

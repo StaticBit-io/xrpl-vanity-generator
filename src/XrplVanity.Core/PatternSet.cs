@@ -59,11 +59,13 @@ public sealed class PatternSet
     /// One rule that requires both halves at once: the body must start with one of
     /// <see cref="Starts"/> and end with one of <see cref="Ends"/>. Each half holds the
     /// expanded, normalized variants of that half only, so case folding stays additive
-    /// (4 + 4 variants for "ab" + "yz", not 16 combinations).
+    /// (4 + 4 variants for "ab" + "yz", not 16 combinations). With <see cref="NearStart"/> the
+    /// starts half may also begin one character later, as a <see cref="MatchPosition.NearStart"/>
+    /// pattern does.
     /// </summary>
     public sealed class Pair
     {
-        internal Pair(HashSet<string> starts, HashSet<string> ends, string display)
+        internal Pair(HashSet<string> starts, HashSet<string> ends, string display, bool nearStart)
         {
             StartsSet = starts;
             EndsSet = ends;
@@ -72,6 +74,7 @@ public sealed class PatternSet
             StartsLength = starts.First().Length;
             EndsLength = ends.First().Length;
             Display = display;
+            NearStart = nearStart;
         }
 
         internal HashSet<string> StartsSet { get; }
@@ -84,6 +87,9 @@ public sealed class PatternSet
         public int StartsLength { get; }
         public int EndsLength { get; }
         public string Display { get; }
+
+        /// <summary>Whether the starts half may begin at the body's second character as well as its first.</summary>
+        public bool NearStart { get; }
     }
 
     public IReadOnlyList<Pair> Pairs => _pairs;
@@ -131,18 +137,22 @@ public sealed class PatternSet
 
         foreach (Pair pair in _pairs)
         {
-            // Halves may touch but must not overlap.
-            if (pair.StartsLength + pair.EndsLength > body.Length)
+            int lastOffset = pair.NearStart ? 1 : 0;
+            for (int offset = 0; offset <= lastOffset; offset++)
             {
-                continue;
-            }
+                // Halves may touch but must not overlap.
+                if (offset + pair.StartsLength + pair.EndsLength > body.Length)
+                {
+                    break;
+                }
 
-            if (pair.StartsLookup.Contains(body[..pair.StartsLength])
-                && pair.EndsLookup.Contains(body[^pair.EndsLength..]))
-            {
-                position = MatchPosition.Pair;
-                pattern = pair.Display;
-                return true;
+                if (pair.StartsLookup.Contains(body.Slice(offset, pair.StartsLength))
+                    && pair.EndsLookup.Contains(body[^pair.EndsLength..]))
+                {
+                    position = MatchPosition.Pair;
+                    pattern = pair.Display;
+                    return true;
+                }
             }
         }
 
@@ -306,9 +316,10 @@ public sealed class PatternSet
         /// Adds a rule that requires both halves. Either half unreachable or empty after
         /// normalization - or halves that together exceed <see cref="MaxBodyLength"/>, which no
         /// address could satisfy - makes the whole rule unreachable; case folding is applied and
-        /// capped per half exactly as it is for a single pattern.
+        /// capped per half exactly as it is for a single pattern. <paramref name="nearStart"/> lets
+        /// the starts half begin at the body's second character too (see <see cref="Pair.NearStart"/>).
         /// </summary>
-        public Builder AddPair(string starts, string ends, bool ignoreCase)
+        public Builder AddPair(string starts, string ends, bool ignoreCase, bool nearStart = false)
         {
             // Display is built from what the user typed (trimmed), not the normalized halves,
             // so the reported rule reads back the way they entered it.
@@ -325,7 +336,7 @@ public sealed class PatternSet
 
             HashSet<string> leftSet = ExpandHalf(left, ignoreCase);
             HashSet<string> rightSet = ExpandHalf(right, ignoreCase);
-            _pairs.Add(new Pair(leftSet, rightSet, display));
+            _pairs.Add(new Pair(leftSet, rightSet, display, nearStart));
             return this;
         }
 

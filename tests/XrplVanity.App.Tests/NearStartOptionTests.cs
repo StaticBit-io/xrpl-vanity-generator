@@ -202,4 +202,114 @@ public class NearStartOptionTests : BunitContext
         Assert.Equal(MatchPosition.NearStart, Assert.Single(vm.Patterns).Position);
         Assert.Empty(cut.FindAll(".chip-speedup"));
     }
+
+    [Fact]
+    public void With_The_Option_On_A_Pair_Entry_Commits_A_NearStart_Pair()
+    {
+        SearchViewModel vm = Vm();
+        vm.EntryNearStart = true;
+        vm.EntryPosition = MatchPosition.Pair;
+        vm.EntryText = "XRPL";
+        vm.EntryEndsText = "FILE";
+
+        vm.AddPatternFromEntry();
+
+        PatternChip chip = Assert.Single(vm.Patterns);
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.True(chip.NearStart);
+        PatternSet nearPair = new PatternSet.Builder().AddPair("XRPL", "FILE", chip.IgnoreCase, nearStart: true).Build();
+        Assert.Equal(SearchEstimator.ExpectedCandidatesPerMatch(nearPair), vm.ExpectedCandidates);
+    }
+
+    [Fact]
+    public void The_Entry_Hint_Offers_The_Option_For_The_Starts_Half_Of_A_Pair()
+    {
+        SearchViewModel vm = Vm();
+        vm.EntryIgnoreCase = false;
+        vm.EntryPosition = MatchPosition.Pair;
+        vm.EntryText = "XRPL";
+        vm.EntryEndsText = "FILE";
+
+        Assert.Contains("about 24× sooner", vm.NearStartHint);
+
+        vm.EntryText = "pshn";
+        Assert.Null(vm.NearStartHint);
+    }
+
+    [Fact]
+    public void A_Pair_And_Its_NearStart_Twin_Are_Two_Rules()
+    {
+        SearchViewModel vm = Vm();
+
+        Assert.True(vm.AddPair("XRPL", "FILE", ignoreCase: false));
+        Assert.True(vm.AddPair("XRPL", "FILE", ignoreCase: false, nearStart: true));
+        Assert.False(vm.AddPair("XRPL", "FILE", ignoreCase: false, nearStart: true));
+    }
+
+    [Fact]
+    public void Taking_The_Offer_On_A_Pair_Chip_Makes_It_NearStart_Cuts_The_Estimate_And_Persists()
+    {
+        MemorySettingsStore settings = new();
+        SearchViewModel vm = Vm(settings);
+        vm.AddPair("XRPL", "FILE", ignoreCase: false);
+        PatternChip chip = vm.Patterns[0];
+        Assert.InRange(chip.NearStartSpeedup!.Value, 24.0, 24.7);
+        double before = vm.ExpectedCandidates!.Value;
+
+        vm.AllowNearStart(chip);
+
+        Assert.True(chip.NearStart);
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.Null(chip.NearStartSpeedup);
+        Assert.InRange(before / vm.ExpectedCandidates!.Value, 24.0, 24.7);
+        PatternDraft draft = Assert.Single(settings.Current.Patterns);
+        Assert.True(draft.NearStart);
+
+        SearchViewModel restored = Vm(settings);
+        Assert.True(Assert.Single(restored.Patterns).NearStart);
+    }
+
+    [Fact]
+    public void Taking_The_Offer_On_A_Pair_Whose_Twin_Exists_Drops_The_Chip()
+    {
+        SearchViewModel vm = Vm();
+        vm.AddPair("XRPL", "FILE", ignoreCase: false, nearStart: true);
+        vm.AddPair("XRPL", "FILE", ignoreCase: false);
+
+        vm.AllowNearStart(vm.Patterns[1]);
+
+        Assert.True(Assert.Single(vm.Patterns).NearStart);
+    }
+
+    [Fact]
+    public void A_NearStart_Pair_Round_Trips_Through_A_Pattern_List()
+    {
+        PatternChip near = new("XRPL", MatchPosition.Pair, ignoreCase: false, "FILE") { NearStart = true };
+        string line = PatternListFormat.Format(near);
+
+        Assert.Equal("nearstart\tXRPL\tends\tFILE\tAa", line);
+        Assert.True(PatternListFormat.TryParse(line, defaultIgnoreCase: true, out PatternChip chip));
+        Assert.Equal(MatchPosition.Pair, chip.Position);
+        Assert.True(chip.NearStart);
+        Assert.Equal("FILE", chip.EndsText);
+        Assert.Equal("starts\tXRPL\tends\tFILE\tAa",
+            PatternListFormat.Format(new PatternChip("XRPL", MatchPosition.Pair, ignoreCase: false, "FILE")));
+    }
+
+    [Fact]
+    public void The_Editor_Shows_The_Box_In_Pair_Mode_And_Marks_The_NearStart_Pair_Chip()
+    {
+        SearchViewModel vm = Vm();
+        IRenderedComponent<PatternEditor> cut = Render<PatternEditor>(p => p.Add(x => x.Vm, vm));
+
+        cut.Find("select.pos").Change("Pair");
+        cut.Find("input.near-start").Change(true);
+        cut.Find("input.pattern").Input("XRPL");
+        cut.Find("input.pattern-ends").Input("FILE");
+        cut.Find("input.pattern").KeyDown("Enter");
+
+        Assert.True(Assert.Single(vm.Patterns).NearStart);
+        Assert.Contains("2nd–3rd", cut.Find(".chip .chip-near").TextContent);
+        Assert.Empty(cut.FindAll(".chip-speedup"));
+    }
 }

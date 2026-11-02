@@ -25,6 +25,16 @@ public sealed class PatternChip
 
     public MatchPosition Position { get; set; }
     public bool IgnoreCase { get; set; }
+
+    /// <summary>
+    /// For a <see cref="MatchPosition.Pair"/> chip: whether its starts half may begin at the 2nd or
+    /// 3rd character of the address, as a <see cref="MatchPosition.NearStart"/> chip does. Ignored
+    /// for every other position, which carries that choice in <see cref="Position"/> itself.
+    /// </summary>
+    public bool NearStart { get; set; }
+
+    /// <summary>True for a pair chip whose starts half may begin at the 2nd or 3rd character.</summary>
+    public bool IsNearStartPair => Position == MatchPosition.Pair && NearStart;
     /// <summary>"cannot occur in an XRPL address", "empty pattern", "longer than 12 characters: searched case-sensitively", or null.</summary>
     public string? Warning { get; internal set; }
     /// <summary>
@@ -36,8 +46,9 @@ public sealed class PatternChip
     public string? Normalized { get; internal set; }
 
     /// <summary>
-    /// For a <see cref="MatchPosition.Starts"/> chip whose first character can rarely follow the
-    /// leading 'r': how many times sooner it would be found as <see cref="MatchPosition.NearStart"/>.
+    /// For a <see cref="MatchPosition.Starts"/> chip, or a <see cref="MatchPosition.Pair"/> chip
+    /// without <see cref="NearStart"/>, whose first character can rarely follow the leading 'r':
+    /// how many times sooner it would be found once it may begin at the 2nd or 3rd character.
     /// Null otherwise. Set by <c>SearchViewModel.RebuildPatternSet</c>.
     /// </summary>
     public double? NearStartSpeedup { get; internal set; }
@@ -55,7 +66,7 @@ public sealed class PatternChip
         {
             string text = Fold(Text, IgnoreCase);
             string ends = EndsText is null ? string.Empty : Fold(EndsText.Trim(), IgnoreCase);
-            return $"{Position}|{IgnoreCase}|{text}|{ends}";
+            return $"{Position}|{IgnoreCase}|{text}|{ends}|{IsNearStartPair}";
         }
     }
 
