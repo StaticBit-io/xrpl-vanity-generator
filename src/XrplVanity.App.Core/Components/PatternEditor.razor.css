@@ -12,8 +12,8 @@
 .chips-toggle:hover { border-color: var(--text-secondary); color: var(--text); }
 .chip-normalized { color: var(--text-secondary); }
 .entry { display: grid; grid-template-columns: 140px 1fr auto auto auto; gap: 8px; align-items: center; }
-/* The Pair mode adds a second box: one more equal-width column, the rest of the row unchanged. */
-.pattern-entry.paired { grid-template-columns: 140px 1fr 1fr auto auto auto; }
+/* The Pair mode adds a second box: one more equal-width column, plus the "2nd or 3rd char" box. */
+.pattern-entry.paired { grid-template-columns: 140px 1fr 1fr auto auto auto auto; }
 /* The Starts mode adds the "2nd or 3rd char" box after "ignore case". */
 .pattern-entry.with-near { grid-template-columns: 140px 1fr auto auto auto auto; }
 /* The dark control chrome, the mint focus border and the placeholder colour are global now

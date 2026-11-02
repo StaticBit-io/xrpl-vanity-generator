@@ -102,8 +102,8 @@ public class CliOptionsTests
     {
         CliOptions options = CliOptions.Parse(new[] { "--starts-ends", "abc:xyz", "--starts-ends", "q:w" });
         Assert.Equal(2, options.Pairs.Count);
-        Assert.Equal(("abc", "xyz"), options.Pairs[0]);
-        Assert.Equal(("q", "w"), options.Pairs[1]);
+        Assert.Equal(("abc", "xyz", false), options.Pairs[0]);
+        Assert.Equal(("q", "w", false), options.Pairs[1]);
     }
 
     [Theory]

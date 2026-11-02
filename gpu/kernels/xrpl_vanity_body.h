@@ -758,12 +758,13 @@ KERNEL void k_prf_entropy(GLOBAL const u8* key32, u64 start, GLOBAL u8* out, int
 // ---------------------------------------------------------------------------
 // M5: device-side matching over host-sorted target groups.
 // groups: 4 x u32 per group = { position (0 starts, 1 ends, 2 contains,
-//         3 near-start: at body offset 0 or 1, 4 pair-starts, 5 pair-ends),
+//         3 near-start: at body offset 0 or 1, 4 pair-starts, 5 pair-ends,
+//         6 pair-starts at body offset 0 or 1),
 //         length, offset into chars, count }.
 //         Targets inside a group are sorted ordinal (unsigned byte order) and
 //         packed at stride = length.
 // pairs:  2 x u32 per paired rule = { starts-half group index, ends-half group
-//         index }. Both halves carry a pair-only position code (4 / 5), which the
+//         index }. Both halves carry a pair-only position code (4..6), which the
 //         or-loop skips, so a half never matches on its own.
 // The predicate below equals XrplVanity.Core.PatternSet.TryMatch's hit / no-hit result.
 // ---------------------------------------------------------------------------
@@ -823,8 +824,10 @@ DEVICE bool matches_any(const u8* body, int bodyLen,
         // Halves that touch exactly still match; overlapping ones do not, and the guard also
         // keeps the ends-half read inside a body too short to hold both.
         if ((int)(sl + el) > bodyLen) continue;
-        if (!group_has(chars, groups[gs * 4 + 2], groups[gs * 4 + 3], sl, body)) continue;
-        if (group_has(chars, groups[ge * 4 + 2], groups[ge * 4 + 3], el, body + bodyLen - (int)el)) return true;
+        if (!group_has(chars, groups[ge * 4 + 2], groups[ge * 4 + 3], el, body + bodyLen - (int)el)) continue;
+        if (group_has(chars, groups[gs * 4 + 2], groups[gs * 4 + 3], sl, body)) return true;
+        if (groups[gs * 4] == 6 && (int)(sl + el) + 1 <= bodyLen
+            && group_has(chars, groups[gs * 4 + 2], groups[gs * 4 + 3], sl, body + 1)) return true;
     }
 
     return false;

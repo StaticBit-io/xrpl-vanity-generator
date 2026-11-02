@@ -24,6 +24,9 @@ public sealed class TargetTable
     public const uint PositionPairStarts = 4;
     public const uint PositionPairEnds = 5;
 
+    /// <summary>The starts half of a pair rule that may also begin at the body's second character.</summary>
+    public const uint PositionPairNearStarts = 6;
+
     private TargetTable(uint[] groups, byte[] chars, uint[] pairs)
     {
         Groups = groups;
@@ -85,7 +88,7 @@ public sealed class TargetTable
         List<((uint Position, string SortedVariants) StartsKey, (uint Position, string SortedVariants) EndsKey)> pairKeys = new(patterns.Pairs.Count);
         foreach (PatternSet.Pair pair in patterns.Pairs)
         {
-            (uint Position, string SortedVariants) startsKey = PairHalfKey(PositionPairStarts, pair.Starts);
+            (uint Position, string SortedVariants) startsKey = PairHalfKey(pair.NearStart ? PositionPairNearStarts : PositionPairStarts, pair.Starts);
             (uint Position, string SortedVariants) endsKey = PairHalfKey(PositionPairEnds, pair.Ends);
 
             if (!pairGroups.ContainsKey(startsKey))

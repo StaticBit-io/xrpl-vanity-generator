@@ -67,7 +67,7 @@ public sealed class SearchViewModel : IDisposable
             // (or corrupted since) carries none, and restoring it would put a chip on screen that
             // names a rule it cannot express — drop it here, the same way a bad value is clamped.
             if (position == MatchPosition.Pair && string.IsNullOrWhiteSpace(draft.EndsText)) continue;
-            _patterns.Add(new PatternChip(draft.Text, position, draft.IgnoreCase, draft.EndsText));
+            _patterns.Add(new PatternChip(draft.Text, position, draft.IgnoreCase, draft.EndsText) { NearStart = draft.NearStart });
         }
 
         RefreshDevices();
@@ -301,9 +301,10 @@ public sealed class SearchViewModel : IDisposable
     }
 
     /// <summary>
-    /// Whether a "starts with" entry is committed as <see cref="MatchPosition.NearStart"/>: allowed
-    /// at the 2nd or 3rd character of the address rather than only right after the 'r'. Off by
-    /// default, because it changes what the address looks like; ignored in every other mode.
+    /// Whether a "starts with" entry is committed as <see cref="MatchPosition.NearStart"/> — and a
+    /// "starts and ends with" entry as a pair whose starts half is — allowed at the 2nd or 3rd
+    /// character of the address rather than only right after the 'r'. Off by default, because it
+    /// changes what the address looks like; ignored in every other mode.
     /// </summary>
     public bool EntryNearStart
     {
@@ -323,8 +324,9 @@ public sealed class SearchViewModel : IDisposable
     }
 
     /// <summary>
-    /// Non-null while a reachable "starts with" entry, with <see cref="EntryNearStart"/> off,
-    /// would be found at least <see cref="NearStartHintSpeedup"/> times sooner with it on.
+    /// Non-null while a reachable "starts with" entry, or the starts half of a pair entry, with
+    /// <see cref="EntryNearStart"/> off, would be found at least <see cref="NearStartHintSpeedup"/>
+    /// times sooner with it on.
     /// Rendered below the entry row.
     /// </summary>
     public string? NearStartHint
@@ -333,7 +335,7 @@ public sealed class SearchViewModel : IDisposable
         {
             lock (_gate)
             {
-                if (_entryPosition != MatchPosition.Starts || _entryNearStart) return null;
+                if (!AllowsNearStart(_entryPosition) || _entryNearStart) return null;
                 string trimmedEntry = _entryText.Trim();
                 if (NearStartSpeedup(trimmedEntry, _entryIgnoreCase) is not double speedup) return null;
                 return $"\"{trimmedEntry}\" can rarely start right after the r: allowing it at the 2nd or 3rd character finds it about {speedup:0}× sooner.";
@@ -431,14 +433,15 @@ public sealed class SearchViewModel : IDisposable
     /// ending with <paramref name="ends"/>. Both halves are required: a blank one adds nothing,
     /// the way <see cref="AddPattern"/> ignores a blank pattern.
     /// </summary>
-    public bool AddPair(string starts, string ends, bool ignoreCase)
+    public bool AddPair(string starts, string ends, bool ignoreCase, bool nearStart = false)
     {
         string trimmedStarts = starts.Trim();
         string trimmedEnds = ends.Trim();
         if (trimmedStarts.Length == 0 || trimmedEnds.Length == 0) return false;
         lock (_gate)
         {
-            if (!TryAdd(new PatternChip(trimmedStarts, MatchPosition.Pair, ignoreCase, trimmedEnds), KnownIdentities())) return false;
+            PatternChip chip = new(trimmedStarts, MatchPosition.Pair, ignoreCase, trimmedEnds) { NearStart = nearStart };
+            if (!TryAdd(chip, KnownIdentities())) return false;
             RebuildPatternSet();
         }
 
@@ -459,6 +462,7 @@ public sealed class SearchViewModel : IDisposable
         string trimmedEnds;
         MatchPosition position;
         bool ignoreCase;
+        bool nearPair;
         lock (_gate)
         {
             trimmed = _entryText.Trim();
@@ -468,6 +472,7 @@ public sealed class SearchViewModel : IDisposable
             if (position == MatchPosition.Pair && trimmedEnds.Length == 0) return false;
             ignoreCase = _entryIgnoreCase;
             if (position == MatchPosition.Starts && _entryNearStart) position = MatchPosition.NearStart;
+            nearPair = position == MatchPosition.Pair && _entryNearStart;
             _entryText = string.Empty;
             // Only in Pair mode: outside it the second box is not on screen, and clearing it would
             // silently drop a draft the user typed before switching modes.
@@ -477,7 +482,7 @@ public sealed class SearchViewModel : IDisposable
         // The result is the add's own: a rule the set already holds commits nothing, and the
         // editor says so rather than leaving the user looking for a chip that never appeared.
         return position == MatchPosition.Pair
-            ? AddPair(trimmed, trimmedEnds, ignoreCase)
+            ? AddPair(trimmed, trimmedEnds, ignoreCase, nearPair)
             : AddPattern(trimmed, position, ignoreCase);
     }
 
@@ -541,16 +546,18 @@ public sealed class SearchViewModel : IDisposable
     }
 
     /// <summary>
-    /// Lets a "starts with" chip begin at the 2nd or 3rd character, the action behind the chip's
-    /// speed-up hint. A chip whose near-start twin is already in the set is dropped instead, so
-    /// the set never holds one rule twice.
+    /// Lets a "starts with" chip, or the starts half of a pair chip, begin at the 2nd or 3rd
+    /// character, the action behind the chip's speed-up hint. A chip whose near-start twin is
+    /// already in the set is dropped instead, so the set never holds one rule twice.
     /// </summary>
     public void AllowNearStart(PatternChip chip)
     {
         lock (_gate)
         {
-            if (chip.Position != MatchPosition.Starts || !_patterns.Contains(chip)) return;
-            chip.Position = MatchPosition.NearStart;
+            if (!_patterns.Contains(chip)) return;
+            if (chip.Position == MatchPosition.Starts) chip.Position = MatchPosition.NearStart;
+            else if (chip.Position == MatchPosition.Pair && !chip.NearStart) chip.NearStart = true;
+            else return;
             string identity = chip.Identity;
             if (_patterns.Any(p => !ReferenceEquals(p, chip) && p.Identity == identity)) _patterns.Remove(chip);
             RebuildPatternSet();
@@ -939,6 +946,10 @@ public sealed class SearchViewModel : IDisposable
             ? IsReachableHalf(trimmedEntry) && IsReachableHalf(_entryEndsText.Trim())
             : IsReachableHalf(trimmedEntry);
 
+    /// <summary>The entry modes the "2nd or 3rd char" option applies to.</summary>
+    public static bool AllowsNearStart(MatchPosition position) =>
+        position is MatchPosition.Starts or MatchPosition.Pair;
+
     /// <summary>
     /// The smallest speed-up worth a hint. A first character that can follow the 'r' gains only
     /// about 1.4×, one that cannot gains about 24×; the partial index 23 ('Q') sits near 2.2×.
@@ -1026,7 +1037,7 @@ public sealed class SearchViewModel : IDisposable
                 // second half; such a chip contributes no rule and says so through its Warning.
                 if (!string.IsNullOrWhiteSpace(chip.EndsText))
                 {
-                    builder.AddPair(chip.Text, chip.EndsText, chip.IgnoreCase);
+                    builder.AddPair(chip.Text, chip.EndsText, chip.IgnoreCase, chip.NearStart);
                 }
             }
             else
@@ -1040,7 +1051,9 @@ public sealed class SearchViewModel : IDisposable
         {
             chip.Warning = ChipWarning(chip);
             chip.Normalized = ChipNormalized(chip);
-            chip.NearStartSpeedup = chip.Position == MatchPosition.Starts ? NearStartSpeedup(chip.Text, chip.IgnoreCase) : null;
+            bool canGoNear = chip.Position == MatchPosition.Starts
+                || (chip.Position == MatchPosition.Pair && !chip.NearStart && !string.IsNullOrWhiteSpace(chip.EndsText));
+            chip.NearStartSpeedup = canGoNear ? NearStartSpeedup(chip.Text, chip.IgnoreCase) : null;
         }
 
         _patternSet = set;
@@ -1055,7 +1068,7 @@ public sealed class SearchViewModel : IDisposable
         {
             SaveSettings(s => s with
             {
-                Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase, p.EndsText)).ToArray(),
+                Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase, p.EndsText, p.IsNearStartPair)).ToArray(),
                 Targets = _targets.Where(t => t.Selected).Select(t => t.Id).ToArray(),
                 CpuThreads = _cpuThreads,
                 Count = _count,

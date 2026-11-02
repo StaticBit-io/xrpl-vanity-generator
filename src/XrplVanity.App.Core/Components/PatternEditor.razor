@@ -18,6 +18,10 @@
         {
           <span class="chip-pos">starts</span>
           <span class="mono">@chip.Text</span>
+          @if (chip.NearStart)
+          {
+            <span class="chip-pos chip-near" title="the starts half may begin at the 2nd or 3rd character of the address">2nd–3rd</span>
+          }
           <span class="chip-pos">ends</span>
           <span class="mono">@chip.EndsText</span>
         }
@@ -69,7 +73,7 @@
       <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
     }
     <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
-    @if (Vm.EntryPosition == MatchPosition.Starts)
+    @if (SearchViewModel.AllowsNearStart(Vm.EntryPosition))
     {
       <label class="near-label" title="The pattern may begin at the 2nd or 3rd character of the address: r?WORD…"><input class="near-start" type="checkbox" @bind="Vm.EntryNearStart" /> 2nd or 3rd char</label>
     }

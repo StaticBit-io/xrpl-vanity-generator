@@ -111,6 +111,10 @@ public static class SearchEstimator
             foreach (string variant in pair.Starts)
             {
                 startsProbability += StartsProbability(variant);
+                if (pair.NearStart)
+                {
+                    startsProbability += Math.Pow(AlphabetSize, -variant.Length);
+                }
             }
 
             // The two halves sit at fixed, non-overlapping ends of the body, so they are

@@ -137,4 +137,81 @@ public class NearStartTests
         Assert.Equal(TargetTable.PositionPairEnds, table.Groups[12]);
         Assert.True(TargetTable.PositionNearStart < TargetTable.PositionPairStarts);
     }
+
+    private static PatternSet NearPair(string starts, string ends, bool ignoreCase = false) =>
+        new PatternSet.Builder().AddPair(starts, ends, ignoreCase, nearStart: true).Build();
+
+    [Theory]
+    [InlineData("rXRPLQQQQQQQQFiLE", true)]
+    [InlineData("rpXRPLQQQQQQQFiLE", true)]
+    [InlineData("rppXRPLQQQQQQFiLE", false)]
+    [InlineData("rpXRPLFiLE", true)]     // halves touch one character in
+    [InlineData("rpXRPLFiL", false)]     // too short for both halves one character in
+    [InlineData("rpXRPLQQQQQQQFiLQ", false)]
+    public void A_NearStart_Pair_Lets_Only_Its_Starts_Half_Move_One_Character(string address, bool expected)
+    {
+        bool matched = NearPair("XRPL", "FILE").TryMatch(address, out MatchPosition position, out string pattern);
+
+        Assert.Equal(expected, matched);
+        if (expected)
+        {
+            Assert.Equal(MatchPosition.Pair, position);
+            Assert.Equal("XRPL..FILE", pattern);
+        }
+    }
+
+    [Fact]
+    public void A_Plain_Pair_Still_Needs_Its_Starts_Half_Right_After_The_R()
+    {
+        PatternSet plain = new PatternSet.Builder().AddPair("XRPL", "FILE", ignoreCase: false).Build();
+
+        Assert.False(Assert.Single(plain.Pairs).NearStart);
+        Assert.False(plain.TryMatch("rpXRPLQQQQQQQFiLE", out _, out _));
+    }
+
+    [Fact]
+    public void A_NearStart_Pair_Estimate_Adds_The_Second_Offset_To_Its_Starts_Half()
+    {
+        double starts = SearchEstimator.StartsProbability("XRPL") + Math.Pow(58, -4);
+        double expected = 1.0 / (starts * Math.Pow(58, -4));
+
+        Assert.Equal(expected, SearchEstimator.ExpectedCandidatesPerMatch(NearPair("XRPL", "FILE"))!.Value, precision: 0);
+    }
+
+    [Fact]
+    public void A_NearStart_Pair_Gains_What_A_NearStart_Pattern_With_Its_First_Character_Gains()
+    {
+        double plain = SearchEstimator.ExpectedCandidatesPerMatch(
+            new PatternSet.Builder().AddPair("XRPL", "FILE", ignoreCase: false).Build())!.Value;
+        double near = SearchEstimator.ExpectedCandidatesPerMatch(NearPair("XRPL", "FILE"))!.Value;
+
+        Assert.Equal(SearchEstimator.NearStartSpeedup(new[] { 'X' }), plain / near, precision: 9);
+    }
+
+    [Fact]
+    public void The_Cli_Takes_A_NearStart_Pair()
+    {
+        CliOptions options = CliOptions.Parse(new[] { "--near-starts-ends", "XRPL:FILE", "--starts-ends", "ab:cd" });
+
+        Assert.Equal(("XRPL", "FILE", true), options.Pairs[0]);
+        Assert.Equal(("ab", "cd", false), options.Pairs[1]);
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse(new[] { "--near-starts-ends", "XRPL" }));
+    }
+
+    [Fact]
+    public void The_Device_Table_Keeps_A_NearStart_Half_Apart_From_The_Same_Plain_Half()
+    {
+        PatternSet set = new PatternSet.Builder()
+            .AddPair("ab", "cd", ignoreCase: false, nearStart: true)
+            .AddPair("ab", "ef", ignoreCase: false)
+            .Build();
+
+        TargetTable table = TargetTable.Build(set);
+
+        uint nearHalf = table.Pairs[0];
+        uint plainHalf = table.Pairs[2];
+        Assert.NotEqual(nearHalf, plainHalf);
+        Assert.Equal(TargetTable.PositionPairNearStarts, table.Groups[nearHalf * 4]);
+        Assert.Equal(TargetTable.PositionPairStarts, table.Groups[plainHalf * 4]);
+    }
 }
