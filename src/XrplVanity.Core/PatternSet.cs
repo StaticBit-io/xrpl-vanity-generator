@@ -23,16 +23,18 @@ public sealed class PatternSet
     public const int MaxBodyLength = 33;
 
     private readonly Bucket[] _starts;
+    private readonly Bucket[] _nearStarts;
     private readonly Bucket[] _ends;
     private readonly List<string> _contains;
     private readonly List<Pair> _pairs;
     private readonly List<NormalizedPattern> _unreachable;
     private readonly List<NormalizedPattern> _caseFoldingSkipped;
 
-    private PatternSet(Bucket[] starts, Bucket[] ends, List<string> contains, List<Pair> pairs,
+    private PatternSet(Bucket[] starts, Bucket[] nearStarts, Bucket[] ends, List<string> contains, List<Pair> pairs,
         List<NormalizedPattern> unreachable, List<NormalizedPattern> caseFoldingSkipped)
     {
         _starts = starts;
+        _nearStarts = nearStarts;
         _ends = ends;
         _contains = contains;
         _pairs = pairs;
@@ -51,7 +53,7 @@ public sealed class PatternSet
 
     /// <summary>True when at least one reachable pattern remains to search for.</summary>
     public bool HasPatterns =>
-        _starts.Length > 0 || _ends.Length > 0 || _contains.Count > 0 || _pairs.Count > 0;
+        _starts.Length > 0 || _nearStarts.Length > 0 || _ends.Length > 0 || _contains.Count > 0 || _pairs.Count > 0;
 
     /// <summary>
     /// One rule that requires both halves at once: the body must start with one of
@@ -101,6 +103,14 @@ public sealed class PatternSet
             }
         }
 
+        foreach (Bucket bucket in _nearStarts)
+        {
+            foreach (string value in bucket.Values)
+            {
+                yield return (MatchPosition.NearStart, value);
+            }
+        }
+
         foreach (Bucket bucket in _ends)
         {
             foreach (string value in bucket.Values)
@@ -139,6 +149,12 @@ public sealed class PatternSet
         if (TryMatchAffix(_starts, body, fromStart: true, out pattern))
         {
             position = MatchPosition.Starts;
+            return true;
+        }
+
+        if (TryMatchNearStart(_nearStarts, body, out pattern))
+        {
+            position = MatchPosition.NearStart;
             return true;
         }
 
@@ -188,6 +204,26 @@ public sealed class PatternSet
         return false;
     }
 
+    /// <summary>A bucket's value at the body's first character, or else at its second.</summary>
+    private static bool TryMatchNearStart(Bucket[] buckets, ReadOnlySpan<char> body, out string pattern)
+    {
+        foreach (Bucket bucket in buckets)
+        {
+            for (int offset = 0; offset <= 1 && offset + bucket.Length <= body.Length; offset++)
+            {
+                ReadOnlySpan<char> slice = body.Slice(offset, bucket.Length);
+                if (bucket.Lookup.Contains(slice))
+                {
+                    pattern = new string(slice);
+                    return true;
+                }
+            }
+        }
+
+        pattern = string.Empty;
+        return false;
+    }
+
     private readonly struct Bucket
     {
         public Bucket(int length, HashSet<string> values)
@@ -205,6 +241,7 @@ public sealed class PatternSet
     public sealed class Builder
     {
         private readonly Dictionary<int, HashSet<string>> _starts = new();
+        private readonly Dictionary<int, HashSet<string>> _nearStarts = new();
         private readonly Dictionary<int, HashSet<string>> _ends = new();
         private readonly List<string> _contains = new();
         private readonly List<Pair> _pairs = new();
@@ -244,6 +281,9 @@ public sealed class PatternSet
                 {
                     case MatchPosition.Starts:
                         AddToBuckets(_starts, variant);
+                        break;
+                    case MatchPosition.NearStart:
+                        AddToBuckets(_nearStarts, variant);
                         break;
                     case MatchPosition.Ends:
                         AddToBuckets(_ends, variant);
@@ -309,7 +349,7 @@ public sealed class PatternSet
 
         public PatternSet Build()
         {
-            return new PatternSet(ToBuckets(_starts), ToBuckets(_ends), _contains, _pairs,
+            return new PatternSet(ToBuckets(_starts), ToBuckets(_nearStarts), ToBuckets(_ends), _contains, _pairs,
                 _unreachable, _caseFoldingSkipped);
         }
 

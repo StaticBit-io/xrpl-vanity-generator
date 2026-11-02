@@ -6,7 +6,8 @@ namespace XrplVanity.App.Core.ViewModels;
 /// The one place that knows the on-disk shape of a pattern list, so what "save list…" writes and
 /// what "load list…" reads can never drift apart. Fields are tab-separated:
 /// <c>ends&#9;RRRRRRRR</c>, a case-sensitive chip adding the <c>Aa</c> marker the chip itself wears,
-/// and a pair spelling both halves as <c>starts&#9;static&#9;ends&#9;bit</c>. A line with no tab at
+/// a pair spelling both halves as <c>starts&#9;static&#9;ends&#9;bit</c>, and a pattern allowed at
+/// the 2nd or 3rd character as <c>nearstart&#9;XRPLFILE</c>. A line with no tab at
 /// all is a plain word from the older word lists (the CLI's <c>--list</c> format) and stays one.
 /// </summary>
 public static class PatternListFormat
@@ -77,6 +78,7 @@ public static class PatternListFormat
             case "starts": position = MatchPosition.Starts; return true;
             case "ends": position = MatchPosition.Ends; return true;
             case "contains": position = MatchPosition.Contains; return true;
+            case "nearstart": position = MatchPosition.NearStart; return true;
             default: position = default; return false;
         }
     }
