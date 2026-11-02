@@ -36,6 +36,13 @@ public sealed class PatternChip
     public string? Normalized { get; internal set; }
 
     /// <summary>
+    /// For a <see cref="MatchPosition.Starts"/> chip whose first character can rarely follow the
+    /// leading 'r': how many times sooner it would be found as <see cref="MatchPosition.NearStart"/>.
+    /// Null otherwise. Set by <c>SearchViewModel.RebuildPatternSet</c>.
+    /// </summary>
+    public double? NearStartSpeedup { get; internal set; }
+
+    /// <summary>
     /// What makes two chips the same rule, so a set never holds one twice. Built from the
     /// normalized halves rather than the typed ones — <c>starts 00000000</c> and
     /// <c>starts oooooooo</c> search for exactly the same thing — and folds case only for a chip

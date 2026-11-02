@@ -59,6 +59,7 @@ rather than searched for.
 | --- | --- | --- |
 | positional words | — | patterns for the `starts` bucket |
 | `--starts P...` | — | patterns to match at address start (after `r`) |
+| `--near-start P` | — | a pattern that may begin at the 2nd or 3rd address character (`rWORD…` or `r?WORD…`); see below (repeatable) |
 | `--ends P...` | — | patterns to match at address end |
 | `--contains P...` | — | patterns to match anywhere |
 | `--starts-ends PREFIX:SUFFIX` | — | requires both a prefix and a suffix on the same address (repeatable) |
@@ -98,6 +99,20 @@ To keep the number of combinations bounded, case expansion applies only to
 patterns of at most 12 characters (up to 2^12 combinations). A longer
 pattern is still searched, but case-sensitively — the tool prints a warning
 saying so. Pass `--case-sensitive` to match any pattern exactly as typed.
+
+### Starting one character later
+
+The character right after the leading `r` of a 34-character address can only
+be one of `pshnaf39wBUDNEGHJKLM4PQ`: the address encodes a 192-bit number,
+and 2^192 is only about 23.3 times 58^32. Any other first character (`X`,
+`S`, `A`, `x`, ...) appears there only in the rare 33-character addresses, so
+`--starts XRPLFILE --case-sensitive` takes about 23 times longer than an
+8-character prefix normally would. The third character has no such bias.
+`--near-start XRPLFILE` also accepts the pattern one character later
+(`r?XRPLFiLE...`), which finds it about 24 times sooner; for a first
+character that can follow the `r` it gains only about 1.4 times. The desktop
+app offers the same choice as the "2nd or 3rd char" box and suggests it on
+any chip that would gain at least 2 times.
 
 ## Exit codes
 

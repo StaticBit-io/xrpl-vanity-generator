@@ -758,11 +758,12 @@ KERNEL void k_prf_entropy(GLOBAL const u8* key32, u64 start, GLOBAL u8* out, int
 // ---------------------------------------------------------------------------
 // M5: device-side matching over host-sorted target groups.
 // groups: 4 x u32 per group = { position (0 starts, 1 ends, 2 contains,
-//         3 pair-starts, 4 pair-ends), length, offset into chars, count }.
+//         3 near-start: at body offset 0 or 1, 4 pair-starts, 5 pair-ends),
+//         length, offset into chars, count }.
 //         Targets inside a group are sorted ordinal (unsigned byte order) and
 //         packed at stride = length.
 // pairs:  2 x u32 per paired rule = { starts-half group index, ends-half group
-//         index }. Both halves carry a pair-only position code (3 / 4), which the
+//         index }. Both halves carry a pair-only position code (4 / 5), which the
 //         or-loop skips, so a half never matches on its own.
 // The predicate below equals XrplVanity.Core.PatternSet.TryMatch's hit / no-hit result.
 // ---------------------------------------------------------------------------
@@ -798,12 +799,15 @@ DEVICE bool matches_any(const u8* body, int bodyLen,
         u32 len = groups[g * 4 + 1];
         u32 off = groups[g * 4 + 2];
         u32 cnt = groups[g * 4 + 3];
-        if (pos >= 3) continue; // a pair half is only ever matched by the pair loop; fail closed on any future code
+        if (pos >= 4) continue; // a pair half is only ever matched by the pair loop; fail closed on any future code
         if ((int)len > bodyLen || cnt == 0 || len == 0) continue;
         if (pos == 0) {
             if (group_has(chars, off, cnt, len, body)) return true;
         } else if (pos == 1) {
             if (group_has(chars, off, cnt, len, body + bodyLen - (int)len)) return true;
+        } else if (pos == 3) {
+            if (group_has(chars, off, cnt, len, body)) return true;
+            if ((int)len + 1 <= bodyLen && group_has(chars, off, cnt, len, body + 1)) return true;
         } else {
             for (int s = 0; s + (int)len <= bodyLen; s++) {
                 if (group_has(chars, off, cnt, len, body + s)) return true;

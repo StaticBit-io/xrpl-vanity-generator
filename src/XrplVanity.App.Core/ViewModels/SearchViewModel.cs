@@ -38,6 +38,7 @@ public sealed class SearchViewModel : IDisposable
     private string _entryEndsText = string.Empty;
     private MatchPosition _entryPosition = MatchPosition.Starts;
     private bool _entryIgnoreCase = true;
+    private bool _entryNearStart;
     private SearchSession? _session;
     private SearchProgress? _progress;
     private int _dutyPercent;
@@ -300,6 +301,47 @@ public sealed class SearchViewModel : IDisposable
     }
 
     /// <summary>
+    /// Whether a "starts with" entry is committed as <see cref="MatchPosition.NearStart"/>: allowed
+    /// at the 2nd or 3rd character of the address rather than only right after the 'r'. Off by
+    /// default, because it changes what the address looks like; ignored in every other mode.
+    /// </summary>
+    public bool EntryNearStart
+    {
+        get { lock (_gate) return _entryNearStart; }
+        set
+        {
+            bool changed;
+            lock (_gate)
+            {
+                changed = value != _entryNearStart;
+                _entryNearStart = value;
+            }
+
+            if (!changed) return;
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Non-null while a reachable "starts with" entry, with <see cref="EntryNearStart"/> off,
+    /// would be found at least <see cref="NearStartHintSpeedup"/> times sooner with it on.
+    /// Rendered below the entry row.
+    /// </summary>
+    public string? NearStartHint
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_entryPosition != MatchPosition.Starts || _entryNearStart) return null;
+                string trimmedEntry = _entryText.Trim();
+                if (NearStartSpeedup(trimmedEntry, _entryIgnoreCase) is not double speedup) return null;
+                return $"\"{trimmedEntry}\" can rarely start right after the r: allowing it at the 2nd or 3rd character finds it about {speedup:0}× sooner.";
+            }
+        }
+    }
+
+    /// <summary>
     /// Non-null when there is neither a reachable committed pattern nor a reachable pending entry;
     /// blocks Start. Rendered inside the Patterns card, below the entry row.
     /// </summary>
@@ -425,6 +467,7 @@ public sealed class SearchViewModel : IDisposable
             trimmedEnds = _entryEndsText.Trim();
             if (position == MatchPosition.Pair && trimmedEnds.Length == 0) return false;
             ignoreCase = _entryIgnoreCase;
+            if (position == MatchPosition.Starts && _entryNearStart) position = MatchPosition.NearStart;
             _entryText = string.Empty;
             // Only in Pair mode: outside it the second box is not on screen, and clearing it would
             // silently drop a draft the user typed before switching modes.
@@ -490,6 +533,26 @@ public sealed class SearchViewModel : IDisposable
         {
             chip.Position = position;
             chip.IgnoreCase = ignoreCase;
+            RebuildPatternSet();
+        }
+
+        PersistDraft();
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Lets a "starts with" chip begin at the 2nd or 3rd character, the action behind the chip's
+    /// speed-up hint. A chip whose near-start twin is already in the set is dropped instead, so
+    /// the set never holds one rule twice.
+    /// </summary>
+    public void AllowNearStart(PatternChip chip)
+    {
+        lock (_gate)
+        {
+            if (chip.Position != MatchPosition.Starts || !_patterns.Contains(chip)) return;
+            chip.Position = MatchPosition.NearStart;
+            string identity = chip.Identity;
+            if (_patterns.Any(p => !ReferenceEquals(p, chip) && p.Identity == identity)) _patterns.Remove(chip);
             RebuildPatternSet();
         }
 
@@ -876,6 +939,34 @@ public sealed class SearchViewModel : IDisposable
             ? IsReachableHalf(trimmedEntry) && IsReachableHalf(_entryEndsText.Trim())
             : IsReachableHalf(trimmedEntry);
 
+    /// <summary>
+    /// The smallest speed-up worth a hint. A first character that can follow the 'r' gains only
+    /// about 1.4×, one that cannot gains about 24×; the partial index 23 ('Q') sits near 2.2×.
+    /// </summary>
+    public const double NearStartHintSpeedup = 2.0;
+
+    /// <summary>
+    /// How many times sooner <paramref name="text"/> as a "starts with" pattern is found once it may
+    /// also begin one character later, or null when that is below <see cref="NearStartHintSpeedup"/>
+    /// or the text is not a reachable pattern. Mirrors the builder's case expansion: a pattern
+    /// longer than <see cref="PatternSet.MaxIgnoreCaseLength"/> is searched case-sensitively.
+    /// </summary>
+    private static double? NearStartSpeedup(string text, bool ignoreCase)
+    {
+        NormalizedPattern normalized = PatternNormalizer.Normalize(text);
+        if (!normalized.Reachable || normalized.Value.Length == 0) return null;
+        char first = normalized.Value[0];
+        HashSet<char> firsts = new() { first };
+        if (ignoreCase && normalized.Value.Length <= PatternSet.MaxIgnoreCaseLength)
+        {
+            firsts.Add(PatternNormalizer.NormalizeChar(char.ToLowerInvariant(first)));
+            firsts.Add(PatternNormalizer.NormalizeChar(char.ToUpperInvariant(first)));
+        }
+
+        double speedup = SearchEstimator.NearStartSpeedup(firsts);
+        return speedup >= NearStartHintSpeedup ? speedup : null;
+    }
+
     /// <summary>"cannot occur in an XRPL address" / "empty pattern" for one half, or null.</summary>
     private static string? UnreachableWarning(NormalizedPattern normalized) =>
         !normalized.Reachable ? "cannot occur in an XRPL address"
@@ -949,6 +1040,7 @@ public sealed class SearchViewModel : IDisposable
         {
             chip.Warning = ChipWarning(chip);
             chip.Normalized = ChipNormalized(chip);
+            chip.NearStartSpeedup = chip.Position == MatchPosition.Starts ? NearStartSpeedup(chip.Text, chip.IgnoreCase) : null;
         }
 
         _patternSet = set;

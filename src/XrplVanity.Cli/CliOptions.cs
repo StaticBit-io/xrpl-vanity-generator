@@ -50,6 +50,9 @@ public sealed class CliOptions
                 case "--starts":
                     patterns.Add((MatchPosition.Starts, Next(args, ref i, arg)));
                     break;
+                case "--near-start":
+                    patterns.Add((MatchPosition.NearStart, Next(args, ref i, arg)));
+                    break;
                 case "--ends":
                     patterns.Add((MatchPosition.Ends, Next(args, ref i, arg)));
                     break;
