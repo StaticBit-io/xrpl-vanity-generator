@@ -56,7 +56,7 @@
       <button class="chips-toggle t" @onclick="() => _expanded = !_expanded">@(collapsed ? $"+{chips.Count - CollapsedChips} more" : "show less")</button>
     </div>
   }
-  <div class="entry pattern-entry @(Vm.EntryPosition switch { MatchPosition.Pair => "paired", MatchPosition.Starts => "with-near", _ => null })">
+  <div class="entry pattern-entry @(Vm.EntryPosition == MatchPosition.Pair ? "paired" : null)">
     <select class="pos form-select" @bind="Vm.EntryPosition">
       <option value="Starts">starts with</option>
       <option value="Ends">ends with</option>
@@ -72,16 +72,20 @@
     {
       <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
     }
-    <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
-    @if (SearchViewModel.AllowsNearStart(Vm.EntryPosition))
-    {
-      <label class="near-label" title="The pattern may begin at the 2nd or 3rd character of the address: r?WORD…"><input class="near-start" type="checkbox" @bind="Vm.EntryNearStart" /> 2nd or 3rd char</label>
-    }
-    <label class="btn-secondary-dark t">
-      load list…
-      <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
-    </label>
-    <button class="save-list btn-secondary-dark t" disabled="@(chips.Count == 0)" @onclick="OnSaveList">save list…</button>
+    <div class="entry-tools">
+      <div class="entry-flags">
+        <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
+        @if (SearchViewModel.AllowsNearStart(Vm.EntryPosition))
+        {
+          <label class="near-label" title="The pattern may begin at the 2nd or 3rd character of the address: r?WORD…"><input class="near-start" type="checkbox" @bind="Vm.EntryNearStart" /> 2nd or 3rd char</label>
+        }
+      </div>
+      <label class="btn-secondary-dark t">
+        load list…
+        <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
+      </label>
+      <button class="save-list btn-secondary-dark t" disabled="@(chips.Count == 0)" @onclick="OnSaveList">save list…</button>
+    </div>
   </div>
   @if (_listError is not null)
   {
