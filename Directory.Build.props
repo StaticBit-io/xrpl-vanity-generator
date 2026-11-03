@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    The single source of truth for the product version.
+
+    The MSIX package version is this value plus a fourth component, which the Store
+    requires to be 0. The version in Package.appxmanifest is not what ships:
+    _VanitySetPackageIdentity in src/XrplVanity.App stamps the generated manifest at
+    build time, and that target is the only thing that sets the package version.
+  -->
+  <PropertyGroup>
+    <VanityVersion>1.0.0</VanityVersion>
+    <Version>$(VanityVersion)</Version>
+  </PropertyGroup>
+
+</Project>

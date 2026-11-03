@@ -13,7 +13,11 @@
     <MauiXamlInflator>SourceGen</MauiXamlInflator>
     <ApplicationTitle>XRPL Vanity</ApplicationTitle>
     <ApplicationId>io.staticbit.vanity</ApplicationId>
-    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <!-- Neither of these reaches the package version: Resizetizer leaves an explicit
+         Identity/@Version in the manifest alone, and _VanitySetPackageIdentity below is what
+         actually stamps it. ApplicationDisplayVersion still follows VanityVersion so it cannot
+         drift; ApplicationVersion is a per-build integer that Windows does not use. -->
+    <ApplicationDisplayVersion>$(VanityVersion)</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
@@ -26,6 +30,19 @@
        Release keeps MSIX, which is what the app ships as. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <WindowsPackageType>None</WindowsPackageType>
+  </PropertyGroup>
+
+  <!--
+    Package identity. The defaults are the sideload values, so the existing sideload build
+    is unchanged; a Store build overrides them on the command line or through the Store
+    publish profile. The Store assigns Name and Publisher when the app name is reserved,
+    and they are not known until then.
+  -->
+  <PropertyGroup>
+    <VanityPackageIdentityName Condition="'$(VanityPackageIdentityName)' == ''">io.staticbit.vanity</VanityPackageIdentityName>
+    <VanityPackagePublisher Condition="'$(VanityPackagePublisher)' == ''">CN=StaticBit Vanity Dev</VanityPackagePublisher>
+    <VanityPackagePublisherDisplayName Condition="'$(VanityPackagePublisherDisplayName)' == ''">StaticBit</VanityPackagePublisherDisplayName>
+    <VanityPackageVersion Condition="'$(VanityPackageVersion)' == ''">$(VanityVersion).0</VanityPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -44,5 +61,55 @@
   <ItemGroup>
     <ProjectReference Include="..\XrplVanity.App.Core\XrplVanity.App.Core.csproj" />
   </ItemGroup>
+
+  <!--
+    Resizetizer rewrites Package.appxmanifest into obj/.../resizetizer/m/ and points the packaging
+    targets at that copy; the source file is never packaged. Identity is stamped on the copy, so the
+    working tree stays clean and the source manifest remains a valid standalone sideload manifest.
+
+    Resizetizer leaves an explicit Identity/@Version alone - verified against Resizetizer 10.0.20,
+    where ApplicationDisplayVersion and ApplicationVersion did not override it - so this target is
+    the only thing that sets the package version.
+  -->
+  <Target Name="_VanitySetPackageIdentity"
+          AfterTargets="MauiGeneratePackageAppxManifest"
+          Condition="'$(WindowsPackageType)' != 'None'">
+
+    <PropertyGroup>
+      <_VanityGeneratedManifest>$(_MauiIntermediateManifest)Package.appxmanifest</_VanityGeneratedManifest>
+      <_VanityManifestNamespace>&lt;Namespace Prefix="m" Uri="http://schemas.microsoft.com/appx/manifest/foundation/windows10" /&gt;</_VanityManifestNamespace>
+    </PropertyGroup>
+
+    <!--
+      Fail loudly rather than ship a package whose identity was never substituted. A silent miss
+      means either a Store upload the portal rejects, or a sideload package carrying Store identity.
+      _MauiIntermediateManifest is internal to Resizetizer, so the path is worth asserting.
+    -->
+    <Error Condition="!Exists('$(_VanityGeneratedManifest)')"
+           Text="Expected the generated app manifest at '$(_VanityGeneratedManifest)'. Resizetizer moved it; update _VanitySetPackageIdentity." />
+
+    <XmlPoke XmlInputPath="$(_VanityGeneratedManifest)"
+             Query="/m:Package/m:Identity/@Name"
+             Value="$(VanityPackageIdentityName)"
+             Namespaces="$(_VanityManifestNamespace)" />
+    <XmlPoke XmlInputPath="$(_VanityGeneratedManifest)"
+             Query="/m:Package/m:Identity/@Publisher"
+             Value="$(VanityPackagePublisher)"
+             Namespaces="$(_VanityManifestNamespace)" />
+    <XmlPoke XmlInputPath="$(_VanityGeneratedManifest)"
+             Query="/m:Package/m:Identity/@Version"
+             Value="$(VanityPackageVersion)"
+             Namespaces="$(_VanityManifestNamespace)" />
+    <!-- Must match the publisher display name in Partner Center exactly, or the upload is
+         rejected with a manifest validation error. -->
+    <XmlPoke XmlInputPath="$(_VanityGeneratedManifest)"
+             Query="/m:Package/m:Properties/m:PublisherDisplayName"
+             Value="$(VanityPackagePublisherDisplayName)"
+             Namespaces="$(_VanityManifestNamespace)" />
+
+    <Message Importance="high"
+             Text="Package identity: Name=$(VanityPackageIdentityName), Publisher=$(VanityPackagePublisher), PublisherDisplayName=$(VanityPackagePublisherDisplayName), Version=$(VanityPackageVersion)" />
+
+  </Target>
 
 </Project>

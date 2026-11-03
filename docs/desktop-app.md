@@ -177,6 +177,37 @@ self-signed code-signing certificate whose subject matches the `Publisher` in
 `src/XrplVanity.App/Platforms/Windows/Package.appxmanifest`
 (`CN=StaticBit Vanity Dev`).
 
+This section covers the sideload package, which is how a build is tested locally. The
+Microsoft Store is a separate channel with its own publish profile and its own identity,
+and it signs the package itself, so none of the certificate steps below apply there. See
+[store-submission.md](store-submission.md).
+
+### Package identity
+
+The identity in `Package.appxmanifest` is not what ships. Resizetizer rewrites the manifest
+into `obj/.../resizetizer/m/` and the packaging targets read that copy; the
+`_VanitySetPackageIdentity` target in `XrplVanity.App.csproj` stamps the copy, so the source
+manifest stays a valid standalone file and the working tree stays clean.
+
+Four properties drive it, and their defaults are the sideload values, so the commands below
+need none of them:
+
+| Property | Default | Purpose |
+| --- | --- | --- |
+| `VanityPackageIdentityName` | `io.staticbit.vanity` | `Identity/@Name`. The Store assigns its own. |
+| `VanityPackagePublisher` | `CN=StaticBit Vanity Dev` | `Identity/@Publisher`. Must match the signing certificate's subject for a sideload package. |
+| `VanityPackagePublisherDisplayName` | `StaticBit` | `Properties/PublisherDisplayName`. Must match Partner Center exactly for a Store package. |
+| `VanityPackageVersion` | `$(VanityVersion).0` | `Identity/@Version`. |
+
+`VanityVersion` in `Directory.Build.props` is the single source of truth for the version: it
+feeds the package version, the assembly version and the version shown in the About section.
+Note that `ApplicationDisplayVersion` and `ApplicationVersion` do **not** reach the package
+version — Resizetizer leaves an explicit `Identity/@Version` alone, which is why the target
+above exists.
+
+Every build prints the identity it stamped, and fails rather than producing a package whose
+identity was never substituted.
+
 ### 1. Create the certificate
 
 Run once per machine that builds packages:
