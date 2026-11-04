@@ -67,11 +67,9 @@ carries it too and scans the same way.
 
 ### A bare seed
 
-The `sEd…` string itself, nothing around it. The StaticBit wallet does **not** import this — its
-scanner recognises a WalletConnect URI or an XRPL address and answers "Unrecognized QR code" to
-anything else — and the dialog says so where the choice is made. It is there for moving one key
-into a wallet that reads a family seed directly, and for reading a key across an air gap without a
-file.
+The `sEd…` string itself, nothing around it. The StaticBit wallet scans it, as does any wallet that
+reads a family seed directly. It is there for moving one key and for reading a key across an air gap
+without a file.
 
 ### Which one is offered
 

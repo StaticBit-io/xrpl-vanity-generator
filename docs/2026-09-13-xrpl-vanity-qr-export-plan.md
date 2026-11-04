@@ -867,7 +867,7 @@ Expected: a build failure, `error CS0246: the type or namespace name "QrExportDi
       }
       else if (_seedOnly)
       {
-        <text>StaticBit does not import a bare seed — it reads this as an address and offers to send. Use it for a wallet that takes a family seed directly.</text>
+        <text>Scanned by StaticBit or any wallet that takes a family seed.</text>
       }
       else
       {
@@ -1390,7 +1390,7 @@ In the Search bullet, after the paragraph about saving and loading a pattern lis
   A found wallet can also leave as a QR code rather than as a file. The button in a result row
   shows that one wallet; `Show QR…` in the selection bar shows every selected row. The dialog
   offers two payloads: the StaticBit backup container, which the StaticBit wallet restores from by
-  scanning, and the bare `sEd…` seed, which it does not import and which is offered only for a
+  scanning, and the bare `sEd…` seed, which it also scans and which is offered only for a
   single wallet. A password is optional and encrypts the container; without one the code is not
   encrypted and says so. One code holds 22 wallets, or 21 with a password. Nothing is written to
   disk — the code is inline SVG, is never an image file, and hides itself after 60 seconds.

@@ -38,8 +38,11 @@ public partial class QrExportDialog : ComponentBase, IDisposable
 
     [Parameter] public EventCallback OnClose { get; set; }
 
-    /// <summary>A code the backup format produced without a password is the one that needs saying so.</summary>
-    private bool ShowsWarning => _code is not null && !_seedOnly && _password.Length == 0;
+    /// <summary>
+    /// A bare seed is never encrypted, and a password typed for the backup format does not apply to it;
+    /// a backup is unencrypted only when it was built without one.
+    /// </summary>
+    private bool ShowsWarning => _code is not null && (_seedOnly || _password.Length == 0);
 
     protected override void OnParametersSet()
     {

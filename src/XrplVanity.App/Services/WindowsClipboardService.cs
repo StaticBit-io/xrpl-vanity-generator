@@ -1,4 +1,7 @@
 using XrplVanity.App.Core.Services;
+using ClipboardContentOptions = Windows.ApplicationModel.DataTransfer.ClipboardContentOptions;
+using DataPackage = Windows.ApplicationModel.DataTransfer.DataPackage;
+using WindowsClipboard = Windows.ApplicationModel.DataTransfer.Clipboard;
 
 namespace XrplVanity.App.Services;
 
@@ -27,7 +30,7 @@ public sealed class WindowsClipboardService : IClipboardService
 
         try
         {
-            await MainThread.InvokeOnMainThreadAsync(() => Clipboard.Default.SetTextAsync(text));
+            await MainThread.InvokeOnMainThreadAsync(() => SetSecretText(text));
         }
         catch (Exception)
         {
@@ -84,6 +87,22 @@ public sealed class WindowsClipboardService : IClipboardService
         {
             // The clipboard can be locked by another application; clearing it is best effort and
             // must never hold up or fault the exit path.
+        }
+    }
+
+    /// <summary>
+    /// Puts a seed on the clipboard but out of clipboard history and clipboard sync. MAUI's
+    /// <c>SetTextAsync</c> allows both, and the delayed clear reaches neither: Windows would keep the
+    /// seed in Win+V and could carry it to the user's other devices.
+    /// </summary>
+    private static void SetSecretText(string text)
+    {
+        DataPackage package = new();
+        package.SetText(text);
+        ClipboardContentOptions options = new() { IsAllowedInHistory = false, IsRoamable = false };
+        if (!WindowsClipboard.SetContentWithOptions(package, options))
+        {
+            throw new InvalidOperationException("Windows refused the clipboard content.");
         }
     }
 

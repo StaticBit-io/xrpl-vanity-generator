@@ -62,9 +62,9 @@ The application has three pages:
   A found wallet can also leave as a QR code rather than as a file. The button in a result row
   shows that one wallet; `Show QR…` in the selection bar shows every selected row. The dialog
   offers two payloads: the StaticBit backup container, which the StaticBit wallet restores from
-  by scanning, and the bare `sEd…` seed, which it does not import and which is offered only for
+  by scanning, and the bare `sEd…` seed, which it also scans and which is offered only for
   a single wallet. A password is optional and encrypts the container; without one the code is
-  not encrypted and says so. Once the code is on screen the password and folder boxes are put
+  not encrypted and says so, as a bare seed always does. Once the code is on screen the password and folder boxes are put
   away and a **Change** button appears next to **Close**: it drops the code and brings the form
   back, still filled in, so another password or folder takes two clicks. One code holds 22 wallets,
   or 21 with a password. Nothing is
@@ -125,7 +125,7 @@ The application has three pages:
 Seeds are masked everywhere by default. A row reveals its seed only on request and hides
 it again after the configured timeout or when the page is left. Copying a seed puts it on
 the clipboard and clears it after the configured delay, but only if the clipboard still
-holds that same seed.
+holds that same seed. The copy stays out of Windows clipboard history and clipboard sync, which the delayed clear could not reach.
 
 ### Where the data is
 
