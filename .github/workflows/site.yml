@@ -1,0 +1,64 @@
+name: site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The site tests run from the repository root. They read the README, the docs and the CLI parser,
+      # so a change to any of those can fail here.
+      - run: node --test site/test/*.test.mjs
+      - run: node site/build.mjs
+
+  # A push to main is a release of the site: it publishes https://xrpl-vanity.staticbit.io. The job
+  # waits for "test", so a red suite never goes live. It is skipped while the repository is private,
+  # because the site links the repository and those links would be 404s for visitors; the first push
+  # to main after the repository goes public is the launch.
+  deploy-site:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.private
+    needs: test
+    runs-on: ubuntu-latest
+    # Two merges in quick succession deploy in order; cancelling the older run could leave the
+    # earlier commit live if it finished last.
+    concurrency:
+      group: deploy-site
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx --yes wrangler@4.151.1
+      PROJECT: xrpl-vanity-site
+    steps:
+      # Without a token wrangler falls back to an interactive login and fails with a message that
+      # does not name the missing secret.
+      - name: the Cloudflare secrets are set
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required to deploy the site" >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node site/build.mjs
+      # In a non-interactive run, "pages deploy" fails on a missing project instead of offering to
+      # create it, so the first deploy creates it here. A failed lookup (bad token) fails the job
+      # rather than falling through to "create".
+      - name: create the Pages project on first deploy
+        run: |
+          projects=$($WRANGLER pages project list --json)
+          if ! printf '%s' "$projects" | grep -q "\"$PROJECT\""; then
+            $WRANGLER pages project create "$PROJECT" --production-branch main
+          fi
+      # From site/: site/wrangler.toml names the project and the output directory.
+      - run: $WRANGLER pages deploy --branch main --commit-hash "$GITHUB_SHA"
+        working-directory: site
