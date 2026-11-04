@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Desktop app | XRPL Vanity</title>
+<meta name="description" content="How to use the XRPL Vanity desktop application for Windows: searching, results, seeds, QR export and settings.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Desktop app</h1>
+<p class="lead">Search for an address, keep the results encrypted, and move a wallet to your phone.</p>
+
+<h2 id="get-it">Get it</h2>
+<p>The application is on its way to the Microsoft Store. Until it arrives, it can be <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">built from source</a>.</p>
+<ul>
+<li>Windows 10 version 1809 (build 17763) or newer, x64.</li>
+<li>The Microsoft Edge WebView2 runtime. Windows 11 and current Windows 10 updates include it.</li>
+<li>For GPU search, an NVIDIA driver (CUDA, on Turing cards from 2018 or newer) or any installed OpenCL platform. Without either, the application searches on the CPU and says so.</li>
+</ul>
+
+<h2 id="search">Search</h2>
+<h3>Add your words</h3>
+<p>Type a word, pick a position, and add it as a rule: <em>starts with</em>, <em>ends with</em>, <em>contains</em>, or <em>starts and ends with</em>, which asks for both halves on one address. Rules ignore case unless you turn that off, and one search can hold many rules.</p>
+<p>The characters <code>0</code>, <code>O</code>, <code>I</code> and <code>l</code> do not exist in an address. They are replaced by <code>o</code>, <code>i</code> and <code>L</code>, and the rule shows the result next to what you typed.</p>
+<p>The character right after the leading <code>r</code> is limited, so some words are about 23 times rarer than their length suggests. The <em>2nd or 3rd char</em> box lets the word begin one character later. When that would find it at least twice as fast, the application offers it on the rule. It stays off by default because it changes how the address reads.</p>
+<p><strong>Save list</strong> and <strong>Load list</strong> keep a set of rules in a text file. Loading adds to the rules on screen and skips duplicates.</p>
+
+<h3>Choose where to search</h3>
+<p>Tick the CPU, with a thread count, and any CUDA and OpenCL devices the application found. They can all run at once.</p>
+<p>The <em>GPU duty</em> control sets the share of the time the GPU works, from 25–100 %. A lower value leaves the card free for other applications, and a change reaches a running search at once.</p>
+
+<h3>Check the estimate</h3>
+<p>Before you start, the page shows how many candidates a match should take and the expected time on the devices you ticked. It uses the speed last measured on each device. On a first run there is none yet, so press <strong>measure speed</strong> or run a search once.</p>
+
+<h3>Run it</h3>
+<p>The page shows the live speed, the candidates tried and the hits. Each hit lands in the results list with its address, rule, device and time. <em>Stop after N matches</em> in Settings ends the search by itself.</p>
+<p>A long search can run from the tray, which also holds the duty control. A notification tells you when a match arrives or a search finishes.</p>
+
+<h2 id="results">Results and history</h2>
+<p>History holds every result the application has stored. Narrow it with the text box, which searches addresses and patterns, and with the pattern list. Tick rows, or <em>select all shown</em>, to export or delete them together.</p>
+<p><strong>Deleting a result cannot be undone:</strong> the seed is gone, and with it the account unless you saved it elsewhere.</p>
+<p><strong>A TSV export holds seeds in plain text.</strong> It goes where you choose and is not protected, so treat that file as the secret it is.</p>
+
+<h2 id="seeds">Seeds</h2>
+<p>A seed controls its account. It is masked everywhere until you reveal it, and it hides again after 15 seconds or when you leave the page. A copied seed is cleared from the clipboard after 30 seconds, unless you have copied something else by then. Both delays are yours to change in Settings.</p>
+<p><strong>Windows clipboard history (Win+V) and clipboard sync can keep their own copy,</strong> which this does not clear. Turn them off before you copy a seed, or use a QR code instead.</p>
+<p>Results are stored in one file, <code>results.dat</code>, encrypted with the Windows Data Protection API (DPAPI). Only the Windows account that wrote the file can read it, so results do not move to another account or computer. No seed appears in a log, a notification or the tray menu.</p>
+<p><strong>Uninstalling the application deletes <code>results.dat</code>, and every seed in it.</strong> Save the seeds you want to keep first.</p>
+
+<h2 id="qr">Move a wallet to your phone</h2>
+<p>The QR button on a result shows that wallet, and <strong>Show QR</strong> shows every selected row. Scan the code with the StaticBit mobile wallet, which restores it from the backup format the code carries. One code holds up to 22 wallets, or 21 with a password.</p>
+<p><strong>Set a password if anyone could see your screen.</strong> It is optional and encrypts the code. Without it the code is not encrypted, and the dialog says so. The code is never written to disk and hides itself after 60 seconds.</p>
+<p>A bare seed can also be shown as a code for a single wallet. That code is never encrypted: it takes no password, and the dialog shows no warning. The StaticBit wallet does not import that form.</p>
+
+<h2 id="settings">Settings</h2>
+<p>Every change applies at once: there is no Save button.</p>
+<div class="reference" role="region" aria-label="Settings" tabindex="0">
+<table>
+<thead><tr><th scope="col">Setting</th><th scope="col">What it does</th><th scope="col">Default</th></tr></thead>
+<tbody>
+<tr><th scope="row">Close button</th><td>Ask, minimize to the tray, or exit.</td><td>Ask every time</td></tr>
+<tr><th scope="row">Notifications</th><td>A notification on a match and when a search finishes.</td><td>On</td></tr>
+<tr><th scope="row">GPU duty</th><td>Share of the time the GPU runs, 25–100 %.</td><td>100</td></tr>
+<tr><th scope="row">Stop after N matches</th><td>Ends the search by itself. Blank or 0 searches until you press Stop.</td><td>Blank</td></tr>
+<tr><th scope="row">Clear clipboard after copying a seed</th><td>Seconds before a copied seed is wiped.</td><td>30</td></tr>
+<tr><th scope="row">Hide a revealed seed after</th><td>Seconds before a revealed seed is masked again.</td><td>15</td></tr>
+<tr><th scope="row">Rate hints</th><td>The last speed measured on each device, used for the estimate. <strong>Forget rate hints</strong> clears them.</td><td>None</td></tr>
+<tr><th scope="row">Data folder</th><td>Where the settings and results live. <strong>Open folder</strong> opens it.</td><td>None</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="more">Something not working?</h2>
+<p>See <a href="/support/">Support</a> for common problems. Building and packaging are covered in the <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">developer notes on GitHub</a>.</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

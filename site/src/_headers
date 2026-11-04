@@ -1,0 +1,12 @@
+# Cloudflare Pages: when several blocks match, their headers are added together.
+
+# The site makes no request to any other origin, and this keeps it that way even if a page is edited
+# carelessly or something is injected: the browser refuses it. No page may depend on inline code.
+/*
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+# The font file carries its package version in its name, so a new one is a new path.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

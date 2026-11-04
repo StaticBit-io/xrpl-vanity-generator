@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>XRPL Vanity: your word in an XRP Ledger address</title>
+<meta name="description" content="Generate an XRP Ledger address that contains the word you choose. Runs entirely offline on your CPU and GPU.">
+<!--@chrome:head-->
+<script type="module" src="/js/home.mjs"></script>
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main">
+
+<section class="hero">
+<div class="container stage">
+<div class="intro">
+<h1>Your word in an XRP Ledger address</h1>
+<p class="lead">XRPL Vanity searches keys on your CPU and GPU, fully offline.</p>
+<div class="actions">
+<button class="btn btn--primary" type="button" data-store disabled><span data-label>Get it from Microsoft Store</span> <span class="tag">soon</span></button>
+<a class="btn" href="https://github.com/StaticBit-io/xrpl-vanity-generator">Source on GitHub</a>
+</div>
+</div>
+<div class="art"><!--@glyph-field--></div>
+</div>
+</section>
+
+<section id="get" class="section">
+<div class="container">
+<div class="head-block">
+<h2>An address people can read</h2>
+<p class="lead">You get the address and the seed that controls it.</p>
+</div>
+<figure class="well diff">
+<div class="diff-head">--- a/address<br>+++ b/address</div>
+<p class="del"><code class="addr" data-example-address>rGx8uTnF5VqKj3dYpWm2bZsL7cRhN4eAaQ</code></p>
+<p class="add"><code class="addr" data-example-address>r<mark>DiAMond</mark>Hgs4kQe7tWvNpYcX3bLm9fZuT2</code></p>
+<figcaption>Examples only: no wallet will accept these addresses.</figcaption>
+</figure>
+</div>
+</section>
+
+<section id="modes" class="section">
+<div class="container">
+<div class="head-block">
+<h2>Put the word where you want it</h2>
+<p class="lead">Match the case exactly or ignore it. One search can hold several words.</p>
+</div>
+<div class="reference" role="region" aria-label="Match modes" tabindex="0">
+<table>
+<thead><tr><th scope="col">Mode</th><th scope="col">Finds</th></tr></thead>
+<tbody>
+<tr><th scope="row">Starts with</th><td><code>r<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">Starts at the 2nd or 3rd character</th><td><code>r9<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">Ends with</th><td><code>r...<mark>DiAMond</mark></code></td></tr>
+<tr><th scope="row">Contains</th><td><code>r...<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">Starts and ends with</th><td><code>r<mark>DiA</mark>...<mark>Mond</mark></code></td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">Each extra character multiplies the wait by up to 58. The desktop app shows the expected time before you start.</p>
+</div>
+</section>
+
+<section id="safe" class="section">
+<div class="container split-rows">
+<div class="head-block">
+<h2>Your seed stays on your computer</h2>
+<p class="lead">Whoever holds a seed controls the account.</p>
+</div>
+<dl class="rows">
+<div><dt>No network code</dt><dd>No account, server, telemetry or update check.</dd></div>
+<div><dt>Secure randomness</dt><dd>Keys come from the system's cryptographic generator.</dd></div>
+<div><dt>Safer in the desktop app</dt><dd>Results encrypted for your Windows account, seeds masked. The CLI prints seeds in plain text.</dd></div>
+<div><dt>QR instead of a file</dt><dd>Scan a wallet into the StaticBit app, with an optional password.</dd></div>
+<div><dt>Source you can read</dt><dd>Build it yourself before a key holds real funds.</dd></div>
+</dl>
+</div>
+</section>
+
+<section id="runs-on" class="section">
+<div class="container">
+<div class="head-block">
+<h2>What it runs on</h2>
+<p class="lead">A CPU handles short words. A GPU makes longer ones practical.</p>
+</div>
+<div class="reference" role="region" aria-label="Search hardware and measured rates" tabindex="0">
+<table>
+<thead><tr><th scope="col">Search on</th><th scope="col">Support</th><th scope="col" class="num">Candidates per second</th></tr></thead>
+<tbody>
+<tr><th scope="row">CPU</th><td>All cores or a set thread count</td><td class="num"><span data-source="docs/benchmarks.md" data-value="118,885">118,885</span><small>Core i5-11400F</small></td></tr>
+<tr><th scope="row">CUDA</th><td>NVIDIA, Turing (2018) or newer</td><td class="num"><span data-source="docs/benchmarks.md" data-value="32,375,668">32,375,668</span><small>RTX 5070 Ti</small></td></tr>
+<tr><th scope="row">OpenCL</th><td>Verified on NVIDIA.</td><td class="num"><span data-source="docs/benchmarks.md" data-value="32,211,960">32,211,960</span><small>RTX 5070 Ti</small></td></tr>
+</tbody>
+</table>
+</div>
+<div class="needs">
+<div><h3>Desktop app</h3><p>Windows 10 version 1809 or newer, x64, with the WebView2 runtime.</p></div>
+<div><h3>CLI</h3><p>Built from source with the .NET 10 SDK. Verified on Windows and Linux.</p></div>
+<div><h3>GPU load</h3><p>Use several devices at once, or cap the load and keep working.</p></div>
+</div>
+<p class="note">Ed25519 keys only. secp256k1 addresses are not supported.</p>
+</div>
+</section>
+
+<section class="band">
+<div class="container band-grid">
+<h2>Start with a word</h2>
+<div class="actions">
+<button class="btn btn--primary" type="button" data-store disabled><span data-label>Get it from Microsoft Store</span> <span class="tag">soon</span></button>
+<a class="btn" href="/cli/">Use the CLI</a>
+</div>
+</div>
+</section>
+
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

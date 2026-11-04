@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>CLI | XRPL Vanity</title>
+<meta name="description" content="How to build and run xrpl-vanity, the command-line search for XRP Ledger vanity addresses.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>xrpl-vanity CLI</h1>
+<p class="lead">The same search as the desktop app, from a terminal on Windows or Linux.</p>
+
+<h2 id="build">Build it</h2>
+<p>There are no prebuilt binaries: run it from source with the .NET 10 SDK.</p>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> git clone https://github.com/StaticBit-io/xrpl-vanity-generator.git
+<span class="prompt">$</span> cd xrpl-vanity-generator
+<span class="prompt">$</span> dotnet run --project src/XrplVanity.Cli -c Release -- --contains xrp --count 1</pre></div>
+<p>The first run builds the program. In the examples below, <code>xrpl-vanity</code> stands for <code>dotnet run --project src/XrplVanity.Cli -c Release --</code>.</p>
+
+<h2 id="search">Choose where the word goes</h2>
+<p>A bare word must appear at the start of the address, right after the leading <code>r</code>. A run can mix positions, and an address matches if any one pattern does.</p>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> xrpl-vanity ripple hodl xrp
+<span class="prompt">$</span> xrpl-vanity --ends xyz --contains dao
+<span class="prompt">$</span> xrpl-vanity --starts-ends abc:xyz
+<span class="prompt">$</span> xrpl-vanity --list words.txt 5</pre></div>
+<p><code>--starts-ends</code> needs both halves on the same address, so it costs as much as one word of their combined length. The last line loads its words from a file and keeps those of at least 5 characters.</p>
+
+<h2 id="flags">Options</h2>
+<div class="reference" role="region" aria-label="Command-line options" tabindex="0">
+<table>
+<thead><tr><th scope="col">Option</th><th scope="col">Default</th><th scope="col">What it does</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>--starts P</code></th><td>none</td><td>Match at the start of the address, after the <code>r</code>. Repeatable. Bare words do the same.</td></tr>
+<tr><th scope="row"><code>--near-start P</code></th><td>none</td><td>Let the word begin at the 2nd or 3rd character. Repeatable.</td></tr>
+<tr><th scope="row"><code>--ends P</code></th><td>none</td><td>Match at the end of the address. Repeatable.</td></tr>
+<tr><th scope="row"><code>--contains P</code></th><td>none</td><td>Match anywhere. Repeatable.</td></tr>
+<tr><th scope="row"><code>--starts-ends PREFIX:SUFFIX</code></th><td>none</td><td>Require a prefix and a suffix on the same address. Repeatable.</td></tr>
+<tr><th scope="row"><code>--near-starts-ends PREFIX:SUFFIX</code></th><td>none</td><td>The same, with the prefix allowed at the 2nd or 3rd character. Repeatable.</td></tr>
+<tr><th scope="row"><code>--list FILE [minLen]</code></th><td>minLen 4</td><td>Load words for the start of the address from a file.</td></tr>
+<tr><th scope="row"><code>--case-sensitive</code></th><td>off</td><td>Match exactly as typed. By default every case combination matches, for words of up to 12 characters.</td></tr>
+<tr><th scope="row"><code>--threads N</code></th><td>all cores</td><td>Worker threads for a CPU search. Ignored with <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--out FILE</code></th><td>none</td><td>Append matches to a file as well as printing them.</td></tr>
+<tr><th scope="row"><code>--count N</code></th><td>none</td><td>Stop after N matches. Otherwise the search runs until you press Ctrl+C.</td></tr>
+<tr><th scope="row"><code>--gpu</code></th><td>off</td><td>Search on the GPU: CUDA first, then OpenCL.</td></tr>
+<tr><th scope="row"><code>--backend NAME</code></th><td>none</td><td>Force <code>cuda</code> or <code>opencl</code>. Implies <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--device N</code></th><td>none</td><td>Pick a device by index. Implies <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--list-devices</code></th><td>none</td><td>List every device and exit.</td></tr>
+<tr><th scope="row"><code>--gpu-devices SPEC</code></th><td>none</td><td>Use several devices at once: <code>all</code>, <code>cuda</code>, <code>opencl</code>, or a comma-separated list. Implies <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--gpu-duty N</code></th><td>100</td><td>Keep the GPU busy about N% of the time, from 1–100.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="words">Which words work</h2>
+<p>Addresses use 58 characters. <code>0</code>, <code>O</code>, <code>I</code> and <code>l</code> do not exist, so your word is adjusted: <code>l</code> becomes <code>L</code>, <code>0</code> and <code>O</code> become <code>o</code>, and <code>I</code> becomes <code>i</code>. A word that still holds an impossible character is reported and skipped.</p>
+<p>Each extra character multiplies the wait, by up to 58 times with <code>--case-sensitive</code> and by less without it, because more spellings count as a match.</p>
+<p>The first character after the <code>r</code> is usually one of <code>pshnaf39wBUDNEGHJKLM4PQ</code>. A word that starts with anything else is about 23 times rarer than its length suggests. <code>--near-start</code> lets it begin one character later, which finds it about 24 times sooner.</p>
+
+<h2 id="gpu">Search on a GPU</h2>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> xrpl-vanity --list-devices
+<span class="prompt">$</span> xrpl-vanity --gpu --contains dao --count 1
+<span class="prompt">$</span> xrpl-vanity --gpu-devices cuda --starts abc
+<span class="prompt">$</span> xrpl-vanity --gpu --gpu-duty 80 --contains dao --count 1 --out dao.tsv</pre></div>
+<p>Every GPU hit is derived again on the CPU, and only printed if the two agree, so a faulty device costs speed and never gives you a wrong key. Without a usable device, <code>--gpu</code> exits with code 2 rather than falling back to the CPU.</p>
+<p>The first OpenCL run can take tens of seconds while the driver compiles the program. Later runs are fast. <code>--gpu-duty</code> leaves room for other applications, and speed drops roughly in proportion. <code>--gpu-devices all</code> opens each card once per backend, so use <code>--gpu-devices cuda</code> for every NVIDIA card once.</p>
+
+<h2 id="output">Results and exit codes</h2>
+<p>Each match is one line on your terminal:</p>
+<div class="well" tabindex="0"><pre>Address: r...	Seed: sEd...</pre></div>
+<p><code>--out FILE</code> appends the same pair, separated by a tab, without the labels. Warnings and the final speed go to stderr, so piping stdout gives you matches alone.</p>
+<p><strong>Anyone who holds the seed controls the account.</strong> Matches are in plain text, on your terminal and in that file, and nowhere else. Keep them private.</p>
+<div class="reference" role="region" aria-label="Exit codes" tabindex="0">
+<table>
+<thead><tr><th scope="col">Code</th><th scope="col">Meaning</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>0</code></th><td>The <code>--count</code> target was met.</td></tr>
+<tr><th scope="row"><code>2</code></th><td>Invalid usage, no reachable pattern, no usable GPU, or a failed search.</td></tr>
+<tr><th scope="row"><code>130</code></th><td>Ended by Ctrl+C before a <code>--count</code> target was met.</td></tr>
+</tbody>
+</table>
+</div>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>
