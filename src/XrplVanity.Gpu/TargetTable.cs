@@ -17,8 +17,15 @@ public sealed class TargetTable
     public const uint PositionStarts = 0;
     public const uint PositionEnds = 1;
     public const uint PositionContains = 2;
-    public const uint PositionPairStarts = 3;
-    public const uint PositionPairEnds = 4;
+    public const uint PositionNearStart = 3;
+
+    // Pair halves sit above every plain position: the device's or-loop skips any code from
+    // PositionPairStarts up, so a half can never match on its own.
+    public const uint PositionPairStarts = 4;
+    public const uint PositionPairEnds = 5;
+
+    /// <summary>The starts half of a pair rule that may also begin at the body's second character.</summary>
+    public const uint PositionPairNearStarts = 6;
 
     private TargetTable(uint[] groups, byte[] chars, uint[] pairs)
     {
@@ -53,6 +60,7 @@ public sealed class TargetTable
                 MatchPosition.Starts => PositionStarts,
                 MatchPosition.Ends => PositionEnds,
                 MatchPosition.Contains => PositionContains,
+                MatchPosition.NearStart => PositionNearStart,
                 // A pair half must never reach the or-loop as a plain group; EnumerateTargets
                 // does not yield one, and this fails closed if that ever changes.
                 _ => throw new ArgumentOutOfRangeException(nameof(patterns), position,
@@ -80,7 +88,7 @@ public sealed class TargetTable
         List<((uint Position, string SortedVariants) StartsKey, (uint Position, string SortedVariants) EndsKey)> pairKeys = new(patterns.Pairs.Count);
         foreach (PatternSet.Pair pair in patterns.Pairs)
         {
-            (uint Position, string SortedVariants) startsKey = PairHalfKey(PositionPairStarts, pair.Starts);
+            (uint Position, string SortedVariants) startsKey = PairHalfKey(pair.NearStart ? PositionPairNearStarts : PositionPairStarts, pair.Starts);
             (uint Position, string SortedVariants) endsKey = PairHalfKey(PositionPairEnds, pair.Ends);
 
             if (!pairGroups.ContainsKey(startsKey))

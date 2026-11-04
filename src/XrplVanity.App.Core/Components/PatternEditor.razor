@@ -18,8 +18,18 @@
         {
           <span class="chip-pos">starts</span>
           <span class="mono">@chip.Text</span>
+          @if (chip.NearStart)
+          {
+            <span class="chip-pos chip-near" title="the starts half may begin at the 2nd or 3rd character of the address">2nd–3rd</span>
+          }
           <span class="chip-pos">ends</span>
           <span class="mono">@chip.EndsText</span>
+        }
+        else if (chip.Position == MatchPosition.NearStart)
+        {
+          <span class="chip-pos">starts</span>
+          <span class="mono">@chip.Text</span>
+          <span class="chip-pos chip-near" title="may begin at the 2nd or 3rd character of the address">2nd–3rd</span>
         }
         else
         {
@@ -29,6 +39,10 @@
         @if (chip.Normalized is not null) { <span class="chip-normalized mono" title="0, O, I and l do not exist in the XRPL alphabet, so they are folded onto o, o, i and L">→ @chip.Normalized</span> }
         @if (!chip.IgnoreCase) { <span class="chip-pos" title="case-sensitive">Aa</span> }
         @if (chip.Warning is not null) { <span class="chip-warn">@chip.Warning</span> }
+        @if (chip.NearStartSpeedup is double speedup)
+        {
+          <button class="chip-speedup t" title="The first character can rarely follow the r. Allow the pattern at the 2nd or 3rd character of the address." @onclick="() => Vm.AllowNearStart(chip)">≈@(speedup.ToString("0"))× sooner at 2nd–3rd</button>
+        }
         <button class="remove" title="Remove" @onclick="() => Vm.RemovePattern(chip)">×</button>
       </span>
     }
@@ -58,12 +72,20 @@
     {
       <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
     }
-    <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
-    <label class="btn-secondary-dark t">
-      load list…
-      <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
-    </label>
-    <button class="save-list btn-secondary-dark t" disabled="@(chips.Count == 0)" @onclick="OnSaveList">save list…</button>
+    <div class="entry-tools">
+      <div class="entry-flags">
+        <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
+        @if (SearchViewModel.AllowsNearStart(Vm.EntryPosition))
+        {
+          <label class="near-label" title="The pattern may begin at the 2nd or 3rd character of the address: r?WORD…"><input class="near-start" type="checkbox" @bind="Vm.EntryNearStart" /> 2nd or 3rd char</label>
+        }
+      </div>
+      <label class="btn-secondary-dark t">
+        load list…
+        <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
+      </label>
+      <button class="save-list btn-secondary-dark t" disabled="@(chips.Count == 0)" @onclick="OnSaveList">save list…</button>
+    </div>
   </div>
   @if (_listError is not null)
   {
@@ -80,5 +102,9 @@
   @if (Vm.PatternHint is not null)
   {
     <div class="pattern-hint">@Vm.PatternHint</div>
+  }
+  @if (Vm.NearStartHint is not null)
+  {
+    <div class="near-start-hint">@Vm.NearStartHint</div>
   }
 </div>

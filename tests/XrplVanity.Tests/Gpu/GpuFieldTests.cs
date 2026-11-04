@@ -101,6 +101,25 @@ public class GpuFieldTests
         }
     }
 
+    /// <summary>
+    /// A field element is only required to be congruent to its value and to fit in eight
+    /// limbs; it is not required to be reduced. Reduction costs a quarter of the kernel's run
+    /// time when it happens after every operation, so it happens once, in fe_to_bytes. Every
+    /// operation must therefore accept an input no canonical invariant could have produced.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Operations_Accept_Unreduced_Inputs(string backend)
+    {
+        BigInteger[] a = { P, P + 1, P + 37, 2 * P, 2 * P + 37, BigInteger.Pow(2, 256) - 1, BigInteger.Pow(2, 255) };
+        BigInteger[] b = { P + 5, 2 * P, P, BigInteger.Pow(2, 256) - 2, P + 1, P + 19, 2 * P + 1 };
+
+        AssertEach(RunOp(backend, OpAdd, a, b), Map(a, b, (x, y) => (x + y) % P));
+        AssertEach(RunOp(backend, OpSub, a, b), Map(a, b, (x, y) => ((x - y) % P + P) % P));
+        AssertEach(RunOp(backend, OpMul, a, b), Map(a, b, (x, y) => (x * y) % P));
+        AssertEach(RunOp(backend, OpSqr, a, b), Map(a, b, (x, _) => (x * x) % P));
+    }
+
     [Theory]
     [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
     public void Canon_Reduces_Any_256_Bit_Value(string backend)

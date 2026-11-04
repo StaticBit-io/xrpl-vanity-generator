@@ -79,7 +79,7 @@ linux/**    text eol=lf
 Then renormalise and re-checkout so the working tree matches:
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 git add .gitattributes
 git add --renormalize .
 git status --short | head          # expect only .gitattributes staged (index was already LF)
@@ -446,7 +446,7 @@ Make both scripts executable in git: `git update-index --chmod=+x linux/run-linu
 - [ ] **Step 2: First run — CPU mode**
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 bash linux/run-linux-tests.sh --cpu-only 2>&1 | tee /tmp/linux-cpu.log
 ```
 
@@ -489,7 +489,7 @@ git commit -m "feat(linux): Docker test harness with pocl; the suite runs on Lin
 - [ ] **Step 1: Run the default (GPU) mode**
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 bash linux/run-linux-tests.sh 2>&1 | tee /tmp/linux-gpu.log
 ```
 

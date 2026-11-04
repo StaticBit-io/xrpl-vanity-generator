@@ -17,9 +17,12 @@ secp256k1 vanity address, this is not the tool for that.
 Requires the .NET 10 SDK.
 
 ```bash
-dotnet build -c Release
 dotnet run --project src/XrplVanity.Cli -c Release -- --contains xrp --count 1
 ```
+
+The first run builds the program. In the examples below, `xrpl-vanity` stands for `dotnet run --project src/XrplVanity.Cli -c Release --`. To build everything except the Windows
+desktop application, which needs the `maui-windows` workload, use
+`dotnet build XrplVanity.Portable.slnf -c Release`.
 
 ## Match modes
 
@@ -32,7 +35,7 @@ Patterns can be anchored to the start of the address (right after the leading
 xrpl-vanity ripple hodl xrp
 
 # roulette — patterns loaded from a word list, minimum length 5
-xrpl-vanity --list google20kwords 5
+xrpl-vanity --list words.txt 5
 
 # suffix / anywhere — mix positions in a single run
 xrpl-vanity --ends xyz --contains dao
@@ -58,10 +61,12 @@ rather than searched for.
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | positional words | — | patterns for the `starts` bucket |
-| `--starts P...` | — | patterns to match at address start (after `r`) |
-| `--ends P...` | — | patterns to match at address end |
-| `--contains P...` | — | patterns to match anywhere |
+| `--starts P` | — | a pattern to match at address start, after `r` (repeatable) |
+| `--near-start P` | — | a pattern that may begin at the 2nd or 3rd address character (`rWORD…` or `r?WORD…`); see below (repeatable) |
+| `--ends P` | — | a pattern to match at address end (repeatable) |
+| `--contains P` | — | a pattern to match anywhere (repeatable) |
 | `--starts-ends PREFIX:SUFFIX` | — | requires both a prefix and a suffix on the same address (repeatable) |
+| `--near-starts-ends PREFIX:SUFFIX` | — | as `--starts-ends`, but the prefix may begin at the 2nd or 3rd address character (repeatable) |
 | `--list FILE [minLen]` | — | load `starts` patterns from a word list, optional min length filter (default 4) |
 | `--case-sensitive` | off (case-insensitive) | match the pattern exactly as typed; by default every case combination is matched |
 | `--threads N` | `ProcessorCount` | number of worker threads (CPU path only; ignored with `--gpu`) |
@@ -99,6 +104,23 @@ patterns of at most 12 characters (up to 2^12 combinations). A longer
 pattern is still searched, but case-sensitively — the tool prints a warning
 saying so. Pass `--case-sensitive` to match any pattern exactly as typed.
 
+### Starting one character later
+
+The character right after the leading `r` of a 34-character address can only
+be one of `pshnaf39wBUDNEGHJKLM4PQ`: the address encodes a 192-bit number,
+and 2^192 is only about 23.3 times 58^32. Any other first character (`X`,
+`S`, `A`, `x`, ...) appears there only in the rare 33-character addresses, so
+`--starts XRPLFILE --case-sensitive` takes about 23 times longer than an
+8-character prefix normally would. The third character has no such bias.
+`--near-start XRPLFILE` also accepts the pattern one character later
+(`r?XRPLFiLE...`), which finds it about 24 times sooner; for a first
+character that can follow the `r` it gains only about 1.4 times.
+`--near-starts-ends XRPL:FILE` does the same for the prefix half of a pair
+(`r?XRPL...FiLE`) and gains the same factor; the suffix stays at the end.
+The desktop app offers the same choice as the "2nd or 3rd char" box in both
+`starts with` and `starts and ends with` modes, and suggests it on any chip
+that would gain at least 2 times.
+
 ## Exit codes
 
 `0` — a `--count` target was fully satisfied. `2` — invalid usage (unknown
@@ -134,7 +156,7 @@ a long search runs, pass `--gpu-duty N`: after every launch (about 50 ms on the
 reference card) the search sleeps for `launch time × (100 − N) / N`, so the device is
 busy about N% of wall time on average and idle otherwise. A launch is never
 interrupted, so the granularity is one launch; throughput drops roughly in
-proportion (`--gpu-duty 80` gave ~13.5 million candidates/s where 100% gives ~19.4).
+proportion.
 The flag applies to `--gpu`, `--backend`/`--device` and every device of
 `--gpu-devices`. Measured utilisation is in [`docs/benchmarks.md`](docs/benchmarks.md).
 
@@ -163,9 +185,9 @@ longest-verified path) and OpenCL. `--gpu` without `--backend` opens the
 first usable device in preference order — CUDA, then OpenCL. CUDA is tried
 first because its program ships precompiled (PTX, no run-time compilation
 and no dependence on the vendor's OpenCL compiler — a cold OpenCL compile
-takes 30–40 s on the reference card). On the reference RTX 5070 Ti, the
-OpenCL backend measured slightly faster (OpenCL ~12.1M/s vs. CUDA ~10.7M/s
-in CLI runs), so pass `--backend opencl` to select it, optionally with
+takes 30–40 s on the reference card). On the reference RTX 5070 Ti, the two
+backends measured within 1% of each other (see `docs/benchmarks.md`). Pass
+`--backend opencl` to select OpenCL, optionally with
 `--device N` to pick a specific device within it; run `--list-devices` first
 to see what is available and at which flat index (`--device N` without
 `--backend` indexes that flat list). The OpenCL backend compiles the kernel

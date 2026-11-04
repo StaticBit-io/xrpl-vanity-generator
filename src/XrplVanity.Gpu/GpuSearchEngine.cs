@@ -16,6 +16,13 @@ public sealed class GpuSearchEngine : IDisposable
     public const int HitCapacity = 4096;
     public const int CandidatesPerLaunch = 1 << 20;
     public const int SubLaunchSize = 1 << 16;
+
+    /// <summary>
+    /// Candidates each device thread derives before one shared field inversion serves the
+    /// whole group. Must equal SEARCH_BATCH in the kernel body; KernelSourceTests pins them
+    /// together, because a mismatch would silently skip or repeat candidates.
+    /// </summary>
+    public const int CandidateBatch = 4;
     private const int HitRecordSize = 52;
     private const int BlockSize = 128;
     private const int TableBytes = 256 * 96;
@@ -92,7 +99,8 @@ public sealed class GpuSearchEngine : IDisposable
         for (int offset = 0; offset < CandidatesPerLaunch; offset += SubLaunchSize)
         {
             int count = Math.Min(SubLaunchSize, CandidatesPerLaunch - offset);
-            _device.Launch(_search, count, BlockSize,
+            int threads = (count + CandidateBatch - 1) / CandidateBatch;
+            _device.Launch(_search, threads, BlockSize,
                 _key, start + (ulong)offset, count, _groups, _groupCount, _chars, _pairs, _pairCount, _hits, _hitCount, HitCapacity, _table);
             _device.Synchronize();
         }

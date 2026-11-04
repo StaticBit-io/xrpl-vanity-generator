@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using XrplVanity.Core;
 
 namespace XrplVanity.Search;
@@ -53,6 +54,32 @@ public static class SearchEstimator
         return shorter;
     }
 
+    /// <summary>Probability that the body starts with <paramref name="value"/>.</summary>
+    public static double StartsProbability(string value) =>
+        LeadingCharacterProbability(value[0]) * Math.Pow(AlphabetSize, -(value.Length - 1));
+
+    /// <summary>
+    /// How many times sooner a pattern is expected to match as <see cref="MatchPosition.NearStart"/>
+    /// than as <see cref="MatchPosition.Starts"/>, given the characters its case variants can begin
+    /// with. Only the first character matters: every variant has the same length and the rest of
+    /// it costs the same at either offset. About 24 when none of them can follow the leading 'r'
+    /// of a full-length address, about 1.4 when all of them can.
+    /// </summary>
+    public static double NearStartSpeedup(IReadOnlyCollection<char> firstCharacters)
+    {
+        ArgumentNullException.ThrowIfNull(firstCharacters);
+        double starts = 0;
+        double near = 0;
+        foreach (char c in firstCharacters)
+        {
+            double p = LeadingCharacterProbability(c);
+            starts += p;
+            near += p + 1.0 / AlphabetSize;
+        }
+
+        return starts > 0 ? near / starts : 1;
+    }
+
     public static double? ExpectedCandidatesPerMatch(PatternSet patterns)
     {
         ArgumentNullException.ThrowIfNull(patterns);
@@ -65,9 +92,14 @@ public static class SearchEstimator
         double probability = 0;
         foreach ((MatchPosition position, string value) in patterns.EnumerateTargets())
         {
-            double single = position == MatchPosition.Starts
-                ? LeadingCharacterProbability(value[0]) * Math.Pow(AlphabetSize, -(value.Length - 1))
-                : Math.Pow(AlphabetSize, -value.Length);
+            double single = position switch
+            {
+                MatchPosition.Starts => StartsProbability(value),
+                // One character later the leading-digit bias is gone, so the second offset costs
+                // a plain 58^-n; a value matching at both offsets at once is ignored like overlaps.
+                MatchPosition.NearStart => StartsProbability(value) + Math.Pow(AlphabetSize, -value.Length),
+                _ => Math.Pow(AlphabetSize, -value.Length),
+            };
             probability += position == MatchPosition.Contains
                 ? Math.Max(bodyLength - value.Length + 1, 1) * single
                 : single;
@@ -78,7 +110,11 @@ public static class SearchEstimator
             double startsProbability = 0;
             foreach (string variant in pair.Starts)
             {
-                startsProbability += LeadingCharacterProbability(variant[0]) * Math.Pow(AlphabetSize, -(pair.StartsLength - 1));
+                startsProbability += StartsProbability(variant);
+                if (pair.NearStart)
+                {
+                    startsProbability += Math.Pow(AlphabetSize, -variant.Length);
+                }
             }
 
             // The two halves sit at fixed, non-overlapping ends of the body, so they are

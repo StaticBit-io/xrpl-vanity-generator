@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Privacy | XRPL Vanity</title>
+<meta name="description" content="The XRPL Vanity desktop application collects nothing and sends nothing. What it stores on your computer, and what this website does.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Privacy policy</h1>
+<p class="lead">XRPL Vanity, the desktop application for Windows, published by StaticBit.</p>
+<p>Last updated: 2026-11-04.</p>
+<section data-policy="summary">
+<h2>Summary</h2>
+<p>The application collects nothing, sends nothing, and has no account system. It has no network code at all: no telemetry, no analytics, no crash reporting, no update check, no licence check. Everything it produces stays on the computer that produced it.</p>
+</section>
+<section data-policy="what-the-application-stores">
+<h2>What the application stores</h2>
+<p>Both files live in the application's own local data folder. The Settings page prints the resolved path and opens the folder on request.</p>
+<div class="reference" role="region" aria-label="Stored files" tabindex="0">
+<table>
+<thead><tr><th scope="col">File</th><th scope="col">Contents</th><th scope="col">Protection</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>settings.json</code></th><td>Interface preferences: pattern and target drafts, thread count, GPU duty, match limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, and the last measured search rate per device.</td><td>Plain JSON. It holds no keys and no personal data.</td></tr>
+<tr><th scope="row"><code>results.dat</code></th><td>The generated addresses and their seeds.</td><td>Encrypted with the Windows Data Protection API (DPAPI) under <code>CurrentUser</code> scope, so only the Windows account that wrote the file can decrypt it.</td></tr>
+</tbody>
+</table>
+</div>
+<p>A seed is the secret that controls an XRP Ledger account. <code>results.dat</code> is the only file the application writes that contains one. No seed is ever written to a log, shown in a notification, or placed in the tray menu.</p>
+<p>If you export results to a TSV file, that file contains seeds in plain text. It is written where you ask for it, and it is not encrypted — protecting it is up to you.</p>
+</section>
+<section data-policy="clipboard">
+<h2>Clipboard</h2>
+<p>Copying a seed places it on the Windows clipboard and clears it after a delay you configure, and only if the clipboard still holds that same seed. Copying anything else in the meantime leaves your newer content alone.</p>
+</section>
+<section data-policy="qr-codes">
+<h2>QR codes</h2>
+<p>A result can be shown as a QR code for the StaticBit mobile wallet. A password is optional and encrypts the code; without one the code on your screen is not encrypted, and anyone who can see or photograph it can read the seed. A code holding a bare seed is never encrypted. The code is never written to disk and hides itself after 60 seconds.</p>
+</section>
+<section data-policy="network">
+<h2>Network</h2>
+<p>The application makes no network connections. The only traffic it can cause is a link you click yourself in the About section or elsewhere in the interface, which opens in your default browser; from that point the destination site's own privacy policy applies. The address search itself never contacts the XRP Ledger or any server — it generates and tests candidates entirely offline.</p>
+</section>
+<section data-policy="this-website">
+<h2>This website</h2>
+<p>This site loads only its own files. It sets no cookies and runs no analytics.</p>
+</section>
+<section data-policy="children">
+<h2>Children</h2>
+<p>The application is not directed at children and collects no information from anyone.</p>
+</section>
+<section data-policy="removing-your-data">
+<h2>Removing your data</h2>
+<p>Uninstalling removes the application. To delete the stored results first, use <strong>Open folder</strong> on the Settings page and delete <code>results.dat</code> and <code>settings.json</code>.</p>
+</section>
+<section data-policy="contact">
+<h2>Contact</h2>
+<p>Questions about this policy: <!--@support-email--></p>
+</section>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

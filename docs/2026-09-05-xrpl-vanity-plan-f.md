@@ -2396,7 +2396,7 @@ Expected: all passed. Then the full suite once (`dotnet run --project tests/Xrpl
 
 `README.md`, in the normalization section after the alphabet sentence, add: "The character right after the leading `r` is not uniform: it is one of `pshnaf39wBUDNEGHJKLM4P` about 94% of the time, `Q` about 1.5%, and anything else only about 0.07% each — so a prefix that starts with, say, `c` or `z` is roughly 58 times rarer than one that starts with `a`."
 
-Run the documentation validator on the three Markdown files: `PYTHONIOENCODING=utf-8 python "C:/Users/Evril/.claude/skills/developer-documentation/scripts/validate_docs.py" docs/benchmarks.md docs/2026-09-05-xrpl-vanity-desktop-design.md README.md`.
+Run the documentation validator on the three Markdown files: `PYTHONIOENCODING=utf-8 python validate_docs.py docs/benchmarks.md docs/2026-09-05-xrpl-vanity-desktop-design.md README.md`.
 
 - [ ] **Step 6: Commit**
 

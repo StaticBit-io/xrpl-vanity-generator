@@ -6,7 +6,9 @@ namespace XrplVanity.App.Core.ViewModels;
 /// The one place that knows the on-disk shape of a pattern list, so what "save list…" writes and
 /// what "load list…" reads can never drift apart. Fields are tab-separated:
 /// <c>ends&#9;RRRRRRRR</c>, a case-sensitive chip adding the <c>Aa</c> marker the chip itself wears,
-/// and a pair spelling both halves as <c>starts&#9;static&#9;ends&#9;bit</c>. A line with no tab at
+/// a pair spelling both halves as <c>starts&#9;static&#9;ends&#9;bit</c>, and a pattern allowed at
+/// the 2nd or 3rd character as <c>nearstart&#9;XRPLFILE</c> (a pair as
+/// <c>nearstart&#9;XRPL&#9;ends&#9;FILE</c>). A line with no tab at
 /// all is a plain word from the older word lists (the CLI's <c>--list</c> format) and stays one.
 /// </summary>
 public static class PatternListFormat
@@ -17,7 +19,7 @@ public static class PatternListFormat
     {
         string suffix = chip.IgnoreCase ? string.Empty : "\t" + CaseSensitiveMarker;
         return chip.Position == MatchPosition.Pair
-            ? $"starts\t{chip.Text}\tends\t{chip.EndsText}{suffix}"
+            ? $"{(chip.NearStart ? "nearstart" : "starts")}\t{chip.Text}\tends\t{chip.EndsText}{suffix}"
             : $"{chip.Position.ToString().ToLowerInvariant()}\t{chip.Text}{suffix}";
     }
 
@@ -60,10 +62,11 @@ public static class PatternListFormat
 
         if (count == 4)
         {
-            if (!string.Equals(fields[0], "starts", StringComparison.OrdinalIgnoreCase)) return false;
+            bool nearStart = string.Equals(fields[0], "nearstart", StringComparison.OrdinalIgnoreCase);
+            if (!nearStart && !string.Equals(fields[0], "starts", StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(fields[2], "ends", StringComparison.OrdinalIgnoreCase)) return false;
             if (fields[1].Length == 0 || fields[3].Length == 0) return false;
-            chip = new PatternChip(fields[1], MatchPosition.Pair, ignoreCase, fields[3]);
+            chip = new PatternChip(fields[1], MatchPosition.Pair, ignoreCase, fields[3]) { NearStart = nearStart };
             return true;
         }
 
@@ -77,6 +80,7 @@ public static class PatternListFormat
             case "starts": position = MatchPosition.Starts; return true;
             case "ends": position = MatchPosition.Ends; return true;
             case "contains": position = MatchPosition.Contains; return true;
+            case "nearstart": position = MatchPosition.NearStart; return true;
             default: position = default; return false;
         }
     }

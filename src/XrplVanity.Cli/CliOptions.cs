@@ -9,7 +9,7 @@ namespace XrplVanity.Cli;
 public sealed class CliOptions
 {
     public required IReadOnlyList<(MatchPosition Position, string Pattern)> Patterns { get; init; }
-    public required IReadOnlyList<(string Starts, string Ends)> Pairs { get; init; }
+    public required IReadOnlyList<(string Starts, string Ends, bool NearStart)> Pairs { get; init; }
     public bool CaseSensitive { get; init; }
     public bool Gpu { get; init; }
     public int Threads { get; init; } = Environment.ProcessorCount;
@@ -27,7 +27,7 @@ public sealed class CliOptions
     public static CliOptions Parse(string[] args)
     {
         List<(MatchPosition, string)> patterns = new();
-        List<(string, string)> pairs = new();
+        List<(string, string, bool)> pairs = new();
         bool caseSensitive = false;
         bool gpu = false;
         int threads = Environment.ProcessorCount;
@@ -50,6 +50,9 @@ public sealed class CliOptions
                 case "--starts":
                     patterns.Add((MatchPosition.Starts, Next(args, ref i, arg)));
                     break;
+                case "--near-start":
+                    patterns.Add((MatchPosition.NearStart, Next(args, ref i, arg)));
+                    break;
                 case "--ends":
                     patterns.Add((MatchPosition.Ends, Next(args, ref i, arg)));
                     break;
@@ -57,7 +60,10 @@ public sealed class CliOptions
                     patterns.Add((MatchPosition.Contains, Next(args, ref i, arg)));
                     break;
                 case "--starts-ends":
-                    pairs.Add(ParsePair(Next(args, ref i, arg)));
+                    pairs.Add(ParsePair(Next(args, ref i, arg), arg, nearStart: false));
+                    break;
+                case "--near-starts-ends":
+                    pairs.Add(ParsePair(Next(args, ref i, arg), arg, nearStart: true));
                     break;
                 case "--case-sensitive":
                     caseSensitive = true;
@@ -171,15 +177,15 @@ public sealed class CliOptions
         return args[++i];
     }
 
-    private static (string, string) ParsePair(string value)
+    private static (string, string, bool) ParsePair(string value, string option, bool nearStart)
     {
         string[] halves = value.Split(':');
         if (halves.Length != 2 || halves[0].Trim().Length == 0 || halves[1].Trim().Length == 0)
         {
-            throw new ArgumentException("Option '--starts-ends' needs PREFIX:SUFFIX, for example abc:xyz.");
+            throw new ArgumentException($"Option '{option}' needs PREFIX:SUFFIX, for example abc:xyz.");
         }
 
-        return (halves[0].Trim(), halves[1].Trim());
+        return (halves[0].Trim(), halves[1].Trim(), nearStart);
     }
 
     private static int NextInt(string[] args, ref int i, string option)

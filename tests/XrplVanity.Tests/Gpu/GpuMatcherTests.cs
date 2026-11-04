@@ -157,6 +157,71 @@ public class GpuMatcherTests
 
     [Theory]
     [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void The_Device_Agrees_With_The_Cpu_On_NearStart_Patterns(string backend)
+    {
+        PatternSet set = new PatternSet.Builder()
+            .Add(MatchPosition.NearStart, "X", ignoreCase: false)
+            .Add(MatchPosition.NearStart, "abc", ignoreCase: true)
+            .Build();
+
+        // Offset 0, offset 1, offset 2 (no match), and bodies with room for offset 0 only.
+        List<string> addresses = new()
+        {
+            "rXQQQQQQQQ", "rQXQQQQQQQ", "rQQXQQQQQQ", "rX", "rQX", "rQQ",
+            "rAbCQQQQQQ", "rQaBcQQQQQ", "rQQabcQQQQ", "rabc", "rQab",
+        };
+        addresses.AddRange(DeriveAddresses(20_000, 20261102));
+
+        string[] corpus = addresses.ToArray();
+        byte[] deviceFlags = MatchOnDevice(backend, Records(corpus), corpus.Length, TargetTable.Build(set));
+
+        int hits = 0;
+        for (int i = 0; i < corpus.Length; i++)
+        {
+            bool cpu = set.TryMatch(corpus[i], out _, out _);
+            Assert.True(cpu == (deviceFlags[i] == 1), $"index {i} {corpus[i]}: cpu={cpu} gpu={deviceFlags[i]}");
+            if (cpu) hits++;
+        }
+
+        Assert.Equal(new byte[] { 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0 }, deviceFlags[..11]);
+        Assert.True(hits > 200, $"only {hits} hits; 'X' one character in should hit about 1 in 58");
+    }
+
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void The_Device_Agrees_With_The_Cpu_On_NearStart_Pairs(string backend)
+    {
+        // "X..Z" shares its starts half with "X..Y" but not the near-start choice, so the device
+        // must keep the two halves in separate groups.
+        PatternSet set = new PatternSet.Builder()
+            .AddPair("X", "Y", ignoreCase: false, nearStart: true)
+            .AddPair("X", "Z", ignoreCase: false)
+            .AddPair("ab", "cd", ignoreCase: true, nearStart: true)
+            .Build();
+
+        // Offsets 0, 1, 2; halves touching at each offset; the plain pair one character in;
+        // a case-folded pair one character in.
+        List<string> addresses = new()
+        {
+            "rXQQQQY", "rQXQQQY", "rQQXQQY", "rXY", "rQXY", "rXQ",
+            "rQXQQZ", "rXQQQZ", "rQaBQQCd", "rQQabcd",
+        };
+        addresses.AddRange(DeriveAddresses(20_000, 20261103));
+
+        string[] corpus = addresses.ToArray();
+        byte[] deviceFlags = MatchOnDevice(backend, Records(corpus), corpus.Length, TargetTable.Build(set));
+
+        for (int i = 0; i < corpus.Length; i++)
+        {
+            bool cpu = set.TryMatch(corpus[i], out _, out _);
+            Assert.True(cpu == (deviceFlags[i] == 1), $"index {i} {corpus[i]}: cpu={cpu} gpu={deviceFlags[i]}");
+        }
+
+        Assert.Equal(new byte[] { 1, 1, 0, 1, 1, 0, 0, 1, 1, 0 }, deviceFlags[..10]);
+    }
+
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
     public void Empty_Table_Matches_Nothing(string backend)
     {
         string[] addresses = DeriveAddresses(64, 7);

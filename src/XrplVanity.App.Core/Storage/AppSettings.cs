@@ -7,8 +7,10 @@ namespace XrplVanity.App.Core.Storage;
 /// <c>MatchPosition.Pair</c> draft and null for every other position; it is trailing and optional
 /// so a settings file written before paired patterns existed still deserializes, and a Pair draft
 /// that arrives without it is dropped on restore rather than rebuilt as half a rule.
+/// <paramref name="NearStart"/> marks a Pair draft whose starts half may begin at the 2nd or 3rd
+/// character; trailing and optional for the same reason.
 /// </summary>
-public sealed record PatternDraft(string Text, string Position, bool IgnoreCase, string? EndsText = null);
+public sealed record PatternDraft(string Text, string Position, bool IgnoreCase, string? EndsText = null, bool NearStart = false);
 
 public sealed record AppSettings
 {

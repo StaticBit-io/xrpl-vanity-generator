@@ -72,7 +72,7 @@ xrpl-vanity/
 - [ ] **Step 1: Create the projects and solution**
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 dotnet new classlib -n XrplVanity.Core -o src/XrplVanity.Core -f net10.0
 dotnet new xunit3 -n XrplVanity.Tests -o tests/XrplVanity.Tests -f net10.0
 dotnet new sln -n XrplVanity
@@ -1074,7 +1074,7 @@ git commit -m "feat: single-candidate evaluator (the GPU-shared semantics unit)"
 - [ ] **Step 1: Create the CLI project and wire references**
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 dotnet new console -n XrplVanity.Cli -o src/XrplVanity.Cli -f net10.0
 rm -f src/XrplVanity.Cli/Program.cs
 dotnet sln add src/XrplVanity.Cli/XrplVanity.Cli.csproj

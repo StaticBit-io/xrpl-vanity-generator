@@ -20,3 +20,7 @@ app/*.cer
 
 # Worktrees created for feature work.
 .worktrees/
+
+# Output of site/build.mjs.
+site/dist/
+site/.wrangler/

@@ -1,6 +1,10 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using XrplVanity.Core;
 using XrplVanity.Gpu;
 using Xunit;
@@ -14,6 +18,107 @@ public class GpuSearchTests
     public GpuSearchTests(ITestOutputHelper output)
     {
         _output = output;
+    }
+
+    /// <summary>
+    /// Each device thread derives a batch of candidates so that one field inversion can
+    /// serve all of them, which means the launch divides the range by the batch size. Get
+    /// that divisor wrong and the search silently skips or repeats counters while every
+    /// address it does return still verifies. Drive k_search over a known key and counter
+    /// range and require its hits to be exactly the hits a CPU scan of the same counters
+    /// finds: no gaps, no repeats.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Search_Covers_Every_Counter_In_The_Range_Exactly_Once(string backend)
+    {
+        const int Count = 8192;
+        const ulong Start = 1_234_567_890UL;
+        byte[] key = new byte[32];
+        for (int i = 0; i < key.Length; i++)
+        {
+            key[i] = (byte)(i * 7 + 1);
+        }
+
+        PatternSet patterns = new PatternSet.Builder().Add(MatchPosition.Starts, "a", ignoreCase: false).Build();
+
+        HashSet<string> expected = ExpectedHits(key, Start, Count, patterns);
+        Assert.True(expected.Count > 100, $"the pattern must hit often enough to be sensitive; got {expected.Count}");
+
+        List<string> actual = DeviceHits(backend, key, Start, Count, patterns);
+
+        Assert.Equal(actual.Count, actual.Distinct().Count());
+        Assert.Equal(expected.OrderBy(h => h, StringComparer.Ordinal), actual.OrderBy(h => h, StringComparer.Ordinal));
+    }
+
+    /// <summary>The same PRF and derivation the kernel runs, counter by counter, on the CPU.</summary>
+    private static HashSet<string> ExpectedHits(byte[] key, ulong start, int count, PatternSet patterns)
+    {
+        BouncyCastleDeriver deriver = new();
+        HashSet<string> hits = new(StringComparer.Ordinal);
+        byte[] message = new byte[40];
+        key.CopyTo(message, 0);
+        Span<char> address = stackalloc char[48];
+        Span<byte> digest = stackalloc byte[64];
+        for (int i = 0; i < count; i++)
+        {
+            BinaryPrimitives.WriteUInt64LittleEndian(message.AsSpan(32), start + (ulong)i);
+            SHA512.HashData(message, digest);
+            ReadOnlySpan<byte> entropy = digest[..16];
+            int length = deriver.DeriveAddress(entropy, address);
+            if (patterns.TryMatch(new string(address[..length]), out _, out _))
+            {
+                hits.Add(Convert.ToHexString(entropy));
+            }
+        }
+
+        return hits;
+    }
+
+    private static List<string> DeviceHits(string backend, byte[] key, ulong start, int count, PatternSet patterns)
+    {
+        using IGpuDevice device = GpuTestHelper.RequireDevice(backend);
+        TargetTable targets = TargetTable.Build(patterns);
+
+        using IGpuBuffer table = device.Alloc(256 * 96);
+        device.Launch(device.GetKernel("k_build_base_table"), 256, 128, table);
+        device.Synchronize();
+
+        using IGpuBuffer dkey = device.Alloc(32);
+        dkey.CopyFrom(key);
+        using IGpuBuffer groups = device.Alloc(Math.Max(4, targets.Groups.Length * 4));
+        groups.CopyFrom(MemoryMarshal.AsBytes(new ReadOnlySpan<uint>(targets.Groups)));
+        using IGpuBuffer chars = device.Alloc(Math.Max(1, targets.Chars.Length));
+        if (targets.Chars.Length > 0)
+        {
+            chars.CopyFrom(targets.Chars);
+        }
+
+        using IGpuBuffer pairs = device.Alloc(Math.Max(4, targets.Pairs.Length * 4));
+        using IGpuBuffer hits = device.Alloc(GpuSearchEngine.HitCapacity * 52);
+        using IGpuBuffer hitCount = device.Alloc(4);
+        hitCount.Clear();
+
+        int threads = (count + GpuSearchEngine.CandidateBatch - 1) / GpuSearchEngine.CandidateBatch;
+        device.Launch(device.GetKernel("k_search"), threads, 128,
+            dkey, start, count, groups, targets.GroupCount, chars, pairs, targets.PairCount,
+            hits, hitCount, GpuSearchEngine.HitCapacity, table);
+        device.Synchronize();
+
+        byte[] countBytes = new byte[4];
+        hitCount.CopyTo(countBytes);
+        uint found = BitConverter.ToUInt32(countBytes, 0);
+        Assert.True(found <= GpuSearchEngine.HitCapacity, $"the hit buffer overflowed with {found} hits; the test range is too dense");
+
+        byte[] records = new byte[GpuSearchEngine.HitCapacity * 52];
+        hits.CopyTo(records);
+        List<string> result = new((int)found);
+        for (int i = 0; i < (int)found; i++)
+        {
+            result.Add(Convert.ToHexString(records.AsSpan(i * 52, 16)));
+        }
+
+        return result;
     }
 
     [Theory]

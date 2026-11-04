@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Support | XRPL Vanity</title>
+<meta name="description" content="How to get help with XRPL Vanity, and fixes for common problems with the desktop application.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Support</h1>
+<p class="lead">Write to <!--@support-email-->.</p>
+<p>Found a bug? <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/issues">Open an issue on GitHub</a>, with your Windows version and the graphics card you search on.</p>
+<p><strong>Never send anyone a seed, in an e-mail, an issue or a screenshot.</strong> Nobody needs it to help you, and whoever holds it controls the account.</p>
+
+<h2 id="problems">Common problems</h2>
+
+<h3>The window opens blank or shows "can't reach this page"</h3>
+<p>The WebView2 runtime is missing. Install the <a href="https://developer.microsoft.com/microsoft-edge/webview2/">Evergreen WebView2 runtime</a> and open the application again.</p>
+
+<h3>No devices are listed beyond the CPU</h3>
+<p>The application finds CUDA through the NVIDIA driver and OpenCL through the installed drivers. Install or update your GPU driver, then press the refresh button on the Devices card. You do not need to restart.</p>
+
+<h3>A device row turns red during a search</h3>
+<p>That device failed, for example after a driver reset, and the message is on the row. The other devices keep running. The search only ends if all of them fail.</p>
+
+<h3>History is read-only</h3>
+<p>The application could not read or write its results file, and the banner on the History page gives the reason. Usually the file was written by another Windows account or copied from another computer: results can only be opened by the account that wrote them. Move the file aside to start a fresh history.</p>
+
+<h3>Notifications never appear</h3>
+<p>The Settings page says whether Windows accepted them. If it did, check that notifications are on for XRPL Vanity in Windows Settings, under System and Notifications, and that do not disturb is off. A long run with a short word can queue hundreds of notifications, and Windows shows them one at a time.</p>
+
+<h3>A word is taking far longer than the estimate</h3>
+<p>The estimate is an average, and a search can run well past it. A word whose first letter rarely follows the <code>r</code> is about 23 times rarer than its length suggests, so try the <em>2nd or 3rd char</em> option. See the <a href="/desktop/#search">desktop guide</a>.</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

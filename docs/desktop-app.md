@@ -28,10 +28,22 @@ The application has three pages:
   independent halves. The halves may touch but never overlap, so halves totalling more
   than 33 characters — the longest address body — are flagged as unreachable rather than
   searched for.
+  In `starts with` mode a `2nd or 3rd char` box lets the pattern begin one character later
+  as well (`r?XRPLFiLE…`); the chip then wears a `2nd–3rd` tag. In `starts and ends with`
+  mode the same box applies to the first half only (`r?XRPL…FiLE`), and the tag sits after
+  that half. It is off by default
+  because it changes how the address reads, but it matters: right after the `r` of a
+  34-character address only `pshnaf39wBUDNEGHJKLM4PQ` can occur, so a pattern beginning
+  with any other character (`X`, `S`, `A`…) is about 23 times rarer than its length
+  suggests. When the box is off and the gain would be at least 2×, a line under the entry
+  says how much sooner the pattern would be found, and the `starts` or paired chip offers
+  the same as a `≈24× sooner at 2nd–3rd` button that switches it over.
   A pattern set can be written to a file with `save list…` and read back with `load
   list…`. The file is UTF-8 text, one rule per line, fields separated by tabs:
   `ends<TAB>RRRRRRRR`, a case-sensitive rule adding the same `Aa` marker its chip wears,
-  and a paired rule spelling out both halves as `starts<TAB>static<TAB>ends<TAB>bit`. A
+  a paired rule spelling out both halves as `starts<TAB>static<TAB>ends<TAB>bit`, and a
+  rule allowed at the 2nd or 3rd character as `nearstart<TAB>XRPLFILE` (a paired one as
+  `nearstart<TAB>XRPL<TAB>ends<TAB>FILE`). A
   line holding a single word and no tab at all is a plain word list entry — the format
   the command line tool's `--list` reads — and becomes a `starts` rule carrying whatever
   the `ignore case` box says at the time, so existing word lists keep loading unchanged.
