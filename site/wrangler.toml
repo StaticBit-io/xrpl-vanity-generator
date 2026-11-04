@@ -1,0 +1,6 @@
+# The Pages project's configuration, read by `wrangler pages deploy` run from site/. With this file in
+# the deployment, these settings are no longer editable in the dashboard: this file is where they change.
+name = "xrpl-vanity-site"
+pages_build_output_dir = "./dist"
+# The newest date the workerd of the pinned wrangler (4.151.1, as deploy-site uses) knows.
+compatibility_date = "2026-10-19"

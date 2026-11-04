@@ -7,6 +7,7 @@ copying `site/dist/` and translating `src/_headers`.
 ```
 site/
   src/               everything that is published (pages, js/, css/, fonts/, _headers)
+  wrangler.toml      the Pages project: name and output directory
   build.mjs          assembles site/dist and refuses a tree that breaks the checks
   checks.mjs         the checks: third-party requests, inline code, broken links, unfenced e-mail
   chrome-markup.mjs  the shared head, header and footer, and the support address
@@ -85,12 +86,44 @@ node <hallmark>/scripts/sloplint.mjs site/src/css/site.css --genre atmospheric -
 The second line uses `--scope app` because Hallmark's landing-page gates, such as 80 words a screen, do not
 fit a reference page or a policy.
 
+## Deployment
+
+`.github/workflows/site.yml` runs the tests and the build on every pull request and push to `main`. A push to
+`main` is a release: the `deploy-site` job then builds `site/dist` and uploads it with `wrangler pages deploy`
+(direct upload; the Pages project is not connected to Git). Its first run creates the project.
+
+The job is skipped while the repository is private, because the site links it. **The first push to `main`
+after the repository goes public is the launch.**
+
+| Setting | Value |
+|---|---|
+| Project name | `xrpl-vanity-site` |
+| Production branch | `main` |
+| Deployed by | the `deploy-site` job, wrangler `4.151.1` |
+| Build output directory | `site/dist` (named in `site/wrangler.toml`; the job deploys from `site/`) |
+| Custom domain | `xrpl-vanity.staticbit.io` |
+
+The job needs two repository secrets, set once by the owner. Without them it fails on its first step and
+names them. The token can be the one xrpl-file uses, if it covers the whole account.
+
+| Secret | Value |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | an API token of the account that holds the `staticbit.io` zone, with the account permission **Cloudflare Pages: Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | that account's ID |
+
+A manual deploy, for example while CI is unavailable: `node site/build.mjs`, then from `site/`:
+`npx wrangler@4.151.1 pages deploy --branch main`.
+
+The custom domain is attached once in the Pages project (Custom domains), after the first deploy. With the
+zone and the project in one Cloudflare account, that also creates the DNS record. Until then the site is at
+`https://xrpl-vanity-site.pages.dev`.
+
 ## Before launch
 
-1. The repository is public, and its repository, Issues and licence links open when signed out.
+1. The repository secrets from [Deployment](#deployment) are set.
 2. `support@staticbit.io` receives mail.
-3. The Pages project and the custom domain `xrpl-vanity.staticbit.io` exist. Build command `node site/build.mjs`, output `site/dist`.
-4. Cloudflare Web Analytics is off for the project: `/privacy/` says the site runs no analytics.
+3. The repository is public, and its repository, Issues and licence links open when signed out. A push to `main` then deploys the site.
+4. The custom domain is attached, and Cloudflare Web Analytics is off for the project: `/privacy/` says the site runs no analytics.
 5. On the live `/support/`, the page source has no `email-decode` script and no `[email protected]`, and no response sets a cookie: a zone feature such as Bot Fight Mode can add `__cf_bm`, which would make `/privacy/` wrong.
 6. "Last updated" on `/privacy/` is the publication date.
 7. The site's URLs go into the Store listing fields only after all of the above.
