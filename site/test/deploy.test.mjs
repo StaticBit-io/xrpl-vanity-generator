@@ -26,9 +26,8 @@ test('only a push to main deploys', () => {
   assert.match(job, /github\.ref == 'refs\/heads\/main'/);
 });
 
-test('nothing deploys while the repository is private, since the site links it', () => {
-  const job = workflow.slice(workflow.indexOf('deploy-site:'));
-  assert.match(job.split('\n').find((line) => line.includes('if:')), /!github\.event\.repository\.private/);
+test('a private repository does not stop the deploy', () => {
+  assert.doesNotMatch(workflow, /repository\.private/);
 });
 
 test('wrangler is pinned, and the secrets come from the repository', () => {
