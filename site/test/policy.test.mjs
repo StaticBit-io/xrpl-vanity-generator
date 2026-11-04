@@ -1,24 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readdirSync, readFileSync } from 'node:fs';
 import { ISSUES_URL } from '../src/js/config.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const STORE_BRANCH = 'claude/store-submission-c14468';
-
-/** PRIVACY.md lives on the Store branch until that merges; afterwards it is at the repository root. */
-function readPolicy() {
-  const file = new URL('../../PRIVACY.md', import.meta.url);
-  if (existsSync(file)) return readFileSync(file, 'utf8');
-  try {
-    return execFileSync('git', ['show', `${STORE_BRANCH}:PRIVACY.md`], { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch {
-    return null;
-  }
-}
+const policy = read('../../PRIVACY.md');
 
 const decode = (text) => text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
 const collapse = (text) => text.replace(/\s+/g, ' ').trim();
@@ -38,9 +24,7 @@ const privacy = read('../src/privacy/index.html');
 const support = read('../src/support/index.html');
 const pageSection = (name) => new RegExp(`<section data-policy="${name}">([\\s\\S]*?)</section>`).exec(privacy)?.[1];
 
-test("the application's sections are the policy's own text", (t) => {
-  const policy = readPolicy();
-  if (policy === null) return t.skip('PRIVACY.md not available');
+test("the application's sections are the policy's own text", () => {
   for (const { heading, body } of markdownSections(policy)) {
     if (heading === 'Contact') continue;
     const section = pageSection(slug(heading));
@@ -49,12 +33,10 @@ test("the application's sections are the policy's own text", (t) => {
   }
 });
 
-test('the page adds only the QR, website and contact sections', (t) => {
-  const policy = readPolicy();
-  if (policy === null) return t.skip('PRIVACY.md not available');
+test('the page adds only the section about the website', () => {
   const known = new Set(markdownSections(policy).map((section) => slug(section.heading)));
   const extra = [...privacy.matchAll(/<section data-policy="([^"]+)">/g)].map((match) => match[1]).filter((name) => !known.has(name));
-  assert.deepEqual(extra.sort(), ['qr-codes', 'this-website']);
+  assert.deepEqual(extra, ['this-website']);
 });
 
 test('the QR section says a code without a password is not encrypted', () => {
@@ -78,10 +60,33 @@ test('the contact is the support address, fenced from Cloudflare', () => {
   assert.ok(!section.includes(ISSUES_URL));
 });
 
-test('the page carries its own date, not the file it came from', () => {
-  const match = /Last updated: (\d{4}-\d{2}-\d{2})/.exec(privacy);
-  assert.ok(match);
-  assert.notEqual(match[1], '2026-09-16');
+test('the page and the policy carry the same date', () => {
+  const date = (text) => /Last updated: (\d{4}-\d{2}-\d{2})/.exec(text)?.[1];
+  assert.ok(date(policy));
+  assert.equal(date(privacy), date(policy));
+});
+
+test('the policy says what leaves the computer only when the user moves it', () => {
+  const summary = markdownSections(policy).find((section) => section.heading === 'Summary').body;
+  assert.doesNotMatch(collapse(summary), /stays on the computer that produced it\.$/);
+  assert.match(collapse(summary), /QR code/);
+});
+
+test('the policy says a copied seed stays out of clipboard history and sync', () => {
+  const clipboard = collapse(markdownSections(policy).find((section) => section.heading === 'Clipboard').body);
+  assert.match(clipboard, /stays out of Windows clipboard history and clipboard sync/);
+  assert.doesNotMatch(clipboard, /keep their own copy/);
+});
+
+test('the policy says uninstalling deletes the seeds', () => {
+  const removing = collapse(markdownSections(policy).find((section) => section.heading === 'Removing your data').body);
+  assert.match(removing, /Uninstalling[^.]*results\.dat[^.]*every seed/);
+});
+
+test('the policy names the support address', () => {
+  const contact = markdownSections(policy).find((section) => section.heading === 'Contact').body;
+  assert.match(contact, /support@staticbit\.io/);
+  assert.ok(!contact.includes(ISSUES_URL));
 });
 
 test('the support page gives the address, the tracker and the common problems', () => {
@@ -100,4 +105,12 @@ test('the support page warns a visitor never to send a seed', () => {
 test('no script sets a cookie', () => {
   const folder = new URL('../src/js/', import.meta.url);
   for (const name of readdirSync(folder)) assert.doesNotMatch(readFileSync(new URL(name, folder), 'utf8'), /document\.cookie/, name);
+});
+
+test('the Store documents point at the site for the privacy policy', () => {
+  for (const name of ['store-listing.md', 'store-submission.md']) {
+    const text = read(`../../docs/${name}`);
+    assert.ok(text.includes('https://xrpl-vanity.staticbit.io/privacy/'), name);
+    assert.ok(!text.includes('blob/main/PRIVACY.md'), name);
+  }
 });

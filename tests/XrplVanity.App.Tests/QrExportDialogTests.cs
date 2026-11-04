@@ -61,6 +61,30 @@ public class QrExportDialogTests : BunitContext
     }
 
     [Fact]
+    public void The_Seed_Format_Says_StaticBit_Can_Scan_It()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+
+        cut.Find("button.format-seed").Click();
+
+        Assert.Contains("Scanned by StaticBit", cut.Find(".format-note").TextContent);
+        Assert.DoesNotContain("does not import", cut.Find(".format-note").TextContent);
+    }
+
+    [Fact]
+    public void Every_Line_About_StaticBit_Links_To_Its_Site()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        Assert.NotEmpty(cut.FindAll(".format-note a[href='https://staticbit.io']"));
+
+        cut.Find("button.format-seed").Click();
+        Assert.NotEmpty(cut.FindAll(".format-note a[href='https://staticbit.io']"));
+
+        cut.Find("button.show-code").Click();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".qr-caption a[href='https://staticbit.io']")));
+    }
+
+    [Fact]
     public void The_Backup_Code_Carries_The_Prefix_The_Wallet_Looks_For()
     {
         IRenderedComponent<QrExportDialog> cut = Open(R(1));
@@ -107,6 +131,60 @@ public class QrExportDialogTests : BunitContext
         cut.Find("button.show-code").Click();
 
         cut.WaitForAssertion(() => Assert.Contains("not encrypted", cut.Find(".qr-warning").TextContent));
+    }
+
+    [Fact]
+    public void A_Bare_Seed_Warns_That_It_Is_Not_Encrypted()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        cut.Find("button.format-seed").Click();
+
+        cut.Find("button.show-code").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.DoesNotContain("hidden", cut.Find(".qr-warning").GetAttribute("class"));
+            Assert.Contains("this wallet", cut.Find(".qr-warning").TextContent);
+        });
+    }
+
+    [Fact]
+    public void A_Password_Typed_For_The_Backup_Does_Not_Silence_The_Seed_Warning()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        cut.Find("input.password").Input("secret");
+        cut.Find("input.password-confirm").Input("secret");
+        cut.Find("button.format-seed").Click();
+
+        cut.Find("button.show-code").Click();
+
+        cut.WaitForAssertion(() => Assert.DoesNotContain("hidden", cut.Find(".qr-warning").GetAttribute("class")));
+    }
+
+    [Fact]
+    public void A_Backup_With_A_Password_Shows_No_Warning()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        cut.Find("input.password").Input("secret");
+        cut.Find("input.password-confirm").Input("secret");
+
+        cut.Find("button.show-code").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll("svg.qr"));
+            Assert.Contains("hidden", cut.Find(".qr-warning").GetAttribute("class"));
+        });
+    }
+
+    [Fact]
+    public void Several_Wallets_Are_Named_In_The_Plural()
+    {
+        IRenderedComponent<QrExportDialog> cut = Open(R(1), R(2));
+
+        cut.Find("button.show-code").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("these wallets", cut.Find(".qr-warning").TextContent));
     }
 
     [Fact]

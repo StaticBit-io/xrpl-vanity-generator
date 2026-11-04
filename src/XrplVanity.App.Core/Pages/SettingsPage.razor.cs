@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using XrplVanity.App.Core.Services;
 
@@ -11,6 +12,17 @@ public partial class SettingsPage
     /// <summary>The same range the Search page's duty slider offers.</summary>
     private const int MinDuty = 25;
     private const int MaxDuty = 100;
+
+    /// <summary>
+    /// The product version, read from the assembly rather than written into the markup, so that a
+    /// bump of VanityVersion in Directory.Build.props reaches the About line as well. The
+    /// informational version carries a "+&lt;commit sha&gt;" suffix that the UI has no use for.
+    /// </summary>
+    private static readonly string AppVersion =
+        typeof(SettingsPage).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion.Split('+')[0]
+        ?? typeof(SettingsPage).Assembly.GetName().Version?.ToString(3)
+        ?? "unknown";
 
     private void OnCloseBehaviorChanged(ChangeEventArgs e)
     {

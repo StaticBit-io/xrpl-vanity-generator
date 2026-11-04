@@ -94,8 +94,18 @@ test('the desktop page says a bare-seed code is never encrypted', () => {
   assert.match(textOf(desktop), /bare seed[\s\S]{0,160}never encrypted/);
 });
 
-test('the desktop page warns about clipboard history', () => {
-  assert.match(textOf(desktop), /clipboard history/i);
+test('the desktop page says a copied seed stays out of clipboard history', () => {
+  assert.match(textOf(desktop), /stays out of Windows clipboard history and clipboard sync/);
+  assert.doesNotMatch(textOf(desktop), /keep their own copy/);
+});
+
+test('the desktop page says StaticBit can scan a bare seed', () => {
+  assert.doesNotMatch(textOf(desktop), /does not import/);
+  assert.match(textOf(desktop), /StaticBit wallet can scan it too/);
+});
+
+test('the desktop page says a bare-seed code warns', () => {
+  assert.doesNotMatch(textOf(desktop), /shows no warning/);
 });
 
 test('the desktop page names what a first run needs for an estimate', () => {
@@ -137,4 +147,13 @@ for (const [name, html] of [['cli', cli], ['desktop', desktop]]) {
 
 test('a reference box scrolls by itself', () => {
   assert.match(read('../src/css/site.css'), /\.reference\s*{[^}]*overflow-x: auto/);
+});
+
+test('every mention of StaticBit in a page links to its site', () => {
+  for (const name of ['index.html', 'desktop/index.html', 'cli/index.html', 'privacy/index.html', 'support/index.html', '404.html']) {
+    const body = read(`../src/${name}`).replace(/<head>[\s\S]*?<\/head>/, '');
+    const links = body.replace(/<a href="https:\/\/staticbit\.io">StaticBit<\/a>/g, '');
+    const text = links.replace(/<[^>]+>/g, ' ');
+    assert.doesNotMatch(text, /\bStaticBit\b(?!-io)/, name);
+  }
 });
