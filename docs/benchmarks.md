@@ -7,7 +7,8 @@ CPU that re-verifies hits, and how often the pattern matches.
 
 Figures were measured between 2026-09-03 and 2026-09-04, and the GPU rates were measured
 again on 2026-09-19 and 2026-09-20 as the field arithmetic changed; each section names the
-commit it belongs to. Rates are candidates (derived addresses) per second.
+commit it belongs to. Rates are candidates (derived addresses) per second. "Android phone" is
+the one section measured elsewhere, on 2026-11-04.
 
 ## Reference machine
 
@@ -322,6 +323,66 @@ line counts the pauses as search time, so it reflects what the user actually get
 duty figures and the full-duty reference predate the 2026-09-19 field-arithmetic work; what
 the section pins is the proportionality, which does not depend on the base rate.
 
+## Android phone
+
+The CPU search on a phone, measured for a possible integration into the StaticBit wallet. GPU
+paths do not exist there: CUDA is absent, and OpenCL is not something an Android app can count
+on. `tools/XrplVanity.MobileBench` runs the loop of `CpuSearchWorkers` against a pattern that
+never matches. It is not part of `XrplVanity.sln`.
+
+Honor WDY-LX1, MediaTek MT6765, 8 × Cortex-A53 (four at 2.2 GHz, four at 1.6 GHz), Android 14,
+on battery, screen on, .NET 10.0.11, commit 08f0363, 2026-11-04. This is a low-end chip, so read
+these figures as a floor and not as a typical phone.
+
+The two values in each cell are two rounds, with the four builds interleaved. "Managed digests"
+replaces `SHA512.HashData` and `SHA256.HashData` with the BouncyCastle digests
+(`ManagedDigestDeriver`); the address it derives is compared with `BouncyCastleDeriver` on 64
+random entropies at the start of every run.
+
+| Runtime | 1 thread | 8 threads | 8 threads, managed digests |
+| --- | --- | --- | --- |
+| Mono, the wallet's release settings (JIT, profiled AOT) | 1,299 and 1,297/s | 7,786 and 7,703/s | 8,839 and 8,934/s |
+| Mono, full AOT | 1,241 and 1,243/s | 7,475 and 7,473/s | 8,588 and 7,849/s |
+| Mono, full AOT with LLVM | 2,812 and 2,807/s | 14,889 and 15,039/s | 20,944 and 20,713/s |
+| CoreCLR (experimental on Android) | 3,467 and 3,468/s | 12,654 and 12,705/s | 15,541 and 15,531/s |
+
+The wallet's settings reach 7,700/s, about 14 times below the 12-thread desktop CPU path and
+about 4,000 times below the GPU. At that rate a case-insensitive prefix of five characters takes
+about 35 minutes on average and one of six takes about 17 hours; with LLVM and managed digests
+they take 13 minutes and 6.4 hours.
+
+Full AOT without LLVM buys nothing. LLVM doubles the single-thread rate and wins at 8 threads,
+where CoreCLR scales worse despite leading on one thread. The price of LLVM was measured only on
+this small app: the build took 7 minutes against about 1.5, and the APK for two ABIs grew from
+14.5 MB to 24.0 MB. CoreCLR needs 35.8 MB and the SDK warns (XA1040) that it is not ready for
+production.
+
+Each stage alone, in microseconds per call on one thread, first round:
+
+| Stage | Wallet settings | Full AOT | LLVM | CoreCLR | Desktop (reference machine) |
+| --- | --- | --- | --- | --- | --- |
+| Ed25519 public key | 693 | 723 | 292 | 259 | 44 |
+| `SHA512.HashData`, 16 B | 12.7 | 12.9 | 12.8 | 11.0 | 0.53 |
+| `SHA256.HashData`, 33 B | 11.8 | 11.9 | 11.6 | 10.2 | 0.22 |
+| BouncyCastle SHA-512, 16 B | 12.7 | 13.1 | 3.4 | 1.9 | 0.38 |
+| BouncyCastle SHA-256, 33 B | 8.9 | 9.3 | 3.2 | 1.7 | 0.40 |
+| Base58 encode, 25 B | 11.4 | 11.8 | 3.8 | 4.1 | 1.10 |
+
+The one-shot hashes cost about 12 µs whichever runtime is in use, which is what a call that
+leaves managed code looks like; that they reach the platform's crypto library is an inference
+from these rates and was not traced. A candidate makes four such calls. Managed digests add 15%
+on the wallet's settings, where managed code is as slow as those calls, and 39% with LLVM, where
+it is not. Desktop gains nothing from them.
+
+**Sustained.** Ten minutes on the wallet's settings, 8 threads, 30-second windows: 7,761/s on
+average, with windows between 7,588/s and 7,826/s and no downward trend. The battery sensor
+went from 28 °C to 31 °C and the charge from 50% to 48%. The charge is reported in whole
+percents, so that drain is rough. A phone with faster cores may throttle where this one does not.
+
+An x86_64 emulator was tried first and is not reported: the same build varied by a factor of
+two or more between runs, and its four vCPUs cannot show the 8-thread ordering. Use it to check
+that the app runs, not to compare rates.
+
 ## Not measured
 
 - Scaling across two or more NVIDIA cards (one GPU on the reference machine).
@@ -329,14 +390,16 @@ the section pins is the proportionality, which does not depend on the base rate.
   pocl only).
 - pocl's cold program compile (every recorded run used the warm `xrpl-vanity-pocl` cache
   volume).
-- Sustained throughput over minutes or hours (every run above lasts seconds; thermal
-  throttling was observed once during earlier CPU spikes and is why A/B comparisons were
+- Sustained throughput over minutes or hours on the reference machine (every run there lasts
+  seconds; thermal throttling was observed once during earlier CPU spikes and is why A/B comparisons were
   interleaved).
 - Multi-device and duty-cycle rates after the 2026-09-19 field-arithmetic work (only the
   single-device CLI rates were re-measured).
 - A redundant limb representation for `fe_mul` (ten limbs of about 25.5 bits), which would
   break the serial carry chain eight saturated 32-bit limbs impose. Deliberately not built;
   see "Where the next gain would have to come from" above for the measurement that stopped it.
+- Any phone other than the one under "Android phone": no faster Android chip and no iPhone. iOS
+  allows no JIT, so the AOT rows are the nearest guide, but nothing was built or run there.
 - Batch sizes between the powers of two: `SEARCH_BATCH` must divide `SubLaunchSize`, so it is
   a power of two, and 8 already regressed.
 
@@ -397,6 +460,39 @@ Linux container, both harness modes (see the README's Linux section for requirem
 bash linux/run-linux-tests.sh
 bash linux/run-linux-tests.sh --cpu-only
 ```
+
+Android phone. Build the app from the repository root; the default is the wallet's settings.
+`BenchVariant` only labels the output. Delete `bin` and `obj` under
+`tools/XrplVanity.MobileBench` when you switch variants, and pass
+`-p:AndroidSdkDirectory=<path>` if the build does not find the Android SDK.
+
+```bash
+dotnet build tools/XrplVanity.MobileBench -c Release
+dotnet build tools/XrplVanity.MobileBench -c Release -p:BenchVariant=mono-full-aot -p:RunAOTCompilation=true -p:AndroidEnableProfiledAot=false
+dotnet build tools/XrplVanity.MobileBench -c Release -p:BenchVariant=mono-aot-llvm -p:RunAOTCompilation=true -p:AndroidEnableProfiledAot=false -p:EnableLLVM=true
+dotnet build tools/XrplVanity.MobileBench -c Release -p:BenchVariant=coreclr -p:UseMonoRuntime=false
+```
+
+Install the APK and open the app on the phone. A run starts by itself and lasts about 7 minutes
+on 8 cores: 3 seconds per stage, 10 seconds per pipeline row, then 300 seconds sustained. The
+app holds the screen on. The last line is `DONE`.
+
+```bash
+adb install -r tools/XrplVanity.MobileBench/bin/Release/net10.0-android/io.staticbit.xrplvanity.bench-Signed.apk
+```
+
+Read the results from the screen or from the file below; each run overwrites it. Do not rely on
+logcat: the tag is `XVBench`, but the firmware of the phone above silences app logs
+(`persist.log.tag=S`). Under Git Bash, set `MSYS_NO_PATHCONV=1` so the device path stays intact.
+
+```bash
+adb shell cat /storage/emulated/0/Android/data/io.staticbit.xrplvanity.bench/files/results.txt
+```
+
+Optional: change the durations with the integer intent extras `stage`, `pipeline`, `sustain` and
+`window`, in seconds. `adb shell cmd package resolve-activity --brief io.staticbit.xrplvanity.bench`
+prints the component to pass to `am start -n`. The rate tables used `--ei stage 3 --ei pipeline 10
+--ei sustain 0`, and the sustained run used `--ei stage 1 --ei pipeline 1 --ei sustain 600`.
 
 Every printed seed in these runs is a real secret for the address next to it. Discard
 the output of benchmark runs.
