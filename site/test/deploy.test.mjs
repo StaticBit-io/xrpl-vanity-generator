@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const workflow = read('../../.github/workflows/site.yml');
 const wrangler = read('../wrangler.toml');
+const deployJob = workflow.slice(workflow.indexOf('deploy-site:'));
 
 test('wrangler names the project and deploys the build output', () => {
   assert.match(wrangler, /^name = "xrpl-vanity-site"$/m);
@@ -16,18 +17,41 @@ test('the workflow deploys the project wrangler names', () => {
 });
 
 test('a red suite never goes live', () => {
-  const job = workflow.slice(workflow.indexOf('deploy-site:'));
-  assert.match(job, /needs: test/);
+  assert.match(deployJob, /needs: test/);
 });
 
-test('only a push to main deploys', () => {
-  const job = workflow.slice(workflow.indexOf('deploy-site:'));
-  assert.match(job, /github\.event_name == 'push'/);
-  assert.match(job, /github\.ref == 'refs\/heads\/main'/);
+test('only a manual run deploys', () => {
+  assert.match(workflow, /^ {2}workflow_dispatch:/m);
+  assert.match(deployJob.split('\n').find((line) => line.includes('if:')), /github\.event_name == 'workflow_dispatch'/);
 });
 
-test('a private repository does not stop the deploy', () => {
-  assert.doesNotMatch(workflow, /repository\.private/);
+test('a manual run offers exactly dev and main', () => {
+  const input = workflow.slice(workflow.indexOf('workflow_dispatch:'), workflow.indexOf('jobs:'));
+  assert.match(input, /required: true/);
+  assert.match(input, /type: choice/);
+  assert.deepEqual([...input.matchAll(/^ +- (\S+)$/gm)].map((match) => match[1]), ['dev', 'main']);
+});
+
+test('the chosen branch is what gets tested, built and uploaded', () => {
+  const testJob = workflow.slice(workflow.indexOf('  test:'), workflow.indexOf('deploy-site:'));
+  assert.match(testJob, /ref: \$\{\{ inputs\.branch \|\| github\.ref \}\}/);
+  assert.match(deployJob, /ref: \$\{\{ inputs\.branch \}\}/);
+  assert.match(deployJob, /pages deploy --branch "\$BRANCH"/);
+  assert.doesNotMatch(deployJob, /--branch main/);
+});
+
+test('the commit recorded is the deployed one, not the commit the run started from', () => {
+  assert.doesNotMatch(deployJob, /GITHUB_SHA/);
+  assert.match(deployJob, /--commit-hash "\$\(git rev-parse HEAD\)"/);
+});
+
+test('the input reaches the shell through the environment', () => {
+  assert.match(deployJob, /BRANCH: \$\{\{ inputs\.branch \}\}/);
+  assert.doesNotMatch(deployJob, /run:.*\$\{\{/);
+});
+
+test('both long-lived branches are tested on push', () => {
+  assert.match(workflow, /branches: \[dev, main\]/);
 });
 
 test('wrangler is pinned, and the secrets come from the repository', () => {

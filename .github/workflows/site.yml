@@ -2,14 +2,27 @@ name: site
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   pull_request:
+  # Publishing is only ever this: Actions > site > Run workflow, with the branch to publish. main is the
+  # Pages production branch; dev goes to its preview address.
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to publish
+        required: true
+        type: choice
+        options:
+          - dev
+          - main
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -18,14 +31,13 @@ jobs:
       - run: node --test site/test/*.test.mjs
       - run: node site/build.mjs
 
-  # A push to main is a release of the site: it publishes https://xrpl-vanity.staticbit.io. The job
-  # waits for "test", so a red suite never goes live.
+  # The job waits for "test", which ran on the same branch, so a red suite never goes live.
   deploy-site:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
-    # Two merges in quick succession deploy in order; cancelling the older run could leave the
-    # earlier commit live if it finished last.
+    # Two runs in quick succession deploy in order; cancelling the older run could leave the earlier
+    # commit live if it finished last.
     concurrency:
       group: deploy-site
       cancel-in-progress: false
@@ -34,6 +46,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       WRANGLER: npx --yes wrangler@4.151.1
       PROJECT: xrpl-vanity-site
+      BRANCH: ${{ inputs.branch }}
     steps:
       # Without a token wrangler falls back to an interactive login and fails with a message that
       # does not name the missing secret.
@@ -44,6 +57,8 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -57,6 +72,7 @@ jobs:
           if ! printf '%s' "$projects" | grep -q "\"$PROJECT\""; then
             $WRANGLER pages project create "$PROJECT" --production-branch main
           fi
-      # From site/: site/wrangler.toml names the project and the output directory.
-      - run: $WRANGLER pages deploy --branch main --commit-hash "$GITHUB_SHA"
+      # From site/: site/wrangler.toml names the project and the output directory. The hash comes from
+      # the checkout because the run may start from another branch than the one published.
+      - run: $WRANGLER pages deploy --branch "$BRANCH" --commit-hash "$(git rev-parse HEAD)"
         working-directory: site
