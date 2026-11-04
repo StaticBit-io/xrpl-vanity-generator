@@ -154,7 +154,7 @@ typedef char i8;
 - [ ] **Step 2: Create the body from the current kernel**
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 git mv gpu/kernels/xrpl_vanity.cu gpu/kernels/xrpl_vanity_body.h
 ```
 
@@ -466,7 +466,7 @@ Regenerate: `python gpu/build-ptx.py` — it must succeed with no NVRTC errors.
 All of these must print nothing:
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 grep -nE "Fe&|Pt&|Precomp&" gpu/kernels/xrpl_vanity_body.h
 grep -nE "[0-9a-fA-F]ull\b|[0-9a-fA-F]ul\b" gpu/kernels/xrpl_vanity_body.h
 grep -nE "__device__|__global__|__constant__|__forceinline__|extern \"C\"|blockIdx|threadIdx|atomicAdd|signed char|unsigned long|size_t" gpu/kernels/xrpl_vanity_body.h

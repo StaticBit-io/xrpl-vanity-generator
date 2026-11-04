@@ -5,8 +5,8 @@ application. The site lives in this repository and is deployed as a static site.
 
 ## Why
 
-The desktop application is being prepared for the Microsoft Store under the publisher StaticBit
-(SBP Labs Inc.). The Store listing has fields for a website, a support page and a privacy policy
+The desktop application is being prepared for the Microsoft Store under the publisher StaticBit.
+The Store listing has fields for a website, a support page and a privacy policy
 URL; today the only candidates are files on GitHub. The project also has no page a newcomer can
 read in half a minute: the README starts with build commands, and `docs/desktop-app.md` is a
 developer document.
@@ -56,7 +56,7 @@ The site fails, even if it works technically, if it:
 ## Constraints
 
 - **Location:** a `site/` folder at the repository root, following the xrpl-file project
-  (`E:\GIT\XRPL\xrpl-file\site`, read its `README.md`): `site/src/` holds everything published,
+  (its `site/` folder, read its `README.md`): `site/src/` holds everything published,
   a small `build.mjs` assembles `site/dist/`, a `serve.mjs` serves it locally, tests run under
   `node --test`. `site/dist/` is git-ignored.
 - **Stack:** plain HTML, CSS and ES modules. Node 22 or newer for the build scripts. No npm
@@ -95,8 +95,8 @@ The site fails, even if it works technically, if it:
 The Hallmark design skill, theme **Terminal**, chosen by the owner from three sketches (Terminal,
 Blueprint, Specimen). The owner described the wanted style as "cryptography".
 
-- Hallmark is not installed globally. Use the clone at
-  `E:\GIT\XRPL\xrpl-file\run\sketches\.hallmark` (`nutlope/hallmark` v2.0.0, MIT, commit
+- Hallmark is not installed globally. Use a local clone
+  (`nutlope/hallmark` v2.0.0, MIT, commit
   `4f6a46c`). Follow `skills/hallmark/SKILL.md` and the theme file
   `skills/hallmark/references/themes/terminal.md`.
 - The material, per the theme: a near-black ground with a green cast in three lightness steps,

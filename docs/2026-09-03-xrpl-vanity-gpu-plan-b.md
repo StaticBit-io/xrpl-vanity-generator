@@ -862,7 +862,7 @@ git commit -m "feat(gpu): search kernel with hit buffer and a CPU re-verificatio
 - [ ] **Step 1: Wire the project reference**
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 dotnet add src/XrplVanity.Cli/XrplVanity.Cli.csproj reference src/XrplVanity.Gpu/XrplVanity.Gpu.csproj
 ```
 

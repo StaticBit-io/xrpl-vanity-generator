@@ -81,7 +81,7 @@ tests/XrplVanity.Tests/Gpu/
 - [ ] **Step 1: Create the project and wire references**
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 dotnet new classlib -n XrplVanity.Gpu -o src/XrplVanity.Gpu -f net10.0
 rm -f src/XrplVanity.Gpu/Class1.cs
 dotnet sln add src/XrplVanity.Gpu/XrplVanity.Gpu.csproj
@@ -762,7 +762,7 @@ if __name__ == "__main__":
 Generate the PTX:
 
 ```bash
-cd E:/GIT/XRPL/xrpl-vanity
+cd xrpl-vanity
 python gpu/build-ptx.py
 ```
 
