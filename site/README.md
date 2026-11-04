@@ -88,32 +88,42 @@ fit a reference page or a policy.
 
 ## Deployment
 
-`.github/workflows/site.yml` runs the tests and the build on every pull request and push to `main`. A push to
-`main` is a release: the `deploy-site` job then builds `site/dist` and uploads it with `wrangler pages deploy`
-(direct upload; the Pages project is not connected to Git). Its first run creates the project.
+`.github/workflows/site.yml` runs the tests and the build on every pull request and on every push to `dev` and
+`main`. Nothing publishes by itself. To publish, run the workflow by hand and pick the branch:
+
+```bash
+gh workflow run site.yml -f branch=main
+```
+
+The same is in Actions > site > Run workflow. The run tests that branch, then the `deploy-site` job builds
+`site/dist` and uploads it with `wrangler pages deploy` (direct upload; the Pages project is not connected to Git).
+
+| Branch | Goes to |
+|---|---|
+| `main` | production: `https://xrpl-vanity.staticbit.io` and `https://xrpl-vanity-site.pages.dev` |
+| `dev` | preview: `https://dev.xrpl-vanity-site.pages.dev` |
 
 | Setting | Value |
 |---|---|
 | Project name | `xrpl-vanity-site` |
 | Production branch | `main` |
-| Deployed by | the `deploy-site` job, wrangler `4.151.1` |
+| Deployed by | a manual run of the `deploy-site` job, wrangler `4.151.1` |
 | Build output directory | `site/dist` (named in `site/wrangler.toml`; the job deploys from `site/`) |
 | Custom domain | `xrpl-vanity.staticbit.io` |
 
 The job needs two repository secrets, set once by the owner. Without them it fails on its first step and
-names them. The token can be the one xrpl-file uses, if it covers the whole account.
+names them.
 
 | Secret | Value |
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | an API token of the account that holds the `staticbit.io` zone, with the account permission **Cloudflare Pages: Edit** |
 | `CLOUDFLARE_ACCOUNT_ID` | that account's ID |
 
-A manual deploy, for example while CI is unavailable: `node site/build.mjs`, then from `site/`:
+Without CI, for example while Actions is down: `node site/build.mjs`, then from `site/`:
 `npx wrangler@4.151.1 pages deploy --branch main`.
 
-The custom domain is attached once in the Pages project (Custom domains), after the first deploy. With the
-zone and the project in one Cloudflare account, that also creates the DNS record. Until then the site is at
-`https://xrpl-vanity-site.pages.dev`.
+The custom domain is attached once in the Pages project (Custom domains). With the zone and the project in one
+Cloudflare account, that also creates the DNS record. Until then production is only at the `pages.dev` address.
 
 ## Before launch
 
