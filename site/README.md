@@ -92,9 +92,6 @@ fit a reference page or a policy.
 `main` is a release: the `deploy-site` job then builds `site/dist` and uploads it with `wrangler pages deploy`
 (direct upload; the Pages project is not connected to Git). Its first run creates the project.
 
-The job is skipped while the repository is private, because the site links it. **The first push to `main`
-after the repository goes public is the launch.**
-
 | Setting | Value |
 |---|---|
 | Project name | `xrpl-vanity-site` |
@@ -122,7 +119,7 @@ zone and the project in one Cloudflare account, that also creates the DNS record
 
 1. The repository secrets from [Deployment](#deployment) are set.
 2. `support@staticbit.io` receives mail.
-3. The repository is public, and its repository, Issues and licence links open when signed out. A push to `main` then deploys the site.
+3. The repository is public, and its repository, Issues and licence links open when signed out. Until then those links are 404s for visitors.
 4. The custom domain is attached, and Cloudflare Web Analytics is off for the project: `/privacy/` says the site runs no analytics.
 5. On the live `/support/`, the page source has no `email-decode` script and no `[email protected]`, and no response sets a cookie: a zone feature such as Bot Fight Mode can add `__cf_bm`, which would make `/privacy/` wrong.
 6. "Last updated" on `/privacy/` is the publication date.

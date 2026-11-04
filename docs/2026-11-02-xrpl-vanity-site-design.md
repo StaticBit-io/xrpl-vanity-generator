@@ -69,9 +69,10 @@ The site fails, even if it works technically, if it:
   `xrpl-file.staticbit.io` (builder's call, see Decisions).
 - **Language:** English.
 - **Launch order:** `StaticBit-io/xrpl-vanity-generator` is private today and becomes public
-  before the site launches. The site is written as if it were public ("the source is public",
-  GitHub links, Issues). It must not go live, and its URLs must not go into the Store listing,
-  while the repository is still private: those links would be 404s for visitors.
+  before the site is announced. The site is written as if it were public ("the source is public",
+  GitHub links, Issues). The owner may publish it from the private repository to test the
+  deployment, but its URLs must not go into the Store listing until the repository is public:
+  the GitHub links are 404s for visitors until then.
 - **Copy:** written with the `writing-site-copy` skill. Draft lines in this document and in the
   style sketch are placeholders, not approved copy.
 - **Fonts and assets:** self-hosted under `site/src/fonts/` with their licence files and a

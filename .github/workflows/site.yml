@@ -19,11 +19,9 @@ jobs:
       - run: node site/build.mjs
 
   # A push to main is a release of the site: it publishes https://xrpl-vanity.staticbit.io. The job
-  # waits for "test", so a red suite never goes live. It is skipped while the repository is private,
-  # because the site links the repository and those links would be 404s for visitors; the first push
-  # to main after the repository goes public is the launch.
+  # waits for "test", so a red suite never goes live.
   deploy-site:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.private
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
     # Two merges in quick succession deploy in order; cancelling the older run could leave the
