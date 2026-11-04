@@ -20,11 +20,11 @@
       }
       else if (_seedOnly)
       {
-        <text>StaticBit does not import a bare seed — it reads this as an address and offers to send. Use it for a wallet that takes a family seed directly.</text>
+        <text>Scanned by <a href="https://staticbit.io">StaticBit</a> or any wallet that takes a family seed.</text>
       }
       else
       {
-        <text>Scanned by StaticBit's restore screen.</text>
+        <text>Scanned by <a href="https://staticbit.io">StaticBit</a>'s restore screen.</text>
       }
     </div>
 
@@ -52,8 +52,8 @@
       }
     </div>
 
-    <div class="qr-warning @(ShowsWarning ? null : "hidden")">This code is not encrypted. Anyone who photographs it owns these wallets.</div>
-    <div class="qr-caption @(_code is null ? "hidden" : null)">Scan with StaticBit on your phone.</div>
+    <div class="qr-warning @(ShowsWarning ? null : "hidden")">This code is not encrypted. Anyone who photographs it owns @(Rows.Count == 1 ? "this wallet" : "these wallets").</div>
+    <div class="qr-caption @(_code is null ? "hidden" : null)">Scan with <a href="https://staticbit.io">StaticBit</a> on your phone.</div>
     <div class="qr-error @(_error is null ? "hidden" : null)">@_error</div>
 
     <div class="stores">

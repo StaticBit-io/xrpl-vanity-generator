@@ -61,11 +61,9 @@ disagree, the code wins and the site is corrected. The tests catch part of this:
 
 - the Options table on `/cli/`, the README's table and the parser in `CliOptions.cs` must list exactly the same flags (`docs-pages.test.mjs`),
 - each speed on the home page must appear in `docs/benchmarks.md`,
-- the application sections of `/privacy/` must equal `PRIVACY.md` word for word. The Contact section is
-  the exception, and the QR codes and This website sections exist only on the page.
+- the sections of `/privacy/` must equal `PRIVACY.md` word for word. Contact is the exception, because the
+  page fences the address, and This website exists only on the page.
 
-`policy.test.mjs` reads `PRIVACY.md` from the repository root, or from the branch
-`claude/store-submission-c14468` until that merges, and reports a visible skip when it finds neither.
 
 ## Design
 
@@ -136,4 +134,3 @@ Cloudflare account, that also creates the DNS record. Until then production is o
 5. On the live `/support/`, the page source has no `email-decode` script and no `[email protected]`, and no response sets a cookie: a zone feature such as Bot Fight Mode can add `__cf_bm`, which would make `/privacy/` wrong.
 6. "Last updated" on `/privacy/` is the publication date.
 7. The site's URLs go into the Store listing fields only after all of the above.
-8. `PRIVACY.md` gets the two additions from `/privacy/` and the new contact, on the Store branch.

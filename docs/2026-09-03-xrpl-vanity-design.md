@@ -32,7 +32,7 @@ is a separate, later project; this document covers only the CPU reference.
 
 ## Repository layout
 
-New public repository, prepared locally at `E:\GIT\XRPL\xrpl-vanity`. Published
+New public repository. Published
 only on explicit command. All repository artifacts (code, docs, commits) are in
 English.
 

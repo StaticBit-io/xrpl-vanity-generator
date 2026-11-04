@@ -62,9 +62,9 @@ The application has three pages:
   A found wallet can also leave as a QR code rather than as a file. The button in a result row
   shows that one wallet; `Show QR…` in the selection bar shows every selected row. The dialog
   offers two payloads: the StaticBit backup container, which the StaticBit wallet restores from
-  by scanning, and the bare `sEd…` seed, which it does not import and which is offered only for
+  by scanning, and the bare `sEd…` seed, which it also scans and which is offered only for
   a single wallet. A password is optional and encrypts the container; without one the code is
-  not encrypted and says so. Once the code is on screen the password and folder boxes are put
+  not encrypted and says so, as a bare seed always does. Once the code is on screen the password and folder boxes are put
   away and a **Change** button appears next to **Close**: it drops the code and brings the form
   back, still filled in, so another password or folder takes two clicks. One code holds 22 wallets,
   or 21 with a password. Nothing is
@@ -125,7 +125,7 @@ The application has three pages:
 Seeds are masked everywhere by default. A row reveals its seed only on request and hides
 it again after the configured timeout or when the page is left. Copying a seed puts it on
 the clipboard and clears it after the configured delay, but only if the clipboard still
-holds that same seed.
+holds that same seed. The copy stays out of Windows clipboard history and clipboard sync, which the delayed clear could not reach.
 
 ### Where the data is
 
@@ -188,6 +188,37 @@ Release builds are MSIX. A sideloaded package has to be signed, so the first ste
 self-signed code-signing certificate whose subject matches the `Publisher` in
 `src/XrplVanity.App/Platforms/Windows/Package.appxmanifest`
 (`CN=StaticBit Vanity Dev`).
+
+This section covers the sideload package, which is how a build is tested locally. The
+Microsoft Store is a separate channel with its own publish profile and its own identity,
+and it signs the package itself, so none of the certificate steps below apply there. See
+[store-submission.md](store-submission.md).
+
+### Package identity
+
+The identity in `Package.appxmanifest` is not what ships. Resizetizer rewrites the manifest
+into `obj/.../resizetizer/m/` and the packaging targets read that copy; the
+`_VanitySetPackageIdentity` target in `XrplVanity.App.csproj` stamps the copy, so the source
+manifest stays a valid standalone file and the working tree stays clean.
+
+Four properties drive it, and their defaults are the sideload values, so the commands below
+need none of them:
+
+| Property | Default | Purpose |
+| --- | --- | --- |
+| `VanityPackageIdentityName` | `io.staticbit.vanity` | `Identity/@Name`. The Store assigns its own. |
+| `VanityPackagePublisher` | `CN=StaticBit Vanity Dev` | `Identity/@Publisher`. Must match the signing certificate's subject for a sideload package. |
+| `VanityPackagePublisherDisplayName` | `StaticBit` | `Properties/PublisherDisplayName`. Must match Partner Center exactly for a Store package. |
+| `VanityPackageVersion` | `$(VanityVersion).0` | `Identity/@Version`. |
+
+`VanityVersion` in `Directory.Build.props` is the single source of truth for the version: it
+feeds the package version, the assembly version and the version shown in the About section.
+Note that `ApplicationDisplayVersion` and `ApplicationVersion` do **not** reach the package
+version — Resizetizer leaves an explicit `Identity/@Version` alone, which is why the target
+above exists.
+
+Every build prints the identity it stamped, and fails rather than producing a package whose
+identity was never substituted.
 
 ### 1. Create the certificate
 

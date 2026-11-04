@@ -19,6 +19,7 @@
 .qr-warning { color: var(--yellow); font-size: 12px; margin-top: 10px; }
 .qr-caption { color: var(--text-secondary); font-size: 12px; margin-top: 8px; }
 .qr-error { color: var(--negative); font-size: 12px; margin-top: 10px; }
+.format-note a, .qr-caption a { color: var(--mint); }
 .stores { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 12px; }
 .stores a { color: var(--text-secondary); text-decoration: none; }
 .stores a:hover { color: var(--mint); }
