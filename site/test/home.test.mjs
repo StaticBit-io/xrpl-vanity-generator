@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,6 +9,7 @@ import { build } from '../build.mjs';
 import { BASE58_ALPHABET } from '../src/js/glyph-field.mjs';
 import { initStore } from '../src/js/home.mjs';
 import { REPOSITORY_URL, STORE_URL } from '../src/js/config.mjs';
+import { checksumValid } from './support/checksum.mjs';
 
 const SITE_DIR = fileURLToPath(new URL('..', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -26,18 +26,6 @@ async function allBuiltHtml() {
 }
 
 const textOf = (markup) => markup.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&');
-
-/** True if the string decodes as base58 with a valid double-SHA-256 checksum, as a wallet checks it. */
-function checksumValid(address) {
-  let value = 0n;
-  for (const character of address) value = value * 58n + BigInt(BASE58_ALPHABET.indexOf(character));
-  let hex = value.toString(16);
-  if (hex.length % 2) hex = `0${hex}`;
-  const bytes = Buffer.concat([Buffer.alloc(address.match(/^r*/)[0].length), Buffer.from(hex, 'hex')]);
-  const payload = bytes.subarray(0, -4);
-  const hash = (data) => createHash('sha256').update(data).digest();
-  return hash(hash(payload)).subarray(0, 4).equals(bytes.subarray(-4));
-}
 
 test('the checksum helper knows a real address from a broken one', () => {
   const genesis = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh';
