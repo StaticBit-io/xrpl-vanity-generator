@@ -1,0 +1,97 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wdth,wght@75..112,300..700&family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=Bodoni+Moda:opsz,wght@6..96,400&family=Geist:wght@400;500&family=Geist+Mono&display=swap">
+<style>
+  .hero { padding: 36px 32px 30px; min-height: 330px; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+  .hero .nav { display: flex; justify-content: space-between; font-size: 12px; opacity: .8; }
+  .hero h1 { margin: 0; line-height: 1.08; }
+  .hero p { margin: 0; max-width: 46ch; font-size: 14px; line-height: 1.5; }
+  .hero .addr { word-break: break-all; }
+  .hero .btns { display: flex; gap: 10px; margin-top: auto; }
+  .hero .btns span { padding: 9px 14px; font-size: 13px; }
+
+  /* A: Terminal */
+  .t { background: oklch(12.5% 0.012 150); color: oklch(94% 0.03 140); font-family: "Martian Mono", monospace; }
+  .t h1 { font-size: 26px; font-weight: 500; font-stretch: 112%; }
+  .t p { font-stretch: 75%; color: oklch(82% 0.05 142); }
+  .t .addr { font-size: 17px; color: oklch(57% 0.14 143); background: oklch(16% 0.016 150); padding: 12px; border: 1px solid oklch(27% 0.028 148); }
+  .t .addr b { color: oklch(12.5% 0.012 150); background: oklch(87% 0.2 142); font-weight: 500; }
+  .t .glyphs { font-size: 10px; line-height: 1.25; color: oklch(30% 0.06 146); letter-spacing: .1em; white-space: nowrap; }
+  .t .glyphs i { color: oklch(57% 0.14 143); font-style: normal; }
+  .t .b1 { background: oklch(87% 0.2 142); color: oklch(14% 0.02 150); }
+  .t .b2 { border: 1px solid oklch(38% 0.045 146); }
+
+  /* B: Blueprint */
+  .bp { background: oklch(35% 0.105 256); color: oklch(97% 0.012 240); font-family: "IBM Plex Sans", sans-serif;
+        background-image: linear-gradient(oklch(97% 0.01 240 / .09) 1px, transparent 1px), linear-gradient(90deg, oklch(97% 0.01 240 / .09) 1px, transparent 1px);
+        background-size: 22px 22px; }
+  .bp h1 { font-family: "Chakra Petch", sans-serif; font-weight: 600; font-size: 26px; text-transform: uppercase; letter-spacing: .01em; }
+  .bp p { color: oklch(90% 0.025 242); }
+  .bp .addr { font-family: "IBM Plex Mono", monospace; font-size: 18px; border: 1px solid oklch(93% 0.02 240 / .85); outline: 1px solid oklch(93% 0.02 240 / .32); outline-offset: 3px; padding: 14px 12px 12px; position: relative; }
+  .bp .dim { font-family: "IBM Plex Mono", monospace; font-size: 11px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; color: oklch(80% 0.045 244); width: 64%; }
+  .bp .dim hr { border: 0; border-top: 1px solid oklch(80% 0.045 244); margin: 0; }
+  .bp .addr u { text-decoration: none; border-bottom: 2px solid oklch(97% 0.012 240); }
+  .bp .b1 { background: oklch(97% 0.012 240); color: oklch(33% 0.105 256); font-family: "Chakra Petch"; text-transform: uppercase; }
+  .bp .b2 { border: 1px solid oklch(97% 0.012 240); font-family: "Chakra Petch"; text-transform: uppercase; }
+
+  /* C: Specimen */
+  .sp { background: oklch(96.5% 0.016 82); color: oklch(17% 0.012 60); font-family: "Geist", sans-serif; }
+  .sp h1 { font-family: "Bodoni Moda", serif; font-weight: 400; font-size: 30px; font-optical-sizing: auto; }
+  .sp p { color: oklch(28% 0.014 60); }
+  .sp .addr { font-family: "Bodoni Moda", serif; font-size: 25px; padding: 10px 0; border-top: 1px solid oklch(80% 0.018 75); border-bottom: 1px solid oklch(80% 0.018 75);
+              background: linear-gradient(transparent 64%, oklch(55% 0.16 262 / .5) 64%, oklch(55% 0.16 262 / .5) calc(64% + 1px), transparent calc(64% + 1px)); }
+  .sp .addr em { font-style: normal; color: oklch(45% 0.18 262); }
+  .sp .cap { font-family: "Geist Mono", monospace; font-size: 11px; color: oklch(49% 0.014 65); }
+  .sp .b1 { background: oklch(17% 0.012 60); color: oklch(96.5% 0.016 82); }
+  .sp .b2 { border: 1px solid oklch(66% 0.02 72); }
+  .cards { grid-template-columns: 1fr !important; max-width: 760px; }
+  .card-image.hero { height: auto !important; aspect-ratio: auto !important; }
+</style>
+
+<h2>Направление стиля: какая «криптография» ваша?</h2>
+<p class="subtitle">Первый экран в трёх материалах Hallmark. Тексты черновые, адрес rDiAMond… — иллюстрация (форма настоящего адреса, но не сгенерирован). Скорости — из docs/benchmarks.md.</p>
+
+<div class="cards">
+  <div class="card" data-choice="terminal" onclick="toggleSelect(this)">
+    <div class="card-image hero t">
+      <div class="nav"><span>xrpl-vanity</span><span>docs  privacy  github</span></div>
+      <h1>Choose how your XRP Ledger address begins.</h1>
+      <p>Ed25519 keys searched on your CPU or GPU, fully offline, until an address carries your word.</p>
+      <div class="addr">r<b>DiAMond</b>Hgs4kQe7tWvNpYcX3bLm9fZu</div>
+      <div class="glyphs">rpshnaf39wB<i>U</i>DNEGHJKLM4PQ<i>R</i>ST7VWXYZ2bcdeC<i>g</i>65jkm8oFqi1<br>tuvAxyzrps<i>h</i>naf39wBUDNEG<i>H</i>JKLM4PQRST7VW<i>X</i>YZ2bcde<br>Cg65jkm8o<i>F</i>qi1tuvAxyzrpshnaf<i>3</i>9wBUDNEGHJKLM4P</div>
+      <div class="btns"><span class="b1">Desktop app</span><span class="b2">CLI on GitHub</span></div>
+    </div>
+    <div class="card-body">
+      <h3>A — Terminal</h3>
+      <p>Почти чёрный с зелёным отливом, фосфорная зелень, всё моноширинным Martian Mono. Картинки «напечатаны» символами base58 — пространство ключей как поток знаков. Самый «шифровальный», но ближе всех к привычному крипто-клише.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="blueprint" onclick="toggleSelect(this)">
+    <div class="card-image hero bp">
+      <div class="nav"><span>XRPL VANITY</span><span>Docs  Privacy  GitHub</span></div>
+      <h1>Choose how your XRP Ledger address begins</h1>
+      <p>Ed25519 keys searched on your CPU or GPU, fully offline, until an address carries your word.</p>
+      <div class="dim"><span>|</span><hr><span>7 chars, about 26.9 M keys/s on RTX 5070 Ti</span></div>
+      <div class="addr">r<u>DiAMond</u>Hgs4kQe7tWvNpYcX3bLm9fZu</div>
+      <div class="btns"><span class="b1">Desktop app</span><span class="b2">CLI on GitHub</span></div>
+    </div>
+    <div class="card-body">
+      <h3>B — Blueprint</h3>
+      <p>Прусская синь, белая линия, сетка чертежа, размерные цепочки. Адрес — «изделие», а его цена в символах и ключах — размеры на чертеже. Криптография как инженерный расчёт: сколько стоит каждая буква.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="specimen" onclick="toggleSelect(this)">
+    <div class="card-image hero sp">
+      <div class="nav"><span>XRPL Vanity</span><span>Docs  Privacy  GitHub</span></div>
+      <h1>Choose how your XRP Ledger address begins.</h1>
+      <p>Ed25519 keys searched on your CPU or GPU, fully offline, until an address carries your word.</p>
+      <div class="addr">r<em>DiAMond</em>Hgs4kQe7tWvNpYcX3bLm9fZu</div>
+      <div class="cap">58 symbols, no 0 O I l. Your word sets the cost.</div>
+      <div class="btns"><span class="b1">Desktop app</span><span class="b2">CLI on GitHub</span></div>
+    </div>
+    <div class="card-body">
+      <h3>C — Specimen (шифровальная книга)</h3>
+      <p>Светлая бумага, бритвенный Bodoni, одна чернильно-синяя метка. Адрес набран как образец шрифта — криптография как старая наука о шифрах и кодовых книгах. Самый неожиданный для крипто-продукта, а значит самый узнаваемый.</p>
+    </div>
+  </div>
+</div>
