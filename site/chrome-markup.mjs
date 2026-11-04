@@ -25,9 +25,15 @@ function renderHead({ pagePath, title, description }) {
     '<link rel="stylesheet" href="/css/base.css">',
     '<link rel="stylesheet" href="/css/site.css">',
     '<meta property="og:type" content="website">',
+    '<meta property="og:site_name" content="XRPL Vanity">',
     `<meta property="og:url" content="${url}">`,
     `<meta property="og:title" content="${escapeHtml(title ?? '')}">`,
     `<meta property="og:description" content="${escapeHtml(description ?? '')}">`,
+    `<meta property="og:image" content="${SITE_ORIGIN}/og-banner.png">`,
+    '<meta property="og:image:width" content="1200">',
+    '<meta property="og:image:height" content="630">',
+    `<meta property="og:image:alt" content="An XRP Ledger address carrying the word STATiCBiT, found in a field of address characters">`,
+    '<meta name="twitter:card" content="summary_large_image">',
   ].join('\n');
 }
 

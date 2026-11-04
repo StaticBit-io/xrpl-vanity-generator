@@ -12,7 +12,7 @@ site/
   checks.mjs         the checks: third-party requests, inline code, broken links, unfenced e-mail
   chrome-markup.mjs  the shared head, header and footer, and the support address
   serve.mjs          dev server for site/dist
-  tools/             contrast.mjs: the contrast report and its check (not published)
+  tools/             contrast.mjs: the contrast report and its check; og-banner.mjs: the link-card picture (not published)
   test/              node:test suites
   dist/              build output, git-ignored
 ```
@@ -74,6 +74,8 @@ Hallmark, theme Terminal. The stamp at the top of `src/css/site.css` records the
 (`src/fonts/SOURCES.txt`), so a character outside it, such as an arrow, falls back to another face.
 
 The mark is Martian Mono's `r` at weight 500 and width 100, drawn as an outline in the site green on the site black. The same path is in `src/favicon.svg`, the application's `appicon.svg`, `splash.svg` and `NavRail.razor`, and `tray.ico` is rendered from it; `logo.test.mjs` keeps them equal. After changing the icon, delete `obj/**/resizetizer`: the MAUI icon step can keep old images.
+
+`src/og-banner.png` is the picture link previews show. `node site/tools/og-banner.mjs` draws it again with headless Chrome or Edge. Its address carries the brand and is an example: it has no valid checksum, so a wallet rejects it. Telegram and others cache a preview by URL; [@WebpageBot](https://t.me/WebpageBot) refreshes one in Telegram.
 
 To repeat Hallmark's rendered check, install `puppeteer-core` outside the repository, point
 `HALLMARK_PUPPETEER` at that folder, start `serve.mjs`, and run `sloplint.mjs` from a Hallmark checkout:
