@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work in the worktree `E:\GIT\XRPL\xrpl-vanity\.worktrees\paired-patterns` on branch `feature/paired-patterns`. Never `git stash`.
+- Work in the worktree `.worktrees/paired-patterns` on branch `feature/paired-patterns`. Never `git stash`.
 - Tests are xUnit v3 run as executables: `dotnet run --project tests/XrplVanity.Tests -c Release [-- -class "*Name"]` and `dotnet run --project tests/XrplVanity.App.Tests -c Release`. **Never `dotnet test`.** The Windows suite is 254 tests and the App suite 107, both 0 failed and 0 skipped before this work starts.
 - GPU-dependent tests skip through `GpuTestHelper.SkipOrFail` when hardware is absent; this machine has CUDA and OpenCL on one RTX 5070 Ti, so they run for real.
 - The CLI contract does not change: stdout `Address: {address}\tSeed: {seed}`, `--out` lines `{address}\t{seed}`, exit codes 0 / 2 / 130, and every existing warning and error text.
@@ -756,7 +756,7 @@ and record its rate line. Never paste a seed anywhere.
 - [ ] **Step 3: Validate and commit**
 
 ```bash
-PYTHONIOENCODING=utf-8 python "C:/Users/Evril/.claude/skills/developer-documentation/scripts/validate_docs.py" README.md docs/benchmarks.md docs/desktop-app.md docs/2026-09-06-xrpl-vanity-paired-patterns-design.md
+PYTHONIOENCODING=utf-8 python validate_docs.py README.md docs/benchmarks.md docs/desktop-app.md docs/2026-09-06-xrpl-vanity-paired-patterns-design.md
 git add README.md docs
 git commit -m "docs: paired patterns, their cost model and the measured throughput"
 ```

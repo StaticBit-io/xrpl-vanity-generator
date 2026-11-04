@@ -871,7 +871,7 @@ Do not touch `README.md`: the option table and the CLI are unaffected.
 - [ ] **Step 2: Validate and commit**
 
 ```bash
-PYTHONIOENCODING=utf-8 python "C:/Users/Evril/.claude/skills/developer-documentation/scripts/validate_docs.py" docs/desktop-app.md
+PYTHONIOENCODING=utf-8 python validate_docs.py docs/desktop-app.md
 git add docs
 git commit -m "docs: history selection, bulk actions and the confirmation dialog"
 ```

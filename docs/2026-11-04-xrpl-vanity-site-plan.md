@@ -6,9 +6,9 @@
 
 **Architecture:** Plain HTML, CSS and ES modules under `site/src/`. A dependency-free `site/build.mjs` copies them to `site/dist/`, fills shared markers (head, header, footer, support address, glyph field) and refuses a tree that breaks the site's own promises: third-party requests, inline code, broken internal links, an unfenced e-mail address. `node --test` suites tie the pages to `README.md`, `docs/desktop-app.md`, `docs/benchmarks.md` and `PRIVACY.md`.
 
-**Tech Stack:** Node 22+ (this machine has 24), `node:test`, no npm dependencies in the site. Hallmark v2.0.0 at `E:\GIT\XRPL\xrpl-file\run\sketches\.hallmark` for design and for `sloplint.mjs`.
+**Tech Stack:** Node 22+ (this machine has 24), `node:test`, no npm dependencies in the site. Hallmark v2.0.0, from a local clone, for design and for `sloplint.mjs`.
 
-**Spec:** `docs/2026-11-02-xrpl-vanity-site-design.md`. Reference implementation for structure: `E:\GIT\XRPL\xrpl-file\site` (read `README.md`, `build.mjs`, `serve.mjs`, `tools/contrast.mjs`).
+**Spec:** `docs/2026-11-02-xrpl-vanity-site-design.md`. Reference implementation for structure: the `site/` folder of xrpl-file (read `README.md`, `build.mjs`, `serve.mjs`, `tools/contrast.mjs`).
 
 ## Global Constraints
 
@@ -110,7 +110,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Scaffold the theme**
 
-Run: `node E:/GIT/XRPL/xrpl-file/run/sketches/.hallmark/skills/hallmark/scripts/theme.mjs scaffold terminal --dir site/src/css`
+Run: `node <hallmark>/skills/hallmark/scripts/theme.mjs scaffold terminal --dir site/src/css`
 Expected: `tokens.css` and `base.css` written.
 
 - [ ] **Step 4: Fetch Martian Mono (approved by the owner)**
@@ -304,7 +304,7 @@ In a new folder under the session scratchpad, run `npm install puppeteer-core`. 
 - [ ] **Step 2: Run the sweep on every page**
 
 Run `node site/build.mjs`, then for each built page, with `HALLMARK_PUPPETEER` set to that folder:
-`node E:/GIT/XRPL/xrpl-file/run/sketches/.hallmark/skills/hallmark/scripts/sloplint.mjs <page> --render`
+`node <hallmark>/skills/hallmark/scripts/sloplint.mjs <page> --render`
 Expected: no `FAIL`, and no "not run" note, at widths 320 to 1920. Fix each `FAIL`. Fix or waive each `REFLEX` on the record in the `site.css` stamp. Then do Hallmark's judged gates and finish review.
 
 - [ ] **Step 3: Check the claims by hand**
