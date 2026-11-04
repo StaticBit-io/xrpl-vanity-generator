@@ -2,13 +2,14 @@
 
 **XRPL Vanity** — desktop application for Windows, published by StaticBit.
 
-Last updated: 2026-09-16.
+Last updated: 2026-11-04.
 
 ## Summary
 
 The application collects nothing, sends nothing, and has no account system. It has no
 network code at all: no telemetry, no analytics, no crash reporting, no update check, no
-licence check. Everything it produces stays on the computer that produced it.
+licence check. Everything it produces stays on the computer that produced it, unless you move it yourself:
+by exporting a file, copying a seed or showing a QR code.
 
 ## What the application stores
 
@@ -33,6 +34,15 @@ Copying a seed places it on the Windows clipboard and clears it after a delay yo
 configure, and only if the clipboard still holds that same seed. Copying anything else in
 the meantime leaves your newer content alone.
 
+A copied seed stays out of Windows clipboard history and clipboard sync.
+
+## QR codes
+
+A result can be shown as a QR code for the StaticBit mobile wallet. A password is optional
+and encrypts the code; without one the code on your screen is not encrypted, and anyone who
+can see or photograph it can read the seed. A code holding a bare seed is never encrypted.
+The code is never written to disk and hides itself after 60 seconds.
+
 ## Network
 
 The application makes no network connections. The only traffic it can cause is a link you
@@ -47,9 +57,11 @@ The application is not directed at children and collects no information from any
 
 ## Removing your data
 
-Uninstalling removes the application. To delete the stored results first, use **Open
-folder** on the Settings page and delete `results.dat` and `settings.json`.
+Uninstalling removes the application and its data folder, including `results.dat` and every
+seed in it, and they cannot be recovered. Save the seeds you want to keep first. To delete
+the stored results without uninstalling, use **Open folder** on the Settings page and delete
+`results.dat` and `settings.json`.
 
 ## Contact
 
-Questions about this policy: https://github.com/StaticBit-io/xrpl-vanity-generator/issues
+Questions about this policy: support@staticbit.io

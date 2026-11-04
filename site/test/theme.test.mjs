@@ -45,5 +45,6 @@ test('every required text and control pair meets AA', () => {
 });
 
 test('the report is the one for the current tokens', () => {
-  assert.equal(readFileSync(REPORT_PATH, 'utf8'), renderReport(allRows()), 'run: node site/tools/contrast.mjs');
+  // A Windows checkout may hold the file with CRLF; the report itself is LF.
+  assert.equal(readFileSync(REPORT_PATH, 'utf8').replaceAll('\r\n', '\n'), renderReport(allRows()), 'run: node site/tools/contrast.mjs');
 });

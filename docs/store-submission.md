@@ -81,10 +81,10 @@ description, the feature list, and the notes for the certification team.
 Screenshots: `docs/images/desktop-search.png` shows the Search page and can be used as-is.
 The Store requires at least one screenshot at a minimum of 1366 x 768.
 
-The privacy policy URL is the repository's [PRIVACY.md](../PRIVACY.md):
+The privacy policy URL is the site's page, which carries the text of [PRIVACY.md](../PRIVACY.md):
 
 ```
-https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/PRIVACY.md
+https://xrpl-vanity.staticbit.io/privacy/
 ```
 
 ## 5. What certification is likely to ask about

@@ -91,7 +91,7 @@ https://github.com/StaticBit-io/xrpl-vanity-generator
 
 Generated seeds are stored locally, encrypted with the Windows Data Protection API under
 the current user, and are never transmitted. Privacy policy:
-https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/PRIVACY.md
+https://xrpl-vanity.staticbit.io/privacy/
 
 The package declares runFullTrust because it is a packaged desktop application that loads
 CUDA and OpenCL drivers and shows a tray icon.

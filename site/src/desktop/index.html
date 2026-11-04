@@ -44,14 +44,14 @@
 
 <h2 id="seeds">Seeds</h2>
 <p>A seed controls its account. It is masked everywhere until you reveal it, and it hides again after 15 seconds or when you leave the page. A copied seed is cleared from the clipboard after 30 seconds, unless you have copied something else by then. Both delays are yours to change in Settings.</p>
-<p><strong>Windows clipboard history (Win+V) and clipboard sync can keep their own copy,</strong> which this does not clear. Turn them off before you copy a seed, or use a QR code instead.</p>
+<p>A copied seed stays out of Windows clipboard history and clipboard sync.</p>
 <p>Results are stored in one file, <code>results.dat</code>, encrypted with the Windows Data Protection API (DPAPI). Only the Windows account that wrote the file can read it, so results do not move to another account or computer. No seed appears in a log, a notification or the tray menu.</p>
 <p><strong>Uninstalling the application deletes <code>results.dat</code>, and every seed in it.</strong> Save the seeds you want to keep first.</p>
 
 <h2 id="qr">Move a wallet to your phone</h2>
-<p>The QR button on a result shows that wallet, and <strong>Show QR</strong> shows every selected row. Scan the code with the StaticBit mobile wallet, which restores it from the backup format the code carries. One code holds up to 22 wallets, or 21 with a password.</p>
+<p>The QR button on a result shows that wallet, and <strong>Show QR</strong> shows every selected row. Scan the code with the <a href="https://staticbit.io">StaticBit</a> mobile wallet, which restores it from the backup format the code carries. One code holds up to 22 wallets, or 21 with a password.</p>
 <p><strong>Set a password if anyone could see your screen.</strong> It is optional and encrypts the code. Without it the code is not encrypted, and the dialog says so. The code is never written to disk and hides itself after 60 seconds.</p>
-<p>A bare seed can also be shown as a code for a single wallet. That code is never encrypted: it takes no password, and the dialog shows no warning. The StaticBit wallet does not import that form.</p>
+<p>A bare seed can also be shown as a code for a single wallet. That code is never encrypted: it takes no password, and the dialog says so. The <a href="https://staticbit.io">StaticBit</a> wallet can scan it too.</p>
 
 <h2 id="settings">Settings</h2>
 <p>Every change applies at once: there is no Save button.</p>
