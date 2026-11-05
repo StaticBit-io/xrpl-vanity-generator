@@ -1,25 +1,26 @@
-# Vanity address search in the StaticBit wallet — implementation plan
+# Vanity address search for the StaticBit wallet — implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let a user of the StaticBit mobile wallet search on the device for an address containing a chosen text while creating an account, and send searches too long for a phone to the desktop app.
+**Goal:** Make the CPU search of this repository available to the StaticBit mobile wallet as a NuGet package, and hand the wallet's developers a guide that lets them build the feature without further help.
 
-**Architecture:** Two repositories, joined by one NuGet package. Part A makes the CPU search of this repository usable without its GPU code and publishes it as `StaticBit.XrplVanity.Core`. Part B adds a service, a platform seam and one page to the wallet, and the found seed then takes the existing path through `AddWalletCommand` and the wizard. The search runs only while the app is open, because that keeps it clear of every background rule in "Store rules" below.
+**Architecture:** All changes land in this repository. The CPU search moves into `XrplVanity.Core`, which has no GPU dependency, and that project becomes the package `StaticBit.XrplVanity.Core`. `docs/wallet-integration.md` tells the wallet's developers how to use it, what the stores allow and how to check the result. **`Wallet.git` is read-only here: nothing in it is changed.**
 
-**Tech Stack:** .NET 10, BouncyCastle, .NET MAUI Blazor Hybrid on Android and iOS, GitHub Packages feed `github-staticbit`. Tests: xUnit v3 in both repositories; the wallet also uses Moq and FluentAssertions under its existing pins.
+**Tech Stack:** .NET 10, BouncyCastle, xUnit v3. The consumer is .NET MAUI Blazor Hybrid on Android and iOS, and the feed is GitHub Packages (`github-staticbit`).
 
 **Spec:** none — this plan is its own spec. Rates come from the "Android phone" section of `docs/benchmarks.md`.
 
 ## Global Constraints
 
-- **Part A branches from `origin/dev`** and its pull requests target `dev` with a squash merge. Part B follows the wallet's own flow from `main`.
-- **Tests here run with `dotnet run`, never `dotnet test`:** `dotnet run --project tests/XrplVanity.Tests -c Release --no-build`, one class with `-- -class "*CpuSearchWorkersTests"`. **The wallet uses `dotnet test`:** `dotnet test "src/[Tests]/SB.Application.Tests/SB.Application.Tests.csproj" -c Release`.
-- **The seed is a secret.** It never reaches a log, an exception message, a file or analytics. Log the stop reason and the candidate count only.
-- **The search runs only while the app is on screen.** No foreground service, no partial wake lock, no background task.
-- **Never say "mining"** in the interface, in store text or in code names. The feature generates keys.
-- Numeric limits live in `VanityLimits` (Task 5): 30 minutes expected, 90 minutes per run, 3 seconds of calibration, 20% battery, one core left free.
-- Explicit types instead of `var`. Comments in English, only where the code cannot say it itself. No AI attribution in commits. Commit messages follow each repository's own language.
-- The build stays warning-free in this repository. In the wallet, read `docs/instructions/UI/README.md` before writing UI and reuse its components.
+- **Work on a branch based on `origin/dev`.** Pull requests target `dev` with a squash merge.
+- **Do not edit anything under `E:\GIT\XRPL\Wallet.git`.** Reading it is fine.
+- **Tests run with `dotnet run`, never `dotnet test`:** whole suite `dotnet run --project tests/XrplVanity.Tests -c Release --no-build`, one class with `-- -class "*CpuSearchWorkersTests"`. After a code change, build first with `dotnet build XrplVanity.sln -c Release`.
+- **The build stays warning-free.**
+- **The seed is a secret.** The guide must say so, and no example may log it.
+- **Never say "mining"** in the guide's suggested interface or store text. The feature generates keys.
+- **No time limit on a search.** A long search gets a warning and a link to the desktop app, and the user may still start it. Nothing blocks or ends it for taking long.
+- Explicit types instead of `var`. Comments in English, only where the code cannot say it itself. No AI attribution in commits.
+- `docs/benchmarks.md` uses CRLF. Edit it without changing the other lines' endings: `sed -i` under Git Bash strips them, so use the Edit tool or a Python script working on bytes.
 
 ## Background
 
@@ -33,33 +34,47 @@ On a low-end phone (MT6765, 8 × Cortex-A53) the wallet's release settings reach
 | 5 characters | 35 minutes |
 | 6 characters | 17 hours |
 
-Rates differ too much between phones for a constant, so the page calibrates on the device before it predicts.
+Rates differ too much between phones for a constant, so the wallet measures the rate on the device before it predicts.
 
-**The search is memoryless.** Every candidate is independent, so stopping loses nothing and a new run has the same odds. That is why this plan has no pause, no resume and no saved state: every interruption is a plain stop with a "Continue" button.
+**The search is memoryless.** Every candidate is independent, so stopping loses nothing and a new run has the same odds. No pause, resume or saved state is needed: an interruption is a plain stop with a way to start again.
 
 ### Store rules
 
-Read on 2026-11-05 from the App Store Review Guidelines, the Google Play policy pages and the Android developer documentation.
+Read on 2026-11-05 from the [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), the Google Play policy pages and the Android developer documentation.
 
-- **Neither store forbids this search, and neither defines "mining".** Apple bans mining on the device (3.1.5(ii)), and Google bans it in its blockchain content policy. The outcome rests with the reviewer.
-- **Apple 2.4.2** rules out rapid battery drain, excessive heat and unnecessary strain, with no numbers, and it applies in the foreground too. This is the main risk and the reason for the limits in this plan.
+- **Neither store forbids this search, and neither defines "mining".** Apple bans mining on the device (3.1.5(ii)), and Google bans it in its [blockchain content policy](https://support.google.com/googleplay/android-developer/answer/13607354). The outcome rests with the reviewer.
+- **Apple 2.4.2** rules out rapid battery drain, excessive heat and unnecessary strain, with no numbers, and it applies in the foreground too. This is the main risk. With no time limit on a search, the battery and heat stops are what answers it.
 - **Apple 2.5.4** limits background services to their intended purposes. Stopping when the app leaves the screen keeps the feature outside it.
-- **Google Play** forbids bypassing power management and sets no CPU or battery limit. Foreground services need a declaration with a video, and `dataSync` is limited to 6 hours a day for apps targeting Android 15. Staying on screen avoids all of this.
-- **Android vitals** counts partial wake locks only in the background or under a foreground service. The ANR thresholds are 0.47% overall and 8% per phone model, which is why one core stays free.
+- **Google Play** [forbids bypassing power management](https://support.google.com/googleplay/android-developer/answer/9888379) and sets no CPU or battery limit. [Foreground services need a declaration with a video](https://support.google.com/googleplay/android-developer/answer/13392821), and `dataSync` is [limited to 6 hours a day](https://developer.android.com/develop/background-work/services/fgs/timeout) for apps targeting Android 15. Staying on screen avoids all of this.
+- **Android vitals** [counts partial wake locks](https://developer.android.com/topic/performance/vitals/excessive-wakelock) only in the background or under a foreground service. The [ANR thresholds](https://developer.android.com/google/play/vitals#core-vitals-faqs) are 0.47% overall and 8% per phone model, which is why one core stays free.
+
+### Facts about the wallet
+
+Read from `Wallet.git` on 2026-11-05. The guide states them and names the files.
+
+- `src/[UI]/SB.WalletApp.UI.App/Pages/Settings/Wallets/New.razor` is the entry screen; `Add.razor.cs` generates a wallet and fills `AddWalletCommand` with `ClassicAddress`, `KeyValue` (the seed), `KeyType = AccountKeyType.Seed` and `Algorithm`, stores it under `SessionStorageKeys.AddNewWallet`, and navigates to `settings/wallets/wizard`.
+- `Add.razor.cs` passes `showAlghoritm=true`, but `Wizard.razor.cs` reads `showAlgorithm`, so the wizard's algorithm drop-down stays hidden today. A vanity seed must keep it hidden: changing the algorithm re-derives the seed into a different address.
+- `IXrplClientService.WalletFromSeed(seed, null, null)` derives by the seed's prefix and returns the algorithm actually used.
+- `Directory.Packages.props` pins `BouncyCastle.Cryptography` at 2.6.1; the package needs 2.7.0.
+- `IAppLifecycleState.IsInBackground` says whether the app is on screen. `PageBase.DisposeAsync` cancels `_cts`, so `_cancellationToken` stops work when the user leaves a page.
+- `IDeviceInfoService` is the existing pattern for a platform seam: an interface in the Application project, implemented in `SB.MobileApp` and `SB.WebApp`. The wallet supports Android API 24 and iOS 15.
+- The web client is Blazor WASM, so the entry must be hidden there with `OperatingSystem.IsBrowser()`.
+
+### Desktop app
+
+The site is `https://xrpl-vanity.staticbit.io`, and the desktop page is `https://xrpl-vanity.staticbit.io/desktop/`. **The app is not in the Microsoft Store yet:** that page says it is on its way and links to a build from source, so until the listing is live the link leads to no installer.
 
 ## Review Focus
 
-Failure modes no happy path exercises. Each has a test or a device check in the owning task.
+Failure modes no happy path exercises. Each has a test or a check in the owning task.
 
-1. **The app leaves the screen in mid-search** (home button, call, lock). The search stops within a second, and the page shows why on return. Task 5, Task 8.
-2. **The search library and the wallet's SDK disagree on an address.** The user must never be shown a seed that restores a different address. Task 5.
-3. **The user leaves the page in mid-search**, by back navigation or by auto-lock. The threads stop and the screen may sleep again. Task 5, Task 8.
-4. **The search ends in any way at all** (found, stopped, exception). `KeepScreenOn` is released every time. Task 5.
-5. **A pattern that can never match, or one that is empty.** It is refused before any work starts. Task 5.
+1. **The CLI or the desktop app loses a type in the move.** Everything in the solution still builds and the whole suite passes. Task 2.
+2. **Digest state leaks between candidates** in the rewritten deriver, giving wrong addresses for a matching seed. Task 1.
+3. **The package drags in GPU code or the kernels.** The `.nupkg` holds one DLL, and its dependency list holds BouncyCastle alone. Task 4.
+4. **`MeasureRate` is called with a token already cancelled.** It returns promptly with `0` and starts nothing lasting. Task 3.
+5. **The guide's sample drifts from the published API.** The sample is compiled against the packed `.nupkg`, not against project references. Task 5.
 
 ---
-
-## Part A — xrpl-vanity
 
 ### Task 1: BouncyCastle digests in the deriver
 
@@ -77,8 +92,8 @@ Failure modes no happy path exercises. Each has a test or a device check in the 
 ```csharp
 [Fact]
 public void One_Instance_Gives_The_Same_Address_Twice()
-// derive the same entropy twice on one BouncyCastleDeriver, then a different entropy,
-// then the first again; Assert.Equal on the first and last, Assert.NotEqual on the middle
+// derive entropy A, then entropy B, then A again on one BouncyCastleDeriver;
+// Assert.Equal on the two A results, Assert.NotEqual on A and B
 ```
 
 - [ ] **Step 2: Run the deriver and cross-check tests against the current code**
@@ -92,20 +107,25 @@ Add `Sha512Digest` and `Sha256Digest` fields next to `_ripemd`. `Seed.AppendChec
 
 - [ ] **Step 4: Remove the second deriver from the benchmark**
 
-Delete `ManagedDigestDeriver.cs`, `CheckDeriversAgree` and the `managed-digests` column in `Bench.cs`. Under "Android phone" in `docs/benchmarks.md`, add one sentence: `BouncyCastleDeriver` has used these digests since this commit, so the third column is what the app now runs.
+Delete `ManagedDigestDeriver.cs`, `CheckDeriversAgree` and the `managed-digests` column in `Bench.cs`. Under "Android phone" in `docs/benchmarks.md`, add one sentence: `BouncyCastleDeriver` has used these digests since this change, so the table's last column is what the code now does, and the benchmark prints one column.
 
 - [ ] **Step 5: Run the whole suite and compare desktop rates**
 
-Run: `dotnet run --project tests/XrplVanity.Tests -c Release --no-build`
-Expected: PASS.
-Run the CLI with `--case-sensitive --starts abc --count 6 --threads 1`, interleaved against the previous commit.
-Expected: no drop beyond noise from about 16,500/s (the benchmark measured 19,680/s and 22,032/s).
+Run: `dotnet build XrplVanity.sln -c Release`, then the whole suite.
+Expected: no warnings, PASS.
+Run: `dotnet run --project src/XrplVanity.Cli -c Release --no-build -- --case-sensitive --starts abc --count 6 --threads 1 | grep '^CPU:'` (the filter keeps seeds out of the output)
+Expected: a `CPU:` rate of at least 15,000/s. The previous code measured about 16,500/s here.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Build the benchmark app**
+
+Run: `dotnet build tools/XrplVanity.MobileBench -c Release -p:AndroidSdkDirectory="C:\Program Files (x86)\Android\android-sdk"`
+Expected: build succeeds.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/XrplVanity.Core/BouncyCastleDeriver.cs tests/XrplVanity.Tests/AddressDeriverTests.cs tools/XrplVanity.MobileBench docs/benchmarks.md
-git commit -m "perf(core): hash in managed code, where Android's one-shot calls cost 12 us each"
+git commit -m "perf(core): hash in managed code, where Android's one-shot calls cost about 12 us each"
 ```
 
 ### Task 2: The CPU search without the GPU
@@ -135,11 +155,11 @@ Expected: FAIL on `Assert.Same`.
 
 - [ ] **Step 3: Move the three files with `git mv`, change their namespace to `XrplVanity.Core`, and make `CpuSearchWorkers` public**
 
-`SearchSession`, `SearchViewModel` and the tests already import `XrplVanity.Core`, so only stale `using` lines should need attention. Keep `SearchEstimatorTests` and `MatchSinkTests` where they are.
+`SearchSession`, `SearchViewModel` and the tests already import `XrplVanity.Core`, so the compiler should have little to say beyond stale `using` lines. Keep `SearchEstimatorTests` and `MatchSinkTests` where they are. Check `src/XrplVanity.Core/XrplVanity.Core.csproj` keeps `InternalsVisibleTo` for the tests.
 
 - [ ] **Step 4: Build and run everything**
 
-Run: `dotnet build XrplVanity.sln -c Release`, then `dotnet run --project tests/XrplVanity.Tests -c Release --no-build`
+Run: `dotnet build XrplVanity.sln -c Release`, then the whole suite.
 Expected: no warnings, PASS.
 
 - [ ] **Step 5: Commit**
@@ -157,7 +177,7 @@ git commit -m "refactor(core): move the CPU search into Core, so a phone needs n
 
 **Interfaces:**
 - Consumes: `CpuSearchWorkers`, `MatchSink` (Task 2).
-- Produces: `public static double CpuSearchWorkers.MeasureRate(int threads, TimeSpan duration, CancellationToken cancellationToken)`, candidates per second; blocks for `duration` or until cancelled; returns `0` when nothing was counted.
+- Produces: `public static double CpuSearchWorkers.MeasureRate(int threads, TimeSpan duration, CancellationToken cancellationToken)`, candidates per second; blocks for `duration` or until cancelled; returns `0` when nothing was counted or the token is already cancelled.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -170,6 +190,10 @@ public void MeasureRate_Is_Positive_And_Takes_About_The_Duration()
 [Fact]
 public void MeasureRate_Stops_When_Cancelled()
 // a token cancelled after 100 ms and a 60-second duration: returns within 5 seconds
+
+[Fact]
+public void MeasureRate_Returns_Zero_For_A_Token_Already_Cancelled()
+// new CancellationToken(canceled: true): returns 0 within 5 seconds
 ```
 
 - [ ] **Step 2: Run them to see them fail**
@@ -179,11 +203,11 @@ Expected: build error, `MeasureRate` is not defined.
 
 - [ ] **Step 3: Implement `MeasureRate`**
 
-Run the workers on a case-sensitive `zzzzzzzz` starts pattern with `MatchSink(limit: null, _ => { })`, under a `CancellationTokenSource` linked to the caller's and set with `CancelAfter(duration)`. Return `CandidatesSearched / Elapsed.TotalSeconds`.
+Return `0` at once if the token is already cancelled. Otherwise run the workers on a case-sensitive `zzzzzzzz` starts pattern with `MatchSink(limit: null, _ => { })`, under a `CancellationTokenSource` linked to the caller's and set with `CancelAfter(duration)`. Return `CandidatesSearched / Elapsed.TotalSeconds`.
 
 - [ ] **Step 4: Run the tests to see them pass**
 
-Run: the command from Step 2.
+Run: `dotnet build XrplVanity.sln -c Release`, then the command from Step 2.
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -196,254 +220,114 @@ git commit -m "feat(core): measure the search rate of the machine it runs on"
 ### Task 4: The package
 
 **Files:**
-- Modify: `src/XrplVanity.Core/XrplVanity.Core.csproj`, `README.md`
+- Modify: `src/XrplVanity.Core/XrplVanity.Core.csproj`, `README.md`, `.gitignore`
 
 **Interfaces:**
 - Produces: package `StaticBit.XrplVanity.Core` version `0.1.0`, target `net10.0`, dependency `BouncyCastle.Cryptography` 2.7.0.
 
 - [ ] **Step 1: Add package metadata to the project**
 
-`PackageId` `StaticBit.XrplVanity.Core`, `Version` `0.1.0`, `Authors` `StaticBit`, `PackageLicenseExpression` `Apache-2.0`, `RepositoryUrl` `https://github.com/StaticBit-io/xrpl-vanity-generator`, and a one-sentence `Description`.
+`PackageId` `StaticBit.XrplVanity.Core`, `PackageVersion` `0.1.0`, `Authors` `StaticBit`, `PackageLicenseExpression` `Apache-2.0`, `RepositoryUrl` `https://github.com/StaticBit-io/xrpl-vanity-generator`, and a one-sentence `Description`. Use `PackageVersion` and not `Version`: `Directory.Build.props` sets `Version` for the product, and the library versions on its own.
 
 - [ ] **Step 2: Add a short "Use as a library" section to the README**
 
-Show `PatternSet.Builder`, `MatchSink` with `limit: 1`, and `CpuSearchWorkers.Run`, then say that `Run` blocks and each worker owns its deriver.
+Say what the package is, name the feed, show `PatternSet.Builder`, `MatchSink` with `limit: 1` and `CpuSearchWorkers.Run`, and state that `Run` blocks and that each worker owns its deriver. Link to `docs/wallet-integration.md`.
 
-- [ ] **Step 3: Pack and inspect**
+- [ ] **Step 3: Ignore `artifacts/`, pack and inspect**
 
-Run: `dotnet pack src/XrplVanity.Core -c Release -o artifacts`
-Expected: `artifacts/StaticBit.XrplVanity.Core.0.1.0.nupkg`, containing `lib/net10.0/XrplVanity.Core.dll` and no GPU files. Confirm that `artifacts/` is ignored by git.
+Add `artifacts/` to `.gitignore`.
+Run: `dotnet pack src/XrplVanity.Core -c Release -o artifacts`, then list the package with `unzip -l artifacts/StaticBit.XrplVanity.Core.0.1.0.nupkg` and read its `.nuspec`.
+Expected: `lib/net10.0/XrplVanity.Core.dll` is the only DLL, no `.ptx` or `.h` file is present, and the one dependency is `BouncyCastle.Cryptography` 2.7.0.
 
-- [ ] **Step 4: Commit and open the pull request to `dev`**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add src/XrplVanity.Core/XrplVanity.Core.csproj README.md .gitignore
 git commit -m "build(core): package the search for the wallet"
 ```
 
-- [ ] **Step 5: Owner action — publish**
+### Task 5: The guide for the wallet's developers
 
-Publishing is outward-facing, so the owner confirms it first. After the merge:
+**Files:**
+- Create: `docs/wallet-integration.md`
+- Modify: `docs/benchmarks.md` only if a link needs fixing
+
+**Interfaces:**
+- Consumes: the packed `.nupkg` (Task 4); every section of this plan's Background.
+
+Write it in English for a developer who knows the wallet and has not seen this repository. Use the skill `developer-documentation`. Reuse the rate table and the store rules from Background, with their links. Use relative links to this repository's files.
+
+- [ ] **Step 1: Write the guide with these sections, in this order**
+
+1. **What you get:** one paragraph, the package name and version, and a line that the search is CPU only on a phone.
+2. **Add the package:** the `Directory.Packages.props` entry, the BouncyCastle bump from 2.6.1 to 2.7.0, and which project references it. The feed `github-staticbit` is already configured in the wallet.
+3. **Run a search:** a complete sample that builds a `PatternSet`, calls `CpuSearchWorkers.MeasureRate`, shows `SearchEstimator.ExpectedTimeToMatch`, runs `CpuSearchWorkers` on a long-running task with `MatchSink(limit: 1, …)`, reports `CandidatesSearched`, and cancels by `CancellationTokenSource`. It must not print the seed. State that `PatternSet.Unreachable` must be empty before starting.
+4. **Where it fits in the wallet:** the wallet facts, as a numbered path from `New.razor` to the wizard: a new page beside `Add.razor`, the same "Attention!" confirmation, `AddWalletCommand` filled the same way, the wizard reached without any algorithm parameter.
+5. **Check the seed before showing it:** call `WalletFromSeed(match.Seed, null, null)`, compare `ClassicAddress` with `match.Address`, take `Algorithm` from the model, and never show a seed whose address differs.
+6. **Rules for a search on a phone:**
+   - runs only while the app is on screen, and stops on background (poll `IAppLifecycleState` about once a second) or when the page goes away;
+   - no foreground service, no partial wake lock;
+   - `Math.Max(1, Environment.ProcessorCount - 1)` threads;
+   - keep the screen on during a search with `DeviceDisplay.Current.KeepScreenOn`, and release it on every exit;
+   - stops when the battery is below 20% and not charging;
+   - stops on heat: `PowerManager.CurrentThermalStatus >= ThermalStatus.Severe` on Android, behind `OperatingSystem.IsAndroidVersionAtLeast(29)`, and `NSProcessInfo.ProcessInfo.ThermalState >= NSProcessInfoThermalState.Serious` on iOS;
+   - no time limit; explain that the search is memoryless, so a stop loses nothing;
+   - hidden in the web client, through one `IsAvailable`-style check used by both the entry button and the page, which also makes hiding it on one platform a one-line change.
+7. **Warn about long searches:** when the expected time is above 30 minutes, show a warning and still let the user start. The warning offers the desktop app, with a link to `https://xrpl-vanity.staticbit.io/desktop/`, and says a found wallet comes back through Restore from QR code. Say plainly that the 30 minutes is a suggested trigger for the message and blocks nothing.
+8. **Suggested interface text:** this table, exactly.
+
+| Where | Text |
+| --- | --- |
+| Entry button | Create with a chosen address |
+| Estimate | About {time} on this device. It can take three times longer. |
+| Warning | This may take about {time} on this device. XRPL Vanity on a computer finds it much faster. |
+| Warning link | Get the desktop app |
+| During a search | Keep the app open while it searches. |
+| Left the screen | Search stopped because the app left the screen. |
+| Low battery | Search stopped because the battery is below 20%. |
+| Heat | Search stopped because the device got too hot. |
+| Under every stop | Continuing loses nothing: every try has the same chance. |
+
+9. **Store rules and review notes:** the store rules, then one paragraph each for App Review and Google Play saying that this is local key generation the user starts and can stop, that it runs only on screen and on all cores but one, that it stops on low battery and on heat, and that nothing is sent anywhere and no reward or pooled work is involved.
+10. **Expected speed:** the rate table, a link to the "Android phone" section of `benchmarks.md`, and how to rerun `tools/XrplVanity.MobileBench` on another phone.
+11. **Check before release:** a list a tester can follow. A four-character search ends in a saved wallet whose address contains the text, and that wallet signs a testnet transaction. Scrolling stays smooth during a search, and Stop answers within a second. The home button, a call and the power button each stop the search, and the page says why on return. Leaving the page stops the search and lets the screen sleep. A search that outlasts the shortest auto-lock setting leaves no seed on screen and no threads running. A 30-minute search on a current phone stays at a comfortable temperature.
+12. **Not known yet:** iOS has never been built or measured, and its release waits for that. Only one low-end Android phone is measured. LLVM (`-p:RunAOTCompilation=true -p:AndroidEnableProfiledAot=false -p:EnableLLVM=true`) gives about 2.3 times the rate of the release settings with the same digests, but its cost on the wallet is unmeasured. The reviewers' decision cannot be known in advance. The desktop app is not in the Microsoft Store yet, so the link leads to a page with no installer until it is.
+
+- [ ] **Step 2: Compile the sample against the packed package**
+
+In a scratch directory outside the repository, create a `net10.0` console project with a `nuget.config` whose only sources are `nuget.org` and the `artifacts` folder, reference `StaticBit.XrplVanity.Core` `0.1.0`, and paste the sample unchanged.
+Run: `dotnet run -c Release` with a one-character pattern.
+Expected: it builds with no project reference to this repository, finds a match, and exits.
+
+- [ ] **Step 3: Validate the Markdown**
+
+Run: `PYTHONIOENCODING=utf-8 python "C:/Users/Evril/.claude/skills/developer-documentation/scripts/validate_docs.py" docs/wallet-integration.md`
+Expected: passes.
+
+- [ ] **Step 4: Check the external links**
+
+Run `curl -sI` on the site link and confirm it answers 200.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add docs/wallet-integration.md
+git commit -m "docs: tell the wallet's developers how to add the search"
+```
+
+---
+
+## After the plan
+
+These are the owner's, and no task performs them:
+
+1. Merge the branch into `dev` through a pull request.
+2. Publish the package; it is an outward-facing step:
 
 ```bash
 dotnet nuget push artifacts/StaticBit.XrplVanity.Core.0.1.0.nupkg --source https://nuget.pkg.github.com/StaticBit-io/index.json --api-key <token>
 ```
 
-`<token>` is a GitHub token with `write:packages`. Part B starts once the feed lists the package.
+`<token>` is a GitHub token with `write:packages`.
 
----
-
-## Part B — wallet (`Wallet.git`)
-
-### Task 5: The search service
-
-**Files:**
-- Modify: `Directory.Packages.props`, `src/[Application]/SB.WalletApp.Application/SB.WalletApp.Application.csproj`, `src/[Application]/SB.WalletApp.Application/IoC/AppServiceExtensions.cs`
-- Create in `src/[Application]/SB.WalletApp.Application/Services/Vanity/`: `VanityLimits.cs`, `VanityModels.cs`, `IVanityDeviceHost.cs`, `IVanityAddressService.cs`, `VanityAddressService.cs`
-- Test: `src/[Tests]/SB.Application.Tests/Services/Vanity/VanityAddressServiceTests.cs`
-
-**Interfaces:**
-- Consumes: `StaticBit.XrplVanity.Core` (Part A); `IXrplClientService.WalletFromSeed(string, string?, string?)`; `IAppLifecycleState.IsInBackground`.
-- Produces:
-
-```csharp
-public static class VanityLimits
-{
-    public static readonly TimeSpan MaxExpectedTime = TimeSpan.FromMinutes(30);
-    public static readonly TimeSpan MaxRunTime = TimeSpan.FromMinutes(90);
-    public static readonly TimeSpan Calibration = TimeSpan.FromSeconds(3);
-    public const double BatteryFloor = 0.20;
-    public static int Threads(int processorCount) => Math.Max(1, processorCount - 1);
-}
-
-public sealed record VanityQuery(string Pattern, MatchPosition Position, bool IgnoreCase);
-public sealed record VanityEstimate(bool Reachable, TimeSpan? ExpectedTime, bool AllowedOnDevice);
-public enum VanityStopReason { Found, Cancelled, AppInBackground, BatteryLow, DeviceHot, TimeLimit }
-public sealed record VanityOutcome(VanityStopReason Reason, AddWalletCommand? Command, long Candidates);
-public enum VanityDeviceCondition { Normal, BatteryLow, Hot }
-
-public interface IVanityDeviceHost
-{
-    VanityDeviceCondition ReadCondition();
-    void KeepScreenOn(bool on);
-}
-
-public interface IVanityAddressService
-{
-    bool IsAvailable { get; }
-    Task<double> MeasureRateAsync(CancellationToken cancellationToken);
-    VanityEstimate Estimate(VanityQuery query, double ratePerSecond);
-    Task<VanityOutcome> SearchAsync(VanityQuery query, IProgress<long>? progress, CancellationToken cancellationToken);
-}
-```
-
-- [ ] **Step 1: Add the package and raise BouncyCastle**
-
-In `Directory.Packages.props`, add `StaticBit.XrplVanity.Core` `0.1.0` and raise `BouncyCastle.Cryptography` from 2.6.1 to 2.7.0, which the package requires. Reference the package from the Application project.
-Run: the whole `SB.Application.Tests` and `SB.WalletApp.Security.Tests` suites.
-Expected: PASS, so the BouncyCastle bump is proven before anything is built on it.
-
-- [ ] **Step 2: Write the failing tests**
-
-Give `VanityAddressService` an internal constructor taking a poll interval and a run limit, so tests use 20 ms and 300 ms. Fake `IVanityDeviceHost` and `IAppLifecycleState`, and set up `IXrplClientService.WalletFromSeed` with Moq to return the real `XrplWallet.FromSeed` result.
-
-| Test | Query | Assertion |
-| --- | --- | --- |
-| `Threads_Leave_One_Core_Free` | — | `Threads(8) == 7`, `Threads(1) == 1` |
-| `Estimate_Refuses_An_Empty_Pattern` | `""` | `Reachable` false, `AllowedOnDevice` false |
-| `Estimate_Allows_Four_Characters_On_A_Slow_Phone` | `abcd`, ignore case, 7,700/s | `AllowedOnDevice` true |
-| `Estimate_Blocks_Beyond_Thirty_Minutes` | `abcde`, ignore case, 7,700/s | `AllowedOnDevice` false, `ExpectedTime` above 30 minutes |
-| `Search_Returns_A_Command_For_The_Found_Address` | `a`, case-sensitive, `Starts` | `Found`; address starts with `ra`; `KeyValue` starts with `sEd`; `KeyType` is `Seed`; `Algorithm` is `ed25519` |
-| `Search_Refuses_When_The_Sdk_Derives_Another_Address` | mock returns another address | throws `InvalidOperationException`; the message contains no `sEd` |
-| `Search_Refuses_An_Unreachable_Pattern` | `""` | throws `ArgumentException`, no workers start |
-| `Search_Stops_When_The_App_Goes_To_The_Background` | `zzzzzzzz`, flips after start | `AppInBackground`, `Command` null |
-| `Search_Stops_On_Low_Battery` / `Search_Stops_When_Hot` | `zzzzzzzz`, condition changes | `BatteryLow` / `DeviceHot` |
-| `Search_Stops_At_The_Run_Limit` | `zzzzzzzz` | `TimeLimit` |
-| `Search_Reports_Cancelled_Without_Throwing` | token cancelled | `Cancelled`, `Candidates` above 0 |
-| `Search_Does_Not_Start_In_The_Background` | already in background | `AppInBackground`, `Candidates` is 0 |
-| `Screen_Is_Released_On_Every_Exit` | found, cancelled and the SDK-mismatch throw | `KeepScreenOn(true)` then `KeepScreenOn(false)` once each |
-| `Progress_Never_Goes_Backwards` | `zzzzzzzz`, cancelled | reported values non-decreasing |
-| `Search_Library_Agrees_With_The_Wallet_Sdk` | no mock: 100 random entropies | `BouncyCastleDeriver` address equals `XrplWallet.FromSeed(Seed.Encode(entropy), null, null).ClassicAddress` |
-
-- [ ] **Step 3: Run them to see them fail**
-
-Run: `dotnet test "src/[Tests]/SB.Application.Tests/SB.Application.Tests.csproj" -c Release --filter "FullyQualifiedName~Vanity"`
-Expected: build errors, the types are not defined.
-
-- [ ] **Step 4: Implement `VanityAddressService`**
-
-- `IsAvailable` is `!OperatingSystem.IsBrowser()`. It is the single decision point for the entry button and the page, so hiding the feature on iOS after a review refusal is a one-line change.
-- `Estimate` builds a `PatternSet`, treats any entry in `Unreachable` as not reachable, and takes the time from `SearchEstimator.ExpectedTimeToMatch`.
-- `SearchAsync` runs `CpuSearchWorkers` with `VanityLimits.Threads(Environment.ProcessorCount)` on a `TaskCreationOptions.LongRunning` task, with `MatchSink(limit: 1, …)`. The awaiting side polls the lifecycle, the device condition, the token and the clock once a second, reports `CandidatesSearched`, and cancels the pool on the first reason it finds.
-- After a match, call `WalletFromSeed(match.Seed, null, null)`. An empty algorithm means "by the seed's prefix". Throw if `ClassicAddress` differs from `match.Address`, and take `Algorithm` from the model.
-- `KeepScreenOn(false)` goes in a `finally`.
-
-Register the service as a singleton, and add `services.TryAddSingleton<IVanityDeviceHost, NullVanityDeviceHost>()` with a null host that reports `Normal`.
-
-- [ ] **Step 5: Run the tests to see them pass**
-
-Run: the command from Step 3, then the whole `SB.Application.Tests` project.
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-Stage the files above and commit in the wallet's commit style, type `feat(wallet)`.
-
-### Task 6: The phone's side of the seam
-
-**Files:**
-- Create: `src/[Clients]/SB.MobileApp/Services/MauiVanityDeviceHost.cs`
-- Modify: `src/[Clients]/SB.MobileApp/IoC/MobileAppServiceExtensions.cs`, `src/[Application]/SB.WalletApp.Application/Services/Vanity/IVanityDeviceHost.cs`
-- Test: `src/[Tests]/SB.Application.Tests/Services/Vanity/VanityDeviceRulesTests.cs`
-
-**Interfaces:**
-- Consumes: `IVanityDeviceHost`, `VanityLimits.BatteryFloor` (Task 5).
-- Produces: `public static VanityDeviceCondition VanityDeviceRules.Classify(double chargeLevel, bool charging, bool hot)` in the Application project, so the rule is tested without a phone.
-
-- [ ] **Step 1: Write the failing tests**
-
-`Classify(0.5, false, false)` is `Normal`; `Classify(0.19, false, false)` is `BatteryLow`; `Classify(0.19, true, false)` is `Normal`; `Classify(-1, false, false)` is `Normal`, because MAUI reports an unknown level as a negative; `Classify(0.5, false, true)` is `Hot`; `Classify(0.1, false, true)` is `Hot`.
-
-- [ ] **Step 2: Run them to see them fail**
-
-Run: `dotnet test "src/[Tests]/SB.Application.Tests/SB.Application.Tests.csproj" -c Release --filter "FullyQualifiedName~VanityDeviceRules"`
-Expected: build error.
-
-- [ ] **Step 3: Implement `Classify` and `MauiVanityDeviceHost`**
-
-- Battery: `Battery.Default.ChargeLevel` and `Battery.Default.State`.
-- Android heat: `PowerManager.CurrentThermalStatus >= ThermalStatus.Severe`, behind `OperatingSystem.IsAndroidVersionAtLeast(29)`, because the wallet supports API 24; older versions report not hot.
-- iOS heat: `NSProcessInfo.ProcessInfo.ThermalState >= NSProcessInfoThermalState.Serious`.
-- `KeepScreenOn`: `DeviceDisplay.Current.KeepScreenOn` through `MainThread.BeginInvokeOnMainThread`.
-
-- [ ] **Step 4: Run the tests and build the phone targets**
-
-Run: the command from Step 2, then `dotnet build "src/[Clients]/SB.MobileApp/SB.MobileApp.csproj" -f net10.0-android -c Debug`, then the same with `-f net10.0-ios` where a Mac is paired.
-Expected: PASS, build succeeds.
-
-- [ ] **Step 5: Commit**
-
-Stage the files above and commit in the wallet's commit style.
-
-### Task 7: The page
-
-**Files:**
-- Create: `src/[UI]/SB.WalletApp.UI.App/Pages/Settings/Wallets/AddVanity.razor`, `AddVanity.razor.cs`
-- Modify: `src/[UI]/SB.WalletApp.UI.App/Pages/Settings/Wallets/New.razor`, `New.razor.cs`
-
-**Interfaces:**
-- Consumes: `IVanityAddressService` (Task 5); `SessionStorageKeys.AddNewWallet`; route `settings/wallets/wizard`.
-- Produces: route `/settings/wallets/add-vanity`.
-
-- [ ] **Step 1: Add the entry point**
-
-In `New.razor`, add a Dark `Button` under "Create an account", labelled "Create with a chosen address", shown when `IVanityAddressService.IsAvailable`. It navigates to `settings/wallets/add-vanity`.
-
-- [ ] **Step 2: Build the page's four states**
-
-`AddVanity` inherits `PageBase<object>` with `[Authorize]`. When `IsAvailable` is false it goes to `PageUrls.ROOT`, so a deep link cannot reach it. Calibrate once on entry with `MeasureRateAsync(_cancellationToken)`. Pass `_cancellationToken` to the search: `PageBase.DisposeAsync` cancels it, which is what stops the threads when the user leaves.
-
-| State | Shows | Actions |
-| --- | --- | --- |
-| Compose | text box; `Starts` / `Ends` / `Contains` drop-down, default `Starts`; "Ignore case" toggle, default on; the estimate | Start, enabled only when `Reachable` and `AllowedOnDevice` |
-| Searching | candidates tried, elapsed time, "Keep the app open while it searches." | Stop |
-| Stopped | the reason text below | Continue, which starts the same query; Back to compose |
-| Found | the address, and the seed in a read-only `TextBox` with the copy button, as in `Add.razor` | Next |
-
-Next behaves as in `Add.razor`: confirm with the same "Attention!" dialog, store the command under `SessionStorageKeys.AddNewWallet`, and go to `settings/wallets/wizard` **without** an algorithm parameter. The wizard's algorithm drop-down would otherwise let the user re-derive the seed into a different address.
-
-- [ ] **Step 3: Use this copy exactly**
-
-| Where | Text |
-| --- | --- |
-| Estimate | About {time} on this device. It can take three times longer. |
-| Over the limit | That would take about {time} on this device. XRPL Vanity on a computer finds it much faster. Bring the result here with Restore from QR code. |
-| `AppInBackground` | Search stopped because the app left the screen. |
-| `BatteryLow` | Search stopped because the battery is below 20%. |
-| `DeviceHot` | Search stopped because the device got too hot. |
-| `TimeLimit` | Search stopped after 90 minutes. |
-| Under every stop | Continuing loses nothing: every try has the same chance. |
-
-- [ ] **Step 4: Build and run the suite**
-
-Run: `dotnet build src/SB.WalletApp.sln`, then the `SB.Application.Tests` project.
-Expected: build succeeds, PASS. Razor behaviour is checked on a device in Task 8.
-
-- [ ] **Step 5: Commit**
-
-Stage the page and `New.razor` and commit in the wallet's commit style.
-
-### Task 8: Device checks, LLVM and store text
-
-**Files:**
-- Create: `docs/vanity-search-review-notes.md` in the wallet repository
-
-- [ ] **Step 1: Check the feature on the Android test phone**
-
-Install a Release build on the HONOR phone. Its firmware silences app logcat, so judge by the screen. Expected:
-- A four-character search finds an address, and the wizard saves a wallet whose address contains the text.
-- The new wallet signs a testnet transaction.
-- Scrolling stays smooth during a search, and Stop answers within a second.
-- The home button, a call and the power button each stop the search, and the page shows the reason on return.
-- Leaving the page stops the search and the screen may sleep again.
-- With auto-lock set to its shortest value, a search that outlasts it leaves no seed on screen and no threads running.
-
-- [ ] **Step 2: Repeat Step 1 on an iPhone and a current Android phone, and record the rate and the heat**
-
-Run a 30-minute search on each. Add the rates to the "Android phone" section of this repository's `docs/benchmarks.md`, or to a new iOS section. **This is the first iOS measurement, and the iOS release waits for it.** If a phone gets uncomfortably hot, lower the thread count before release.
-
-- [ ] **Step 3: Measure LLVM on the real app**
-
-Build the Android AAB as it ships, then with `-p:RunAOTCompilation=true -p:AndroidEnableProfiledAot=false -p:EnableLLVM=true`. Record download size, build time, cold start and the search rate. **Owner decision:** enable it or stay with the default. The feature works either way; only the rates differ.
-
-- [ ] **Step 4: Write the review notes**
-
-In `docs/vanity-search-review-notes.md`, keep one paragraph for App Review and one for Google Play. They say that the feature is local key generation that the user starts and can stop; that it runs only while the app is on screen, on all cores but one, and stops on low battery, on heat and after 90 minutes; and that nothing is sent anywhere and no reward or pooled work is involved. Mention no other project's terms.
-
-- [ ] **Step 5: Owner action — submit**
-
-Submit with the notes attached. If a reviewer refuses the feature on one platform, change `IsAvailable` to exclude it and resubmit; the QR path from the desktop app keeps working there.
-
-- [ ] **Step 6: Commit**
-
-Stage the notes and commit in the wallet's commit style.
+3. Pass `docs/wallet-integration.md` to the wallet's developers.
