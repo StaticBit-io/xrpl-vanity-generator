@@ -1,0 +1,128 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace XrplVanity.Core;
+
+/// <summary>What a <see cref="CpuSearch.FindFirstAsync"/> call produced; <see cref="Found"/> is null when it was cancelled first.</summary>
+public readonly record struct CpuSearchOutcome(Match? Found, long Candidates, TimeSpan Elapsed);
+
+/// <summary>
+/// One-call entry points over <see cref="CpuSearchWorkers"/> that are safe to call from a UI.
+/// The workers are bare threads, call back on a worker thread and cancel the source they are
+/// given; here the caller's token is only ever observed, never handed over, and the callback
+/// merely stores the match, so nothing a UI owns is touched off its thread.
+/// </summary>
+public static class CpuSearch
+{
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(1);
+
+    // Never matches in practice, so a rate probe measures pure derivation and matching cost.
+    private static readonly PatternSet ProbePatterns =
+        new PatternSet.Builder().Add(MatchPosition.Starts, "zzzzzzzz", ignoreCase: false).Build();
+
+    /// <summary>
+    /// Measures candidates per second over <paramref name="duration"/>. Cancelling ends the probe
+    /// early and returns the rate measured so far; a token that is already cancelled returns 0.
+    /// </summary>
+    public static async Task<double> MeasureRateAsync(int threads, TimeSpan duration, CancellationToken cancellationToken)
+    {
+        if (duration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(duration), duration, "The duration must be positive.");
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return 0;
+        }
+
+        MatchSink sink = new(limit: null, _ => { });
+        (long candidates, TimeSpan elapsed) = await RunAsync(ProbePatterns, threads, sink, duration, progress: null, cancellationToken)
+            .ConfigureAwait(false);
+
+        return elapsed > TimeSpan.Zero ? candidates / elapsed.TotalSeconds : 0;
+    }
+
+    /// <summary>
+    /// Searches until one address matches or <paramref name="cancellationToken"/> is cancelled.
+    /// Cancellation is an outcome with <see cref="CpuSearchOutcome.Found"/> null, not an exception.
+    /// <paramref name="progress"/> receives the running candidate count about once a second and
+    /// once more with the final count, from a thread-pool thread: pass a <see cref="Progress{T}"/>
+    /// created on the UI thread to have it marshalled there.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="patterns"/> holds nothing reachable to search for.</exception>
+    public static async Task<CpuSearchOutcome> FindFirstAsync(
+        PatternSet patterns, int threads, IProgress<long>? progress, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(patterns);
+        if (!patterns.HasPatterns)
+        {
+            throw new ArgumentException("The pattern set has no reachable pattern to search for.", nameof(patterns));
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return default;
+        }
+
+        Match? found = null;
+        MatchSink sink = new(limit: 1, match => found = match);
+        (long candidates, TimeSpan elapsed) = await RunAsync(patterns, threads, sink, limit: null, progress, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Run has returned, so every worker is joined and the sink's write is visible here.
+        return new CpuSearchOutcome(found, candidates, elapsed);
+    }
+
+    private static async Task<(long Candidates, TimeSpan Elapsed)> RunAsync(
+        PatternSet patterns, int threads, MatchSink sink, TimeSpan? limit, IProgress<long>? progress, CancellationToken cancellationToken)
+    {
+        CpuSearchWorkers workers = new(threads, patterns, sink);
+
+        // Run cancels the source it is given when the sink refuses a match, so it gets a private
+        // one. It is disposed only after Run has returned: workers read it until they are joined.
+        using CancellationTokenSource stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (limit is TimeSpan after)
+        {
+            stop.CancelAfter(after);
+        }
+
+        // Run blocks for the whole search, so it must not take a thread-pool thread.
+        Task run = Task.Factory.StartNew(
+            () => workers.Run(stop), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+        try
+        {
+            if (progress is null)
+            {
+                await run.ConfigureAwait(false);
+            }
+            else
+            {
+                await ReportWhileRunningAsync(run, workers, progress).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            // Also reached when the progress callback throws: the workers must not outlive the call.
+            stop.Cancel();
+            await run.ConfigureAwait(false);
+        }
+
+        long candidates = workers.CandidatesSearched;
+        progress?.Report(candidates);
+        return (candidates, workers.Elapsed);
+    }
+
+    private static async Task ReportWhileRunningAsync(Task run, CpuSearchWorkers workers, IProgress<long> progress)
+    {
+        using PeriodicTimer timer = new(ProgressInterval);
+        Task tick = timer.WaitForNextTickAsync().AsTask();
+        while (await Task.WhenAny(run, tick).ConfigureAwait(false) != run)
+        {
+            progress.Report(workers.CandidatesSearched);
+            tick = timer.WaitForNextTickAsync().AsTask();
+        }
+    }
+}
