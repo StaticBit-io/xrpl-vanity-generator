@@ -46,16 +46,18 @@ jobs:
       - uses: actions/checkout@v4
       - run: bash linux/run-linux-tests.sh --cpu-only
 
-  # Publishes the package once both suites pass on main, which only merges from dev reach. It runs
-  # on every push there and skips a version the feed already has, so a run that failed or was
-  # replaced is made up for by the next one.
+  # Publishes the package once both suites pass on main, which only merges from dev reach. A tag
+  # marks the commit a version was published from, so every run compares main with what the feed
+  # holds and not with the previous push: a run that failed or was replaced is made up for by the
+  # next one, and a library change without a new version keeps failing until the version is raised.
+  # If the tag cannot be pushed after a publish, the next run fails on the duplicate: add it by hand.
   package:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [windows, linux]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       packages: write
     env:
       DOTNET_NOLOGO: 1
@@ -68,19 +70,28 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      # Skipping a version the feed has would otherwise hide a library change merged without a new
-      # one: the run would be green and the package would stay old.
-      - name: a change to the library raises the package version
-        env:
-          BEFORE: ${{ github.event.before }}
+      - name: find out whether there is a version to publish
+        id: release
         run: |
-          previous=$(git show "$BEFORE:$PROJECT" | grep '<PackageVersion>' || true)
-          current=$(grep '<PackageVersion>' "$PROJECT")
-          if [ "$previous" = "$current" ] && ! git diff --quiet "$BEFORE" "$GITHUB_SHA" -- src/XrplVanity.Core; then
-            echo "::error file=$PROJECT::src/XrplVanity.Core changed but PackageVersion did not, so nothing would be published. Raise it on dev and merge into main again."
+          version=$(sed -n 's:.*<PackageVersion>\(.*\)</PackageVersion>.*:\1:p' "$PROJECT")
+          : "${version:?no PackageVersion in $PROJECT}"
+          if ! git rev-parse --quiet --verify "refs/tags/core-v$version" > /dev/null; then
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          elif ! git diff --quiet "core-v$version" "$GITHUB_SHA" -- src/XrplVanity.Core; then
+            echo "::error file=$PROJECT::src/XrplVanity.Core changed since $version was published. Raise PackageVersion on dev and merge into main again."
             exit 1
           fi
-      - run: dotnet pack "$PROJECT" -c Release -o artifacts
-      - run: dotnet nuget push artifacts/*.nupkg --source https://nuget.pkg.github.com/StaticBit-io/index.json --api-key "$FEED_TOKEN" --skip-duplicate
+      - if: steps.release.outputs.version
+        run: dotnet pack "$PROJECT" -c Release -o artifacts
+      # No --skip-duplicate: with no tag for this version, finding it on the feed is a real conflict.
+      - if: steps.release.outputs.version
+        run: dotnet nuget push "artifacts/StaticBit.XrplVanity.Core.$VERSION.nupkg" --source https://nuget.pkg.github.com/StaticBit-io/index.json --api-key "$FEED_TOKEN"
         env:
+          VERSION: ${{ steps.release.outputs.version }}
           FEED_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: steps.release.outputs.version
+        run: |
+          git tag "core-v$VERSION" "$GITHUB_SHA"
+          git push origin "core-v$VERSION"
+        env:
+          VERSION: ${{ steps.release.outputs.version }}

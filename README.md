@@ -413,7 +413,9 @@ has been measured on an Android phone, see [docs/benchmarks.md](docs/benchmarks.
 it has not been built or run on iOS. It goes to the StaticBit GitHub Packages feed,
 `https://nuget.pkg.github.com/StaticBit-io/index.json`, when `dev` is merged into
 `main` and both test suites pass; the first version appears with the next such merge.
-A change to `src/XrplVanity.Core` needs a new `PackageVersion`, or that run fails.
+A change to `src/XrplVanity.Core` needs a new `PackageVersion`: until it has one, the
+run fails on every push to `main`. A `core-v<version>` tag marks what each version was
+published from.
 
 ```csharp
 using System.Threading;
