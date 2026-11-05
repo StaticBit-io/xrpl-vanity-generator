@@ -315,7 +315,7 @@ Notes on the sample:
   memory, ends the search and not the app: `FindFirstAsync` and `MeasureRateAsync` throw the
   original exception once every thread has stopped. The sample catches it, writes its type to
   the log and shows a plain status. That catch also covers the rest of the `try`, such as the
-  measure and the platform calls, so the log is where the cause is.
+  measure and the warning dialog, so the log is where the cause is.
 - `FindFirstAsync` throws only when it holds no match. A match it already holds is returned as
   usual and the failure is dropped, so a find always reaches `KeepAsync`. The same is true of an
   exception from `IProgress.Report`. In both cases the final progress report is skipped.
@@ -609,7 +609,10 @@ public interface IVanitySearchPlatform
     /// <summary>Must not throw; report an unknown battery as null.</summary>
     DeviceCondition ReadCondition();
 
-    /// <summary>Safe to call from any thread.</summary>
+    /// <summary>
+    /// Safe to call from any thread. Must not throw: the sample turns the screen off in a
+    /// finally that runs before a found key is saved, so a throw there would lose the key.
+    /// </summary>
     void SetKeepScreenOn(bool keepOn);
 }
 
@@ -643,7 +646,8 @@ Implement the interface in `SB.MobileApp` with these platform calls:
   plugged state is the extra `BatteryManager.ExtraPlugged`, and a non-zero value means the
   device is on a charger.
 - `DeviceDisplay.Current.KeepScreenOn` changes UI state, so set it on the main thread: wrap the
-  call in `MainThread.BeginInvokeOnMainThread` unless you know the caller is already on it.
+  call in `MainThread.BeginInvokeOnMainThread` unless you know the caller is already on it. A
+  direct call must catch what it throws, because `SetKeepScreenOn` must not throw.
 - What was checked: the Android calls above compile against .NET 10 for Android, and the
   battery broadcast ran on the test phone. The thermal status was never read on a device, and the
   iOS calls were never built, because no iOS build exists.
