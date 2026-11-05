@@ -404,6 +404,39 @@ See [docs/desktop-app.md](docs/desktop-app.md) for the requirements, how to buil
 and run it from source, how to sign and install the MSIX, and the manual smoke
 checklist.
 
+## Use as a library
+
+The search engine is also packaged as a NuGet package, `StaticBit.XrplVanity.Core`,
+for .NET 10 applications that want to generate vanity addresses themselves, such as
+a wallet. It runs on the CPU in managed code and pulls in no native or GPU code. It
+has been measured on an Android phone, see [docs/benchmarks.md](docs/benchmarks.md);
+it has not been built or run on iOS. It is meant for the StaticBit GitHub Packages
+feed, `https://nuget.pkg.github.com/StaticBit-io/index.json`, and is not published
+there yet.
+
+```csharp
+using System.Threading;
+using XrplVanity.Core;
+
+PatternSet patterns = new PatternSet.Builder()
+    .Add(MatchPosition.Starts, "abc", ignoreCase: true)
+    .Build();
+
+CpuSearchOutcome outcome = await CpuSearch.FindFirstAsync(
+    patterns, threads: 4, progress: null, CancellationToken.None);
+
+if (outcome.Found is Match match)
+{
+    Console.WriteLine(match.Address);
+}
+```
+
+The result carries the seed too. Treat it as a secret: store it encrypted and keep
+it out of logs.
+
+See [docs/wallet-integration.md](docs/wallet-integration.md) for how to add the
+package to an application and run a search from its user interface.
+
 ## Acknowledgements
 
 This tool is inspired by, and its CLI surface and matching semantics are

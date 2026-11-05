@@ -3,7 +3,6 @@ using System.Linq;
 using XrplVanity.Cli;
 using XrplVanity.Core;
 using XrplVanity.Gpu;
-using XrplVanity.Search;
 using Xunit;
 
 namespace XrplVanity.Tests;

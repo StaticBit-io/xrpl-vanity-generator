@@ -1,7 +1,6 @@
 using System;
-using XrplVanity.Core;
 
-namespace XrplVanity.Search;
+namespace XrplVanity.Core;
 
 /// <summary>
 /// The single place matches pass through: enforces the optional count limit exactly and hands
