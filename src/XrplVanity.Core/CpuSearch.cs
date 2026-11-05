@@ -8,10 +8,11 @@ namespace XrplVanity.Core;
 public readonly record struct CpuSearchOutcome(Match? Found, long Candidates, TimeSpan Elapsed);
 
 /// <summary>
-/// One-call entry points over <see cref="CpuSearchWorkers"/> that are safe to call from a UI.
-/// The workers are bare threads, call back on a worker thread and cancel the source they are
-/// given; here the caller's token is only ever observed, never handed over, and the callback
-/// merely stores the match, so nothing a UI owns is touched off its thread.
+/// One-call entry points over <see cref="CpuSearchWorkers"/>. The workers are bare threads, call
+/// back on a worker thread and cancel the source they are given; here the caller's token is only
+/// ever observed, never handed over, the callback merely stores the match, and cancellation is an
+/// outcome, not an exception. Progress is reported on an arbitrary thread, so a caller that owns
+/// UI state must marshal it.
 /// </summary>
 public static class CpuSearch
 {
@@ -51,9 +52,9 @@ public static class CpuSearch
     /// Searches until one address matches or <paramref name="cancellationToken"/> is cancelled.
     /// Cancellation is an outcome with <see cref="CpuSearchOutcome.Found"/> null, not an exception.
     /// <paramref name="progress"/> receives the running candidate count about once a second and
-    /// once more with the final count, from a thread-pool thread: pass a <see cref="Progress{T}"/>
-    /// created on the UI thread to have it marshalled there. Arguments are validated before the
-    /// token is looked at, so a bad one throws whatever the token's state.
+    /// once more with the final count, on an arbitrary thread, the final report included: pass a
+    /// <see cref="Progress{T}"/> created on the UI thread to have it marshalled there. Arguments
+    /// are validated before the token is looked at, so a bad one throws whatever the token's state.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="patterns"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="patterns"/> holds nothing reachable to search for.</exception>
