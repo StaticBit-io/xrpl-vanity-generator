@@ -305,8 +305,8 @@ The test suite runs on Linux inside Docker, with two modes:
   suite without GPU passthrough; CUDA rows are skipped (59 tests) with the
   reason "CUDA driver library not found"; OpenCL rows run on pocl. The run
   asserts OpenCL is present and the remaining 106 tests pass, 0 failed. This
-  exercises the "machine without NVIDIA" scenario and makes a CPU-only CI
-  job now possible. The same CLI smokes run against `opencl:0` only
+  exercises the "machine without NVIDIA" scenario and is what the `linux` job
+  in `.github/workflows/dotnet.yml` runs. The same CLI smokes run against `opencl:0` only
   (`--gpu-devices all` reports `on 1 device(s)`), plus two additional exit-2
   smokes specific to this mode: `--gpu-devices cuda` and `--backend cuda`
   each fail with a "no matching device" / "no usable device" reason, since
