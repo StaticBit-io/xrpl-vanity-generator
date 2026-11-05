@@ -133,6 +133,21 @@ public class CpuSearchTests
         Assert.Equal(0, rate);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_Worker_Failure_Reaches_The_Caller_As_An_Exception(bool withProgress)
+    {
+        InvalidOperationException failure = new("sink failed");
+        MatchSink sink = new(limit: null, _ => throw failure);
+        IProgress<long>? progress = withProgress ? new SyncProgress() : null;
+
+        InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CpuSearch.RunAsync(OneChar(), threads: 2, sink, limit: null, progress, CancellationToken.None));
+
+        Assert.Same(failure, thrown);
+    }
+
     [Fact]
     public void Match_ToString_Hides_The_Seed()
     {
