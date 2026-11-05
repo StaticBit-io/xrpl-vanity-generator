@@ -141,6 +141,8 @@ public class SearchViewModelTests
         vm.Start();
 
         WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+        // OnCompleted goes Idle first and notifies last, so this is the end of the completion work.
+        WaitUntil(() => { lock (notes.Sent) return notes.Sent.Any(n => n.Title == "Search finished"); }, "the finish notification");
         Assert.Equal(SessionOutcome.CountReached, vm.LastSummary!.Outcome);
         Assert.Equal(3, vm.Results.Count);
         Assert.All(vm.Results, r => Assert.StartsWith("ra", r.Address));
