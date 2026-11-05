@@ -29,6 +29,12 @@ test('a module script from a file and ordinary prose are not inline code', () =>
   assert.deepEqual(findInlineCode('a.html', '<p>the style= attribute and one onclick= are words here</p>'), []);
 });
 
+test('a JSON-LD block is data, and no other script type is', () => {
+  assert.deepEqual(findInlineCode('a.html', '<script type="application/ld+json">{}</script>'), []);
+  assert.equal(findInlineCode('a.html', '<script type="text/javascript">x()</script>').length, 1);
+  assert.equal(findInlineCode('a.html', '<script type="module">x()</script>').length, 1);
+});
+
 test('a root-relative link resolves to a built file, with the fragment dropped', () => {
   const files = new Set(['privacy/index.html', 'index.html', 'css/site.css']);
   const pages = new Map([['index.html', '<a href="/privacy/#contact">p</a><a href="/">h</a><link href="/css/site.css">']]);

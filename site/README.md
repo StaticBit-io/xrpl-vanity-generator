@@ -8,7 +8,7 @@ copying `site/dist/` and translating `src/_headers`.
 site/
   src/               everything that is published (pages, js/, css/, fonts/, _headers)
   wrangler.toml      the Pages project: name and output directory
-  build.mjs          assembles site/dist and refuses a tree that breaks the checks
+  build.mjs          assembles site/dist, writes sitemap.xml and robots.txt, refuses a tree that breaks the checks
   checks.mjs         the checks: third-party requests, inline code, broken links, unfenced e-mail
   chrome-markup.mjs  the shared head, header and footer, and the support address
   serve.mjs          dev server for site/dist
@@ -133,4 +133,5 @@ Cloudflare account, that also creates the DNS record. Until then production is o
 4. The custom domain is attached, and Cloudflare Web Analytics is off for the project: `/privacy/` says the site runs no analytics.
 5. On the live `/support/`, the page source has no `email-decode` script and no `[email protected]`, and no response sets a cookie: a zone feature such as Bot Fight Mode can add `__cf_bm`, which would make `/privacy/` wrong.
 6. "Last updated" on `/privacy/` is the publication date.
-7. The site's URLs go into the Store listing fields only after all of the above.
+7. The site is verified in Google Search Console and Bing Webmaster Tools, and `sitemap.xml` is submitted to both.
+8. The site's URLs go into the Store listing fields only after all of the above.
