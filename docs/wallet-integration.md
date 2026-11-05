@@ -9,8 +9,8 @@ describes both code bases as they were on 2026-11-05.
 
 `StaticBit.XrplVanity.Core` 0.1.0 is a managed C# library in the namespace `XrplVanity.Core`.
 It generates Ed25519 family seeds and keeps the first one whose classic address matches a
-pattern, for example an address that starts with `rAbc`. It has no GPU code, and on a phone it
-runs on the CPU only.
+pattern, for example one with the text `Abc` right after the leading `r` that every classic
+address has. It has no GPU code, and on a phone it runs on the CPU only.
 
 The package is packed but not published: `artifacts/StaticBit.XrplVanity.Core.0.1.0.nupkg` in
 this repository holds the final code. It becomes available on the `github-staticbit` feed once
@@ -69,6 +69,7 @@ public partial class VanitySearch : PageBase<object>
     [Inject]
     private IVanitySearchPlatform _platform { get; set; } = default!;
 
+    private bool _running;
     private CancellationTokenSource? _search;
     private string? _stopReason;
     private string _status = "";
@@ -85,6 +86,33 @@ public partial class VanitySearch : PageBase<object>
 
     private async Task StartAsync(string prefix)
     {
+        // A second tap while a search runs must not start another: it would overwrite _search,
+        // and Stop would then reach only the new one.
+        if (_running)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            await RunSearchAsync(prefix);
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private async Task RunSearchAsync(string prefix)
+    {
+        // PatternSet matches the part of the address after its fixed leading 'r'.
+        if (prefix.StartsWith('r'))
+        {
+            _status = "Type the text without the leading r: every address already starts with it.";
+            return;
+        }
+
         PatternSet patterns = new PatternSet.Builder()
             .Add(MatchPosition.Starts, prefix, ignoreCase: true)
             .Build();
@@ -246,6 +274,14 @@ Notes on the sample:
   a set with no pattern. They check these before they look at the token. `Math.Max(1, ...)` keeps
   `threads` valid on a single core.
 - Cancelling the token is an outcome, not an exception: `Found` is `null`.
+- Every classic address starts with `r`, and `PatternSet` matches the part after it. The text the
+  user types therefore goes in without the `r`: passing `rAbc` would search for addresses that
+  read `rrAbc`. The sample refuses text that starts with a lowercase `r`, so that this cannot
+  happen silently. The price is that a user cannot ask for an address whose second character is
+  a lowercase `r`, which is about 1 address in 1,350 anyway.
+- `StartAsync` returns at once while a search is active, so a second tap cannot start another
+  one. Also disable the Start button while `_running` is true, so the user sees that it is
+  busy.
 - The builder folds the look-alike characters `0`, `O`, `I` and `l` onto the letters that base58
   has. Any other character outside the alphabet, such as `_` or a space, lands in `Unreachable`,
   and so does an empty pattern.
