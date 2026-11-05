@@ -350,9 +350,11 @@ column, not the first two.
 | Mono, full AOT with LLVM | 2,812 and 2,807/s | 14,889 and 15,039/s | 20,944 and 20,713/s |
 | CoreCLR (experimental on Android) | 3,467 and 3,468/s | 12,654 and 12,705/s | 15,541 and 15,531/s |
 
-The wallet's settings reach 7,700/s, about 14 times below the 12-thread desktop CPU path and
-about 4,000 times below the GPU. At that rate a case-insensitive prefix of five characters takes
-about 35 minutes on average and one of six takes about 17 hours; with LLVM and managed digests
+Before the digest change, the wallet's settings reached 7,700/s, about 14 times below the
+12-thread desktop CPU path and about 4,000 times below the GPU. At that rate a case-insensitive
+prefix of five characters took about 35 minutes on average and one of six took about 17 hours.
+With the managed digests that `BouncyCastleDeriver` uses now, the same settings reach about
+8,900/s, and the two take about 31 minutes and about 15 hours; with LLVM and managed digests
 they take 13 minutes and 6.4 hours.
 
 Full AOT without LLVM buys nothing. LLVM doubles the single-thread rate and wins at 8 threads,

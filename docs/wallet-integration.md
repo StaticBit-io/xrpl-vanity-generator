@@ -86,6 +86,13 @@ public partial class VanitySearch : PageBase<object>
 
     private async Task StartAsync(string prefix)
     {
+        // A direct URL opens this page on a client where the feature is off, such as the web client.
+        if (!_platform.IsAvailable())
+        {
+            _status = "This is not available on this device.";
+            return;
+        }
+
         // A second tap while a search runs must not start another: it would overwrite _search,
         // and Stop would then reach only the new one.
         if (_running)
@@ -126,10 +133,13 @@ public partial class VanitySearch : PageBase<object>
         _stopReason = null;
         _candidates = 0;
 
+        // A new search must not leave the previous seed on screen or saveable by Next.
+        _wallet = null;
+        _command = null;
+
         // Linked to the page's source, so leaving the page cancels the search.
         using CancellationTokenSource search = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
         _search = search;
-        _platform.SetKeepScreenOn(true);
         Task watch = Task.CompletedTask;
         CpuSearchOutcome outcome = default;
         try
@@ -162,6 +172,10 @@ public partial class VanitySearch : PageBase<object>
 
             _status = "Keep the app open while it searches.";
             StateHasChanged();
+
+            // Only the search holds the screen: not the measure, and not the warning dialog,
+            // which the user may leave open. The watcher starts together with it.
+            _platform.SetKeepScreenOn(true);
             watch = WatchDeviceAsync(search);
 
             // Progress<long> created here, on the UI thread, posts back to it. The callback
@@ -178,6 +192,7 @@ public partial class VanitySearch : PageBase<object>
         finally
         {
             // Every exit gets here, a found seed included, so the screen can sleep again.
+            // Turning it off when it was never turned on is harmless.
             search.Cancel();
             await watch;
             _search = null;
@@ -320,6 +335,10 @@ for a chosen address:
 6. Fill `AddWalletCommand` the same way, store it under `SessionStorageKeys.AddNewWallet`, and
    navigate to `settings/wallets/wizard` with no query parameter. See the code in the next
    section.
+7. Decide what Back from the wizard does. It recreates the page, so the sample's `_wallet` and
+   `_command` are gone and the found address with them. The seed then stays only in the command
+   under `SessionStorageKeys.AddNewWallet`. Either restore the page from that command, or accept
+   the loss knowingly: the user who goes back searches again.
 
 Do not pass an algorithm parameter to the wizard. `Add.razor.cs` passes `showAlghoritm=true`, but
 `Wizard.razor.cs` reads `showAlgorithm`, so the algorithm drop-down is hidden today, and it must
@@ -355,6 +374,8 @@ public partial class VanitySearch
         XrplWalletModel wallet = await _xrpl.WalletFromSeed(match.Seed, null, null);
         if (!string.Equals(wallet.ClassicAddress, match.Address, StringComparison.Ordinal))
         {
+            _wallet = null;
+            _command = null;
             return false;
         }
 
@@ -448,12 +469,15 @@ Implement the interface in `SB.MobileApp` with these platform calls:
 ## Rules for a search on a phone
 
 - **Where it is available.** Offer the feature on Android 10 (API 29) and later, and on iOS,
-  through one `IsAvailable`-style check that the entry button and the page both use. That
-  excludes the web client; Windows, which has the desktop app; and Android below 10, which has
-  no thermal status to stop on. The wallet itself supports Android 7 (API 24) and iOS 15, so
+  through one `IsAvailable` check that the entry button and the page both use; the sample's
+  `StartAsync` makes it first, because a direct URL opens the page on the web client too. The
+  check excludes the web client; Windows, which has the desktop app; and Android below 10, which
+  has no thermal status to stop on. The wallet itself supports Android 7 (API 24) and iOS 15, so
   the check is what keeps the feature off the older Android versions. It also makes hiding the
-  feature on one platform a one-line change. On Android the check is
-  `OperatingSystem.IsAndroidVersionAtLeast(29)`.
+  feature on one platform a one-line change. In `SB.MobileApp` it is one expression:
+  `OperatingSystem.IsAndroidVersionAtLeast(29) || OperatingSystem.IsIOS()`. It is false on
+  Windows and in the browser, and the null implementation returns `false` for every other
+  client.
 - **Only while the app is on screen.** Subscribe to `AppEventNotifier.OnAppLifecycleChanged`,
   stop when `args.IsInBackground` is true, and stop when the page goes away. The sample does
   both, and `Swap.razor.cs` shows another page subscribing. `IAppLifecycleState.IsInBackground`
@@ -551,7 +575,8 @@ screen on while it runs. Nothing is sent anywhere, and no reward or pooled work 
 
 On a low-end phone (MediaTek MT6765, 8 x Cortex-A53), on 8 threads, the wallet's release
 settings reach about 8,900 candidates per second. LLVM AOT reaches about 20,800 per second. Ten
-minutes showed no throttling, and the charge fell by 2 to 3 points. This guide recommends one
+minutes with the platform hashes, which ran at 7,761 per second, showed no throttling, and the
+charge fell by 2 points. This guide recommends one
 thread fewer, so expect slightly less than these rates. The table is the expected time at 8,900
 per second:
 
@@ -560,6 +585,12 @@ per second:
 | 4 characters | about 1 minute |
 | 5 characters | about 31 minutes |
 | 6 characters | about 15 hours |
+
+The table is the best case. It assumes the first character after the `r` is one of the common
+ones. Text that starts with `c`, `i`, `o`, `t`, `v`, `x`, `y` or `z`, or with one of the digits
+`0`, `1`, `2`, `5`, `6`, `7` and `8`, costs far more: `xrpl` takes about 62 minutes at 8,900/s,
+where `abcd` takes about 1, and `1234` takes about 8 hours. The estimate that the sample shows
+accounts for this, because it is computed from the pattern.
 
 The measurements, the build settings and the other runtimes are in the [Android
 phone](benchmarks.md#android-phone) section of `benchmarks.md`.
@@ -575,15 +606,15 @@ adb install -r tools/XrplVanity.MobileBench/bin/Release/net10.0-android/io.stati
 
 Open the app on the phone. A run starts by itself, lasts about 6 minutes on 8 cores, and prints
 one rate column. Read the results from the screen or from the file the Reproduce section names,
-not from logcat. Every seed the run prints is a real secret for the address next to it, so
-discard the output.
+not from logcat.
 
 ## Check before release
 
 A tester can follow this list on a current Android phone and on an iPhone.
 
 - A four-character search ends in a saved wallet whose address contains the text, and that
-  wallet signs a testnet transaction.
+  wallet signs a testnet transaction. Use text that starts with one of the common first
+  characters, such as `abcd`: `xrpl` takes about an hour.
 - Scrolling stays smooth during a search, and Stop answers within a second.
 - The home button and the power button each stop the search. On a return before the auto-lock
   time, the page says why. On a return after it, the sign-in page appears, no seed is shown, and
