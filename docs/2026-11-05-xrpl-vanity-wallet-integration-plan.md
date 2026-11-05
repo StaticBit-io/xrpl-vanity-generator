@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Work on a branch based on `origin/dev`.** Pull requests target `dev` with a squash merge.
-- **Do not edit anything under `E:\GIT\XRPL\Wallet.git`.** Reading it is fine.
+- **Do not edit anything in the wallet repository.** Reading it is fine.
 - **Tests run with `dotnet run`, never `dotnet test`.** There are two suites, and both must pass after every code change: `dotnet build XrplVanity.sln -c Release`, then `dotnet run --project tests/XrplVanity.Tests -c Release --no-build` and `dotnet run --project tests/XrplVanity.App.Tests -c Release --no-build`. One class: `-- -class "*CpuSearchTests"`.
 - **The build stays warning-free.**
 - **The seed is a secret.** The guide must say so, and no example may log it.
@@ -127,7 +127,7 @@ Expected: the new mean is not clearly below the old one. Runs on this machine sp
 
 - [ ] **Step 7: Build the benchmark app**
 
-Run: `dotnet build tools/XrplVanity.MobileBench -c Release -p:AndroidSdkDirectory="C:\Program Files (x86)\Android\android-sdk"`
+Run: `dotnet build tools/XrplVanity.MobileBench -c Release -p:AndroidSdkDirectory=<path>`
 Expected: build succeeds.
 
 - [ ] **Step 8: Commit**
@@ -344,7 +344,7 @@ Expected: it builds with no project reference to this repository, finds a match,
 
 - [ ] **Step 3: Validate the Markdown**
 
-Run: `PYTHONIOENCODING=utf-8 python "C:/Users/Evril/.claude/skills/developer-documentation/scripts/validate_docs.py" docs/wallet-integration.md`
+Run: `PYTHONIOENCODING=utf-8 python <developer-documentation skill>/scripts/validate_docs.py docs/wallet-integration.md`
 Expected: passes.
 
 - [ ] **Step 4: Check the site link**
