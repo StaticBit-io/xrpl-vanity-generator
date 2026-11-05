@@ -36,12 +36,17 @@ export function findExternalRefs(name, text) {
   return found;
 }
 
-/** Everything the Content-Security-Policy in _headers would block: the page must not depend on it. */
+/**
+ * Everything the Content-Security-Policy in _headers would block: the page must not depend on it.
+ * A JSON-LD block is data that no browser runs, so the policy does not apply to it.
+ */
 export function findInlineCode(name, html) {
   const found = [];
   const text = stripComments(html);
   for (const [tag] of text.matchAll(/<script\b[^>]*>/gi)) {
-    if (attribute(tag, 'src') === null) found.push(`${name}: inline <script>`);
+    if (attribute(tag, 'src') === null && attribute(tag, 'type')?.toLowerCase() !== 'application/ld+json') {
+      found.push(`${name}: inline <script>`);
+    }
   }
   if (/<style\b/i.test(text)) found.push(`${name}: inline <style>`);
   for (const [tag] of text.matchAll(/<[a-z][^>]*>/gi)) {
