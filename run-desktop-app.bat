@@ -9,6 +9,7 @@ set "PROJECT=src\XrplVanity.App\XrplVanity.App.csproj"
 set "TFM=net10.0-windows10.0.22621.0"
 set "LAYOUT=src\XrplVanity.App\bin\publish"
 set "MANIFEST=src\XrplVanity.App\bin\Release\%TFM%\win-x64\AppxManifest.xml"
+set "INTERMEDIATE=src\XrplVanity.App\obj\Release\%TFM%\win-x64"
 set "SUBJECT=CN=StaticBit Vanity Dev"
 
 echo ===============================================
@@ -58,6 +59,10 @@ if not errorlevel 1 (
 )
 
 rem --- 5. publish ------------------------------------------------------------
+rem Resizetizer can keep the images of an earlier logo while refreshing their dates, and the
+rem package then shows the old icon. Its stamps go too, or it would skip the empty folder.
+if exist "%INTERMEDIATE%\resizetizer" rmdir /s /q "%INTERMEDIATE%\resizetizer"
+del /q "%INTERMEDIATE%\maui*.stamp" 2>nul
 echo.
 echo Building... this takes a few minutes the first time.
 dotnet publish "%PROJECT%" -c Release -f %TFM% -p:PublishProfile=MSIX-win-x64 -p:PackageCertificateThumbprint=!THUMB! --nologo -v quiet
