@@ -44,13 +44,13 @@ credentials come from the `GH_PACKAGES_TOKEN` environment variable.
 
 The class below is a page of the wallet. It builds a `PatternSet`, refuses text that cannot
 appear in an address, measures the rate of the device for 3 seconds on the same number of threads
-as the search, predicts the time, warns about a long search, runs the search and checks the seed
+as the search, predicts the time, warns about a long search, runs the search, then checks and stores the seed
 that comes back. The guards from [Rules for a search on a phone](#rules-for-a-search-on-a-phone)
 are already in it.
 
 It takes these members as given: `PageBase<T>` with `_cts` and `appNavigation`, the platform
 interface from [The platform seam](#the-platform-seam), `ConfirmLongSearchAsync`, which is your
-dialog with the warning and its link, and `VerifyAsync`, which is in [Check the seed before
+dialog with the warning and its link, and `KeepAsync`, which is in [Check the seed before
 showing it](#check-the-seed-before-showing-it). In the wallet the class derives from
 `PageBase<object>`; `_cts` is the source that `PageBase.DisposeAsync` cancels. The wallet's own
 `using` lines for `AppEventNotifier` (`SB.WalletApp.Application.AppEvents`) and
@@ -133,9 +133,9 @@ public partial class VanitySearch : PageBase<object>
         _stopReason = null;
         _candidates = 0;
 
-        // A new search must not leave the previous seed on screen or saveable by Next.
-        _wallet = null;
-        _command = null;
+        // A new search must not leave the previous seed on screen. The key itself stays in the history.
+        _found = null;
+        _seedShown = null;
 
         // Linked to the page's source, so leaving the page cancels the search.
         using CancellationTokenSource search = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
@@ -202,8 +202,7 @@ public partial class VanitySearch : PageBase<object>
         if (outcome.Found is Match match)
         {
             // Match.ToString leaves the seed out, but do not log its fields one by one.
-            bool verified = await VerifyAsync(match);
-            _status = verified ? "" : "The seed did not match its address and was discarded. Search again.";
+            _status = await KeepAsync(match);
         }
         else
         {
@@ -328,17 +327,16 @@ for a chosen address:
    as the sample does, not with `_cancellationToken`. `PageBase._cancellationToken` is declared and
    never assigned (`PageBase.cs`, line 44), so it never cancels. `PageBase.DisposeAsync` cancels
    and disposes `_cts`.
-4. When a seed passes the check in the next section, show it in a read-only text box with a copy
-   button, as `Add.razor` does.
+4. When a seed passes the check in the next section, it is stored at once. Show the address, and
+   show the seed only on a tap, in a read-only text box with a copy button, as `Add.razor` does.
 5. On Next, show the same "Attention!" confirmation as `Add.razor.cs`. If the user declines, do
    nothing.
 6. Fill `AddWalletCommand` the same way, store it under `SessionStorageKeys.AddNewWallet`, and
    navigate to `settings/wallets/wizard` with no query parameter. See the code in the next
    section.
-7. Decide what Back from the wizard does. It recreates the page, so the sample's `_wallet` and
-   `_command` are gone and the found address with them. The seed then stays only in the command
-   under `SessionStorageKeys.AddNewWallet`. Either restore the page from that command, or accept
-   the loss knowingly: the user who goes back searches again.
+7. Back from the wizard recreates the page, and nothing is lost: the key stays in the history
+   described in [Keep what the search finds](#keep-what-the-search-finds), and the user can make
+   it a wallet from there.
 
 Do not pass an algorithm parameter to the wizard. `Add.razor.cs` passes `showAlghoritm=true`, but
 `Wizard.razor.cs` reads `showAlgorithm`, so the algorithm drop-down is hidden today, and it must
@@ -352,7 +350,9 @@ address from it. Call `IXrplClientService.WalletFromSeed(seed, null, null)`, whi
 seed's prefix and returns the algorithm it used. Compare `ClassicAddress` with `match.Address`,
 and take `Algorithm` from the returned model. Never show a seed whose address differs.
 
-This is the rest of the class, with the check, and the save path of `Add.razor.cs`:
+This is the rest of the class: the check, the write to the history, and the save path of
+`Add.razor.cs`. Seed and command are built only when they are needed, so the page does not hold a
+secret it is not showing.
 
 ```csharp
 using Microsoft.AspNetCore.Components;
@@ -364,31 +364,42 @@ public partial class VanitySearch
     private IXrplClientService _xrpl { get; set; } = default!;
 
     [Inject]
+    private IFoundKeyStore _foundKeys { get; set; } = default!;
+
+    [Inject]
     private ISessionStorageService _sessionStorageService { get; set; } = default!;
 
-    private XrplWalletModel? _wallet;
-    private AddWalletCommand? _command;
+    private FoundKey? _found;
+    private string? _seedShown;
 
-    private async Task<bool> VerifyAsync(Match match)
+    private async Task<string> KeepAsync(Match match)
     {
         XrplWalletModel wallet = await _xrpl.WalletFromSeed(match.Seed, null, null);
         if (!string.Equals(wallet.ClassicAddress, match.Address, StringComparison.Ordinal))
         {
-            _wallet = null;
-            _command = null;
-            return false;
+            return "The seed did not match its address and was discarded. Search again.";
         }
 
-        _wallet = wallet;
-        _command = new AddWalletCommand
+        try
         {
-            ClassicAddress = wallet.ClassicAddress,
-            KeyValue = match.Seed,
-            KeyType = AccountKeyType.Seed,
-            Algorithm = wallet.Algorithm,
-            DerivationPath = wallet.DerivationPath,
-        };
-        return true;
+            // Not the page's token: leaving the page must not abort this write.
+            _found = await _foundKeys.AddAsync(match, CancellationToken.None);
+            return "";
+        }
+        catch (InvalidOperationException)
+        {
+            // The vault is locked and nothing was stored, so the page is the only copy.
+            _seedShown = match.Seed;
+            return "This key could not be saved. Copy the seed now: it is lost when you leave this page.";
+        }
+    }
+
+    private async Task OnShowSeedClickAsync()
+    {
+        if (_found is not null)
+        {
+            _seedShown = await _foundKeys.RevealSeedAsync(_found, CancellationToken.None);
+        }
     }
 
     private async Task OnNextClickAsync()
@@ -396,18 +407,127 @@ public partial class VanitySearch
         bool confirmed = await notificationService.Confirm(
             "Attention!",
             "Make sure you save your seed, otherwise you won't be able to restore access to your account.");
-        if (!confirmed || _command is null)
+        if (!confirmed || _found is null)
         {
             return;
         }
 
-        await _sessionStorageService.SetAsync(SessionStorageKeys.AddNewWallet, _command);
-        appNavigation.GoTo("settings/wallets/wizard", _command);
+        string seed = await _foundKeys.RevealSeedAsync(_found, CancellationToken.None);
+        XrplWalletModel wallet = await _xrpl.WalletFromSeed(seed, null, null);
+        AddWalletCommand command = new()
+        {
+            ClassicAddress = wallet.ClassicAddress,
+            KeyValue = seed,
+            KeyType = AccountKeyType.Seed,
+            Algorithm = wallet.Algorithm,
+            DerivationPath = wallet.DerivationPath,
+        };
+
+        await _sessionStorageService.SetAsync(SessionStorageKeys.AddNewWallet, command);
+        appNavigation.GoTo("settings/wallets/wizard", command);
     }
 }
 ```
 
 Guard `OnNextClickAsync` with a `ClickGuard`, as `Add.razor.cs` does.
+
+## Keep what the search finds
+
+A found key is stored the moment it passes the check, in a history of its own, as `results.dat`
+is on the desktop. A search can run for a long time on a phone nobody is holding, so a seed that
+lived only on the page would be lost when the auto-lock sends the app to the sign-in page. A found
+key is not a wallet until the user makes it one, because a search often gives several candidates
+and only one of them is wanted.
+
+The secret and the record live apart:
+
+- **The seed goes in the vault.** Call `ISecretVault.StoreAsync(new WalletSecret(seed, null), …)`,
+  which returns a reference. The vault is unlocked during a search, which only runs signed in and
+  on screen.
+- **The record goes in plain storage,** through `IKeyValueStorageService`: the address, the
+  pattern, its position, the time and the reference. It holds no secret.
+
+Put this in the Application project, and implement it there:
+
+```csharp
+using XrplVanity.Core;
+
+public sealed record FoundKey(string Address, string Pattern, string Position, DateTimeOffset FoundAt, string SecretRef);
+
+public interface IFoundKeyStore
+{
+    /// <summary>Stores the seed in the vault, then the record, in that order.</summary>
+    /// <exception cref="InvalidOperationException">The vault is locked; nothing was stored.</exception>
+    Task<FoundKey> AddAsync(Match match, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<FoundKey>> GetAllAsync();
+
+    /// <exception cref="KeyNotFoundException">The vault no longer holds this entry.</exception>
+    Task<string> RevealSeedAsync(FoundKey key, CancellationToken cancellationToken);
+
+    Task DeleteAsync(FoundKey key, CancellationToken cancellationToken);
+
+    Task ClearAsync(CancellationToken cancellationToken);
+
+    /// <summary>The references the history owns, or null when the history cannot be trusted.</summary>
+    Task<IReadOnlySet<string>?> TryGetLiveReferencesAsync();
+}
+```
+
+`AddAsync` stores the seed first. If the app dies between the two writes, the result is an entry
+nobody references, and the sweep below collects it. The other order would leave a record that
+points at nothing.
+
+### The vault deletes entries no wallet references
+
+**Storing a found key in the vault is not enough.** `VaultMigrationService.CollectOrphansAsync`
+runs once per session and deletes every entry that no wallet row references and that was not
+written in the current session. A found key that is not a wallet is exactly such an entry. It
+works in testing and disappears on the next launch, with no error.
+
+Change the sweep so that the history counts as an owner of its references:
+
+1. Add `IFoundKeyStore` to `VaultMigrationService`.
+2. After the two existing guards, call `TryGetLiveReferencesAsync`. If it returns `null`, log it
+   and skip the whole run, as the guards do.
+3. Add the references it returns to `liveReferences`.
+
+Keep the existing guards as they are, and keep them first: they look at wallets alone.
+
+**An empty history proves nothing on its own.** The sweep's comments describe a corrupted read that
+returns "loaded successfully, empty" instead of throwing. For wallets the guard is to skip on an
+empty list, but an empty history is also an ordinary state, so that guard cannot work here. Keep
+the number of records in a separate storage key, write it on every change, and have
+`TryGetLiveReferencesAsync` return `null` when the list's length disagrees with it or when the read
+throws. A corrupted read then costs one skipped sweep, not every found key.
+
+This is code that protects keys, so review it as such, and add tests: a found key survives a sweep
+in a later session; a history that cannot be read skips the sweep; a list that disagrees with the
+count skips the sweep.
+
+### The history screen
+
+Follow the desktop's History, described in [docs/desktop-app.md](desktop-app.md):
+
+- A list of found keys, newest first, showing the address, the pattern and the time, with a filter
+  by pattern.
+- Delete and Clear, each with a confirmation. Both remove the vault entries as well as the
+  records.
+- Show the seed only on a tap, through `RevealSeedAsync` with a short reason such as `found-key`.
+  If it throws `KeyNotFoundException`, say the key is gone and offer to delete the record.
+- A way to make a key a wallet, which is the Next path in the sample. `AddAsync` of the wallet
+  writes its own vault entry, so the record can stay; mark it through
+  `IWalletsService.GetByClassicAddressAsync` rather than deleting it.
+- A line that says the keys are only on this phone: see [Suggested interface
+  text](#suggested-interface-text). **Found keys are in no backup until they are wallets,** because
+  the backup reads wallets, and they do not survive removing the app.
+
+Clear the history wherever the vault itself is recreated (`ISecretVault.CreateAsync` with
+`allowOverwrite`): its references then point at nothing. No single reset method turned up by name
+in the wallet, so check every path that replaces the vault.
+
+Keep the texts a user searched for separately, as the desktop keeps its pattern drafts in settings.
+They are not secrets and need only ordinary storage.
 
 ## The platform seam
 
@@ -493,12 +613,13 @@ Implement the interface in `SB.MobileApp` with these platform calls:
   device is not charging, and stop on heat.
 - **No time limit.** A search runs until it finds a match or the user or a guard stops it. A
   stopped search loses nothing, because every try is independent and a new run has the same odds.
-  No pause, resume or saved state is needed.
-- **A found seed is not kept.** A seed that was found and not yet saved is lost if the app
-  returns through the auto-lock path. This is on purpose: do not persist the seed to survive
-  that. The auto-lock is checked only in `App.OnResume`; the timer is set in `OnSleep`, the
-  default is 60 seconds, and the choices run from 0 to 1,800. An app on screen never locks. If the
-  time has passed on resume, the app goes to the sign-in page and the page state is gone.
+  A running search needs no pause, resume or saved state.
+- **A found seed is stored at once.** `KeepAsync` writes it to the vault as soon as it passes the
+  check, so the auto-lock cannot lose it. The auto-lock is checked only in `App.OnResume`; the
+  timer is set in `OnSleep`, the default is 60 seconds, and the choices run from 0 to 1,800. An app
+  on screen never locks. If the time has passed on resume, the app goes to the sign-in page and the
+  page state is gone, but the key stays in the history. Only a find whose write failed exists on
+  the page alone.
 
 ## Warn about long searches
 
@@ -524,6 +645,11 @@ random and can be several times longer or shorter.
 | Low battery | Search stopped because the battery is below 20%. |
 | Heat | Search stopped because the device got too hot. |
 | Under every stop | Continuing loses nothing: every try has the same chance. |
+| Found | Found and saved in your search history. |
+| Reveal button | Show seed |
+| Make a wallet | Add as a wallet |
+| Could not save | This key could not be saved. Copy the seed now: it is lost when you leave this page. |
+| History note | These keys are only on this phone. They are not in your backups until you add them as wallets. |
 
 ## Store rules and review notes
 
@@ -620,7 +746,14 @@ A tester can follow this list on a current Android phone and on an iPhone.
   time, the page says why. On a return after it, the sign-in page appears, no seed is shown, and
   no threads run.
 - Leaving the page stops the search and lets the screen sleep.
-- After a find, the screen sleeps normally.
+- After a find, the screen sleeps normally, and the seed is not on screen until Show seed is
+  tapped.
+- A search left alone finds a key, the phone sleeps, and after a return through the sign-in page
+  the key is in the history.
+- A key that is not a wallet is still in the history, with its seed, after two full restarts of
+  the app. This is what proves the sweep leaves it alone.
+- Deleting a history entry removes its seed: after the next restart the vault holds no entry for
+  it. A key added as a wallet still signs after its history entry is deleted.
 - A warned search can still be started, and the link opens the site.
 - A 30-minute search on a current phone stays at a comfortable temperature.
 
@@ -632,6 +765,8 @@ A tester can follow this list on a current Android phone and on an iPhone.
   about 2.3 times the rate of the release settings with the same digests, but its cost on the
   wallet is unmeasured.
 - The reviewers' decision cannot be known in advance.
+- `IFoundKeyStore` and the sweep change are a design here, not code that ran: the sample compiles
+  against stubs, and nothing has been run against the real vault.
 - The desktop app is not in the Microsoft Store yet. The link in the warning leads to a page
   that says it is on its way and links to a build from source, with no installer. Wait for the
   listing before release, or accept that.

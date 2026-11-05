@@ -36,7 +36,7 @@ On a low-end phone (MT6765, 8 × Cortex-A53), on 8 threads, the wallet's release
 
 Rates differ too much between phones for a constant, so the wallet measures the rate on the device before it predicts.
 
-**The search is memoryless.** Every candidate is independent, so stopping a running search loses nothing and a new run has the same odds. No pause, resume or saved state is needed. This holds for a search in progress only: a seed that was found and not yet saved is lost if the app locks.
+**The search is memoryless.** Every candidate is independent, so stopping a running search loses nothing and a new run has the same odds. No pause, resume or saved state is needed. This holds for a search in progress only: a seed that was found and not yet saved is lost if the app locks. **Superseded on 2026-11-05:** the owner chose to keep found keys in a history, as on the desktop; see "Keep what the search finds" in `docs/wallet-integration.md`.
 
 ### Store rules
 
