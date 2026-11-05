@@ -4,8 +4,12 @@
 @if (Rows is { Count: > 0 })
 {
   <div class="modal-backdrop"></div>
-  <div class="modal-box card-box qr-box" role="dialog" aria-modal="true" aria-label="Show as QR code" tabindex="-1" @onkeydown="OnKeyDown" @ref="_box">
+  <div class="modal-box card-box qr-box" role="dialog" aria-modal="true" aria-label="Show as QR code" aria-describedby="@(Note is null ? null : "qr-note")" tabindex="-1" @onkeydown="OnKeyDown" @ref="_box">
     <h3>Show as QR code</h3>
+    @if (Note is not null)
+    {
+      <p id="qr-note" class="tutorial-note">@Note</p>
+    }
 
     @* Buttons rather than radios: this application has no other radio group, and a button says
        plainly that choosing a format throws away whatever code is on screen. *@
@@ -64,7 +68,7 @@
     <div class="buttons">
       @if (_code is not null && !_seedOnly)
       {
-        <button class="btn-secondary-dark change-code t" @onclick="DropCode">Change</button>
+        <button class="btn-secondary-dark change-code t" @onclick="ChangeCode">Change</button>
       }
       <button class="btn-secondary-dark close t" @ref="_close" @onclick="() => OnClose.InvokeAsync()">Close</button>
     </div>

@@ -2,22 +2,47 @@
 @implements IDisposable
 @inject SearchViewModel Vm
 @inject IWindowService Window
+@inject TutorialService Tutorial
 
 <div class="shell">
-  <NavRail />
+  <TutorialRegion Name="@TutorialRegions.Nav">
+    <NavRail />
+  </TutorialRegion>
   <main class="content">@Body</main>
 </div>
+<TutorialOverlay />
 <ClosePrompt Visible="_askClose" OnChoice="OnCloseChoice" />
 
 @code {
     private bool _askClose;
+    private volatile bool _disposed;
 
     protected override void OnInitialized() => Window.CloseRequested += OnCloseRequested;
 
-    public void Dispose() => Window.CloseRequested -= OnCloseRequested;
+    // ShouldOffer reads the whole result store, so it runs off the UI thread; the offer is raised
+    // back here, and only if the layout is still alive.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        bool offer = await Task.Run(Tutorial.ShouldOffer);
+        if (offer && !_disposed)
+        {
+            Tutorial.ShowOffer();
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Window.CloseRequested -= OnCloseRequested;
+    }
 
     private void OnCloseRequested()
     {
+        // The tutorial runs on a sandbox of the user's state; leave it before the close behaviour
+        // runs so a hide or exit never takes the tutorial's values along.
+        Tutorial.Leave();
         switch (Vm.Settings.CloseBehavior)
         {
             case CloseBehavior.MinimizeToTray:

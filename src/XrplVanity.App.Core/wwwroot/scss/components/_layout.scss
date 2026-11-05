@@ -45,7 +45,6 @@
 .settings-grid > .card-box { height: 100%; margin-top: 0; }
 .settings-grid .full { grid-column: 1 / -1; }
 .srow { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--dark-gray); font-size: 13px; }
-.srow:first-of-type { border-top: 0; }
 .srow .desc { color: var(--text-secondary); font-size: 12px; margin-top: 2px; }
 // Plain <a href> (no target="_blank"): BlazorWebView routes external navigation through its own
 // UrlLoading handler to the system browser, where a target="_blank" would be inert.

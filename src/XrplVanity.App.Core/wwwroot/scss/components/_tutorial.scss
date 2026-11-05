@@ -1,0 +1,37 @@
+// A region is a wrapper the first-run tutorial can light or dim. With no tutorial running it
+// carries only data-tutorial, so everything below that is not a .tutorial-* rule exists to make the
+// wrapper behave exactly like the single element it holds.
+
+// The rail was a grid item of .shell and filled its height; a one-cell grid keeps the stretch
+// without knowing anything about the rail.
+[data-tutorial="nav"] { display: grid; }
+
+// The results card flexes to the rest of the column (see .results) and keeps its 240px floor; the
+// wrapper takes over both so the card still fills it.
+[data-tutorial="results"] { flex: 1; min-height: 240px; display: flex; flex-direction: column; }
+
+// .card-box + .card-box stacks 12px on top of the column gap, but the wrappers now sit between the
+// cards and break that selector. Only the pairs that were adjacent cards need it back.
+[data-tutorial="patterns"] + [data-tutorial="estimate"],
+[data-tutorial="devices"] + [data-tutorial="duty"],
+[data-tutorial="stats"] + [data-tutorial="results"] { margin-top: 12px; }
+
+// The outline is drawn inside the box: the cards touch the edges of .content-scroll, which clips
+// anything outside them. Mint on --box-bg is about 9:1, well over the 3:1 WCAG 2.2 asks of a
+// focus-like indicator.
+.tutorial-lit { outline: 2px solid var(--mint); outline-offset: -2px; border-radius: var(--radius-card); transition: opacity var(--ease); }
+// A settings row has no padding of its own, so the inset outline would cut into its text and touch
+// the checkbox. The negative margin and the padding cancel, so the row's content does not move; the
+// card's own 16px padding leaves room for the 8px, so nothing reaches the card's clipped edge.
+[data-tutorial^="setting"].tutorial-lit { border-radius: var(--radius-chip); margin-inline: -8px; padding-inline: 8px; }
+
+// The title and the Start button sit in the page header, outside the clipping container, and have
+// no card edge to hug: the outline stands off them instead.
+[data-tutorial="title"].tutorial-lit,
+[data-tutorial="start"].tutorial-lit { outline-offset: 4px; border-radius: var(--radius-chip); }
+
+.tutorial-dimmed { opacity: 0.35; transition: opacity var(--ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-lit, .tutorial-dimmed { transition: none; }
+}

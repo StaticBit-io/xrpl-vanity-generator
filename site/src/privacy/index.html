@@ -10,7 +10,7 @@
 <main id="main" class="prose">
 <h1>Privacy policy</h1>
 <p class="lead">XRPL Vanity, the desktop application for Windows, published by <a href="https://staticbit.io">StaticBit</a>.</p>
-<p>Last updated: 2026-11-04.</p>
+<p>Last updated: 2026-11-05.</p>
 <section data-policy="summary">
 <h2>Summary</h2>
 <p>The application collects nothing, sends nothing, and has no account system. It has no network code at all: no telemetry, no analytics, no crash reporting, no update check, no licence check. Everything it produces stays on the computer that produced it, unless you move it yourself: by exporting a file, copying a seed or showing a QR code.</p>
@@ -22,7 +22,7 @@
 <table>
 <thead><tr><th scope="col">File</th><th scope="col">Contents</th><th scope="col">Protection</th></tr></thead>
 <tbody>
-<tr><th scope="row"><code>settings.json</code></th><td>Interface preferences: pattern and target drafts, thread count, GPU duty, match limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, and the last measured search rate per device.</td><td>Plain JSON. It holds no keys and no personal data.</td></tr>
+<tr><th scope="row"><code>settings.json</code></th><td>Interface preferences: pattern and target drafts, thread count, GPU duty, match limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, whether the first-run tutorial has been offered, and the last measured search rate per device.</td><td>Plain JSON. It holds no keys and no personal data.</td></tr>
 <tr><th scope="row"><code>results.dat</code></th><td>The generated addresses and their seeds.</td><td>Encrypted with the Windows Data Protection API (DPAPI) under <code>CurrentUser</code> scope, so only the Windows account that wrote the file can decrypt it.</td></tr>
 </tbody>
 </table>

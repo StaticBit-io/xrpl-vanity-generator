@@ -1,24 +1,29 @@
 @page "/"
 @inherits ViewModelPage
+@inject TutorialService Tutorial
 
 @* While the clear dialog is open the page behind it is inert, the way History
    leaves it: the controls it covers must not answer a stray click or a tab. *@
 <header class="page-head" inert="@(_clearPending || _qrRows is not null)">
-  <h1>XRPL Vanity <StatusPill State="Vm.State" /></h1>
-  <div class="actions">
-    @if (Vm.State == SearchState.Idle)
-    {
-      <button class="btn-primary-mint start t" disabled="@(!Vm.CanStart)" @onclick="Vm.Start">Start</button>
-      @if (Vm.TargetProblem is not null)
+  <TutorialRegion Name="@TutorialRegions.Title">
+    <h1>XRPL Vanity <StatusPill State="Vm.State" /></h1>
+  </TutorialRegion>
+  <TutorialRegion Name="@TutorialRegions.Start">
+    <div class="actions">
+      @if (Vm.State == SearchState.Idle)
       {
-        <div class="start-hint muted">@Vm.TargetProblem</div>
+        <button class="btn-primary-mint start t" disabled="@(!Vm.CanStart)" @onclick="Vm.Start">Start</button>
+        @if (Vm.TargetProblem is not null)
+        {
+          <div class="start-hint muted">@Vm.TargetProblem</div>
+        }
       }
-    }
-    else
-    {
-      <button class="btn-stop stop t" disabled="@(Vm.State == SearchState.Stopping)" @onclick="Vm.Stop">Stop</button>
-    }
-  </div>
+      else
+      {
+        <button class="btn-stop stop t" disabled="@(Vm.State == SearchState.Stopping)" @onclick="Vm.Stop">Stop</button>
+      }
+    </div>
+  </TutorialRegion>
 </header>
 <div class="content-scroll" inert="@(_clearPending || _qrRows is not null)">
   @if (Vm.LastFailure is not null)
@@ -27,27 +32,41 @@
   }
   <div class="search-grid">
     <div class="col">
-      <PatternEditor Vm="Vm" OnClearRequested="() => _clearPending = true" />
-      <EstimateCard Vm="Vm" />
+      <TutorialRegion Name="@TutorialRegions.Patterns">
+        <PatternEditor Vm="Vm" OnClearRequested="OpenClear" />
+      </TutorialRegion>
+      <TutorialRegion Name="@TutorialRegions.Estimate">
+        <EstimateCard Vm="Vm" />
+      </TutorialRegion>
     </div>
     <div class="col">
-      <DevicePicker Vm="Vm" />
-      <DutySlider Vm="Vm" />
+      <TutorialRegion Name="@TutorialRegions.Devices">
+        <DevicePicker Vm="Vm" />
+      </TutorialRegion>
+      <TutorialRegion Name="@TutorialRegions.Duty">
+        <DutySlider Vm="Vm" />
+      </TutorialRegion>
     </div>
     <div class="col-bottom">
-      <LiveStats Progress="Vm.Progress" />
+      <TutorialRegion Name="@TutorialRegions.Stats">
+        <LiveStats Progress="Vm.Progress" />
+      </TutorialRegion>
       @* A persist failure during a run must be visible here too: the session list still shows the
          hits, but they are not on disk and are gone on restart. *@
       @if (Vm.HistoryReadOnlyReason is not null)
       {
         <Banner Kind="negative" Text="@Vm.HistoryReadOnlyReason" />
       }
-      <ResultsList Items="Vm.Results" ShowTarget="true" OnShowQr="rows => _qrRows = rows" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
+      <TutorialRegion Name="@TutorialRegions.Results">
+        @* IsSandbox is read before Results: a sandbox that ends between the two reads then shows the
+           user's results locked, never the practice ones unlocked. *@
+        <ResultsList SecretsLocked="Vm.IsSandbox" Items="Vm.Results" ShowTarget="true" OnShowQr="ShowQr" RevealSeconds="Vm.Settings.SeedRevealSeconds" ClipboardClearSeconds="Vm.Settings.ClipboardClearSeconds" />
+      </TutorialRegion>
     </div>
   </div>
 </div>
 
-<QrExportDialog Rows="_qrRows" OnClose="() => _qrRows = null" />
+<QrExportDialog Rows="_qrRows" OnClose="CloseQr" Note="@QrNote" />
 
 <ConfirmDialog Visible="_clearPending" Title="@ClearTitle" Message="@ClearMessage" ConfirmLabel="Clear"
-               OnConfirm="ConfirmClear" OnCancel="() => _clearPending = false" />
+               OnConfirm="ConfirmClear" OnCancel="CloseClear" />

@@ -6,7 +6,7 @@
   <div class="head">
     <div class="card-title">Results <span class="count">@Items.Count</span></div>
     @* Greyed out while a selection exists: the bar below is then the place to export from, so this button never changes meaning mid-click. *@
-    <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0 || (Selectable && _selected.Count > 0))" @onclick="() => Export(_items)">Export TSV…</button>
+    <button class="btn-secondary-dark export t" disabled="@(SecretsLocked || Items.Count == 0 || (Selectable && _selected.Count > 0))" @onclick="() => Export(_items)">Export TSV…</button>
   </div>
   @if (_exportError is not null) { <div class="export-error">@_exportError</div> }
   @* The host owns its filter row, so the "all shown" checkbox lives with the list it selects.
@@ -23,7 +23,7 @@
       <div class="sel-bar @(_selected.Count == 0 ? "idle" : "")" aria-hidden="@(_selected.Count == 0)">
         <b>@_selected.Count selected</b>
         <span class="acts">
-          <button class="btn-secondary-dark export-selected t" @onclick="() => Export(SelectedItems())">Export selected…</button>
+          <button class="btn-secondary-dark export-selected t" disabled="@SecretsLocked" @onclick="() => Export(SelectedItems())">Export selected…</button>
           @if (OnShowQr.HasDelegate)
           {
             <button class="btn-secondary-dark show-qr-selected t" @onclick="() => OnShowQr.InvokeAsync(SelectedItems())">Show QR…</button>
@@ -49,13 +49,13 @@
         <div class="result-row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(Selectable ? "has-select" : "") @(_selected.ContainsKey(item.Address) ? "picked" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
           @if (Selectable) { <input class="pick" type="checkbox" aria-label="@($"Select {item.Address}")" checked="@_selected.ContainsKey(item.Address)" @onchange="e => Pick(item, (bool)e.Value!)" /> }
           <span class="mono address">@item.Address</span>
-          <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
+          <button class="btn-icon copy-address" title="Copy address" disabled="@SecretsLocked" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
           <span class="pattern">@item.Pattern <span class="muted">(@item.Position.ToLowerInvariant())</span></span>
           @if (ShowTarget) { <span class="target muted">@item.Target</span> }
           <span class="time muted">@item.FoundAt.ToLocalTime().ToString("HH:mm:ss")</span>
           <span class="mono seed">@(_revealed.Contains(item.Address) ? item.Seed : "••••••••")</span>
-          <button class="btn-icon reveal" title="@(_revealed.Contains(item.Address) ? "Hide seed" : "Reveal seed")" @onclick="() => ToggleReveal(item.Address)">👁</button>
-          <button class="btn-icon copy-seed" title="Copy seed (clipboard clears after @ClipboardClearSeconds s)" @onclick="() => Clipboard.CopySecretAsync(item.Seed, TimeSpan.FromSeconds(ClipboardClearSeconds))">⧉</button>
+          <button class="btn-icon reveal" title="@(_revealed.Contains(item.Address) ? "Hide seed" : "Reveal seed")" disabled="@SecretsLocked" @onclick="() => ToggleReveal(item.Address)">👁</button>
+          <button class="btn-icon copy-seed" title="Copy seed (clipboard clears after @ClipboardClearSeconds s)" disabled="@SecretsLocked" @onclick="() => Clipboard.CopySecretAsync(item.Seed, TimeSpan.FromSeconds(ClipboardClearSeconds))">⧉</button>
           @if (OnShowQr.HasDelegate) { <button class="btn-icon show-qr" title="Show as QR code" @onclick="() => OnShowQr.InvokeAsync(new[] { item })">▣</button> }
           @if (OnDelete.HasDelegate) { <button class="btn-icon delete" title="Delete" @onclick="() => OnDelete.InvokeAsync(item)">🗑</button> }
         </div>

@@ -24,6 +24,12 @@ public partial class ResultsList : IDisposable
     [Parameter] public bool Selectable { get; set; }
 
     /// <summary>
+    /// Disables seed reveal, seed copy and file export, leaving the QR button usable. The tutorial's
+    /// practice result is shown this way so its seed cannot leave the application by those routes.
+    /// </summary>
+    [Parameter] public bool SecretsLocked { get; set; }
+
+    /// <summary>
     /// Every address the host holds, filter or no filter. Supplied by a host that filters what it
     /// passes in <see cref="Items"/> (HistoryPage), so the selection is pruned against what still
     /// exists rather than against what happens to be on screen. Null means Items is the whole

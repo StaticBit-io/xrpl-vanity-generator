@@ -24,6 +24,28 @@ public partial class SettingsPage
         ?? typeof(SettingsPage).Assembly.GetName().Version?.ToString(3)
         ?? "unknown";
 
+    /// <summary>
+    /// The tutorial forces a stop count of 1 on the live view model so its search ends at the first
+    /// match; the field must show the user's own value, which is what the saved settings still hold.
+    /// </summary>
+    private int? ShownCount => Vm.IsSandbox ? Vm.Settings.Count : Vm.Count;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        // CanStart also turns false while the offer card is open and true again when it is answered,
+        // which the view model does not announce.
+        Tutorial.Changed += OnViewModelChanged;
+    }
+
+    public override void Dispose()
+    {
+        Tutorial.Changed -= OnViewModelChanged;
+        base.Dispose();
+    }
+
+    private void StartTutorial() => Tutorial.Begin();
+
     private void OnCloseBehaviorChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse((string?)e.Value, out CloseBehavior parsed))

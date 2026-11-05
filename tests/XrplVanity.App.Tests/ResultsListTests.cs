@@ -494,4 +494,29 @@ public class ResultsListTests : BunitContext
         Assert.Empty(cut.FindAll("button.show-qr"));
         Assert.Empty(cut.FindAll("button.show-qr-selected"));
     }
+
+    [Fact]
+    public void SecretsLocked_Disables_Reveal_Copy_Of_Address_And_Seed_And_Export_But_Not_Qr()
+    {
+        RegisterServices();
+        List<SessionResult>? asked = null;
+        IRenderedComponent<ResultsList> cut = Render<ResultsList>(p => p
+            .Add(x => x.Items, new[] { R(1), R(2) })
+            .Add(x => x.Selectable, true)
+            .Add(x => x.SecretsLocked, true)
+            .Add(x => x.OnShowQr, (IReadOnlyList<SessionResult> rows) => asked = rows.ToList()));
+        cut.FindAll("input.pick")[0].Change(true);
+
+        Assert.All(cut.FindAll("button.reveal"), b => Assert.True(b.HasAttribute("disabled")));
+        // The practice address belongs to a seed that is dropped; funds sent to it would be lost.
+        Assert.All(cut.FindAll("button.copy-address"), b => Assert.True(b.HasAttribute("disabled")));
+        Assert.All(cut.FindAll("button.copy-seed"), b => Assert.True(b.HasAttribute("disabled")));
+        Assert.True(cut.Find("button.export").HasAttribute("disabled"));
+        Assert.True(cut.Find("button.export-selected").HasAttribute("disabled"));
+        Assert.All(cut.FindAll("button.show-qr"), b => Assert.False(b.HasAttribute("disabled")));
+        Assert.False(cut.Find("button.show-qr-selected").HasAttribute("disabled"));
+
+        cut.FindAll("button.show-qr")[0].Click();
+        Assert.NotNull(asked);
+    }
 }
