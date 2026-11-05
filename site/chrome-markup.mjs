@@ -13,6 +13,24 @@ function escapeHtml(text) {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
+/** What search engines read about the program. Price and ratings stay out until there are real ones. */
+function renderStructuredData(description) {
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'XRPL Vanity',
+    description,
+    url: `${SITE_ORIGIN}/`,
+    image: `${SITE_ORIGIN}/og-banner.png`,
+    applicationCategory: 'UtilitiesApplication',
+    operatingSystem: 'Windows, Linux',
+    license: 'https://www.apache.org/licenses/LICENSE-2.0',
+    publisher: { '@type': 'Organization', name: 'StaticBit', url: 'https://staticbit.io' },
+  };
+  // A "<" in the text could otherwise close the script element early.
+  return `<script type="application/ld+json">${JSON.stringify(data).replaceAll('<', '\\u003c')}</script>`;
+}
+
 function renderHead({ pagePath, title, description }) {
   const url = `${SITE_ORIGIN}${pagePath}`;
   return [
@@ -34,6 +52,7 @@ function renderHead({ pagePath, title, description }) {
     '<meta property="og:image:height" content="630">',
     `<meta property="og:image:alt" content="An XRP Ledger address carrying the word STATiCBiT, found in a field of address characters">`,
     '<meta name="twitter:card" content="summary_large_image">',
+    ...(pagePath === '/' ? [renderStructuredData(description ?? '')] : []),
   ].join('\n');
 }
 

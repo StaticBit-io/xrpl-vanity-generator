@@ -7,6 +7,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderChrome, supportEmailHtml } from './chrome-markup.mjs';
 import { findBrokenLinks, findExternalRefs, findInlineCode, findUnfencedEmails } from './checks.mjs';
+import { SITE_ORIGIN } from './src/js/config.mjs';
 import { renderGlyphField } from './src/js/glyph-field.mjs';
 
 // Cloudflare Pages rejects a deployment with any file over 25 MiB.
@@ -68,6 +69,20 @@ async function fillPages(outDir) {
   return pages;
 }
 
+/** The files crawlers ask for by name. The 404 page is not a place a search should send anyone. */
+async function writeCrawlerFiles(outDir, pages) {
+  const urls = [...pages.keys()]
+    .filter((name) => name !== '404.html')
+    .map((name) => `${SITE_ORIGIN}${pagePathOf(name)}`)
+    .sort();
+  const entries = urls.map((url) => `  <url><loc>${url}</loc></url>`).join('\n');
+  await writeFile(
+    join(outDir, 'sitemap.xml'),
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`,
+  );
+  await writeFile(join(outDir, 'robots.txt'), `Sitemap: ${SITE_ORIGIN}/sitemap.xml\n`);
+}
+
 async function checkPromises(outDir, pages) {
   const files = await listFiles(outDir);
   const problems = [];
@@ -97,6 +112,7 @@ export async function build({ siteDir, outDir, maxFileBytes = MAX_FILE_BYTES }) 
   try {
     await cp(join(siteDir, 'src'), outDir, { recursive: true });
     const pages = await fillPages(outDir);
+    await writeCrawlerFiles(outDir, pages);
     await checkPromises(outDir, pages);
     await checkSizes(outDir, maxFileBytes);
   } catch (error) {
