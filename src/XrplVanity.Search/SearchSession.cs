@@ -296,8 +296,8 @@ public sealed class SearchSession : IDisposable
         _progress = final;
         RaiseProgress(final);
 
-        // A failed CPU counts as one that never opened: nobody cancelled a session that had
-        // nothing left running.
+        // A CPU that failed counts as one that never opened. A device that opened and died later
+        // does not, so a session that loses one mid-run still ends as Cancelled.
         bool anyOpened = (_cpu is not null && _cpuFailure is null) || (deviceResult?.DevicesOpened ?? 0) > 0;
         SessionOutcome outcome = _sink.CountSatisfied ? SessionOutcome.CountReached
             : anyOpened ? SessionOutcome.Cancelled
