@@ -23,7 +23,6 @@ internal static class Bench
 
     public static void Run(BenchOptions options, Action<string> log, Func<string>? probe)
     {
-        CheckDeriversAgree(log);
         MeasureStages(options.StageSeconds, log);
 
         int cores = Environment.ProcessorCount;
@@ -32,36 +31,14 @@ internal static class Bench
         log("pipeline (candidates/s):");
         foreach (int threads in threadCounts)
         {
-            double platform = MeasurePipeline(threads, options.PipelineSeconds, () => new BouncyCastleDeriver());
-            double managed = MeasurePipeline(threads, options.PipelineSeconds, () => new ManagedDigestDeriver());
-            log($"  threads={threads,-2} shipped={platform,10:N0}  managed-digests={managed,10:N0}");
+            double rate = MeasurePipeline(threads, options.PipelineSeconds, () => new BouncyCastleDeriver());
+            log($"  threads={threads,-2} {rate,10:N0}");
         }
 
         if (options.SustainSeconds > 0)
         {
             MeasureSustained(cores, options, log, probe);
         }
-    }
-
-    private static void CheckDeriversAgree(Action<string> log)
-    {
-        IAddressDeriver shipped = new BouncyCastleDeriver();
-        IAddressDeriver managed = new ManagedDigestDeriver();
-        byte[] entropy = new byte[EntropyBytes];
-        char[] a = new char[48];
-        char[] b = new char[48];
-        for (int i = 0; i < 64; i++)
-        {
-            RandomNumberGenerator.Fill(entropy);
-            int lengthA = shipped.DeriveAddress(entropy, a);
-            int lengthB = managed.DeriveAddress(entropy, b);
-            if (!a.AsSpan(0, lengthA).SequenceEqual(b.AsSpan(0, lengthB)))
-            {
-                throw new InvalidOperationException("The two derivers disagree; rates from them would mean nothing.");
-            }
-        }
-
-        log("derivers agree on 64 random entropies");
     }
 
     private static void MeasureStages(int seconds, Action<string> log)

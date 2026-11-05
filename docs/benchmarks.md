@@ -334,10 +334,14 @@ Honor WDY-LX1, MediaTek MT6765, 8 × Cortex-A53 (four at 2.2 GHz, four at 1.6 GH
 on battery, screen on, .NET 10.0.11, commit 08f0363, 2026-11-04. This is a low-end chip, so read
 these figures as a floor and not as a typical phone.
 
-The two values in each cell are two rounds, with the four builds interleaved. "Managed digests"
-replaces `SHA512.HashData` and `SHA256.HashData` with the BouncyCastle digests
-(`ManagedDigestDeriver`); the address it derives is compared with `BouncyCastleDeriver` on 64
-random entropies at the start of every run.
+The two values in each cell are two rounds, with the four builds interleaved. The first two
+columns were measured with `BouncyCastleDeriver` as it was at commit 08f0363, which hashed with
+`SHA512.HashData` and `SHA256.HashData`. The last column used a second deriver,
+`ManagedDigestDeriver`, that replaced those two calls with the BouncyCastle digests; every run
+compared its addresses with the first deriver's on 64 random entropies and printed both columns.
+`BouncyCastleDeriver` has used the BouncyCastle digests since the change that removed
+`ManagedDigestDeriver`, and the benchmark now prints one column: a rerun reproduces the last
+column, not the first two.
 
 | Runtime | 1 thread | 8 threads | 8 threads, managed digests |
 | --- | --- | --- | --- |
@@ -370,11 +374,11 @@ Each stage alone, in microseconds per call on one thread, first round:
 
 The one-shot hashes cost about 12 µs whichever runtime is in use, which is what a call that
 leaves managed code looks like; that they reach the platform's crypto library is an inference
-from these rates and was not traced. A candidate makes four such calls. Managed digests add 15%
+from these rates and was not traced. A candidate makes four such calls. Managed digests added 15%
 on the wallet's settings, where managed code is as slow as those calls, and 39% with LLVM, where
 it is not. Desktop gains nothing from them.
 
-**Sustained.** Ten minutes on the wallet's settings, 8 threads, 30-second windows: 7,761/s on
+**Sustained.** Ten minutes on the wallet's settings with the platform hashes, 8 threads, 30-second windows: 7,761/s on
 average, with windows between 7,588/s and 7,826/s and no downward trend. The battery sensor
 went from 28 °C to 31 °C and the charge from 50% to 48%. The charge is reported in whole
 percents, so that drain is rough. A phone with faster cores may throttle where this one does not.
@@ -473,7 +477,7 @@ dotnet build tools/XrplVanity.MobileBench -c Release -p:BenchVariant=mono-aot-ll
 dotnet build tools/XrplVanity.MobileBench -c Release -p:BenchVariant=coreclr -p:UseMonoRuntime=false
 ```
 
-Install the APK and open the app on the phone. A run starts by itself and lasts about 7 minutes
+Install the APK and open the app on the phone. A run starts by itself and lasts about 6 minutes
 on 8 cores: 3 seconds per stage, 10 seconds per pipeline row, then 300 seconds sustained. The
 app holds the screen on. The last line is `DONE`.
 
