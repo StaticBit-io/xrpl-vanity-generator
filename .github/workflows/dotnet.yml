@@ -47,10 +47,12 @@ jobs:
       - run: bash linux/run-linux-tests.sh --cpu-only
 
   # Publishes the package once both suites pass on main, which only merges from dev reach. A tag
-  # marks the commit a version was published from, so every run compares main with what the feed
-  # holds and not with the previous push: a run that failed or was replaced is made up for by the
-  # next one, and a library change without a new version keeps failing until the version is raised.
-  # If the tag cannot be pushed after a publish, the next run fails on the duplicate: add it by hand.
+  # marks the commit a version was published from, so every run compares with that commit and not
+  # with the previous push: a run that failed or was replaced is made up for by the next one, and a
+  # library change without a new version keeps failing until the version is raised. The feed itself
+  # is not read, so a version deleted from it stays tagged, and the job will not publish it again.
+  # If the tag cannot be pushed after a publish, the next run fails on the duplicate: check that the
+  # version is on the feed, then add the tag by hand.
   package:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [windows, linux]

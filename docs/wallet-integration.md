@@ -12,8 +12,8 @@ It generates Ed25519 family seeds and keeps the first one whose classic address 
 pattern, for example one with the text `Abc` right after the leading `r` that every classic
 address has. It has no GPU code, and on a phone it runs on the CPU only.
 
-The package is not published yet. It reaches the `github-staticbit` feed with the next merge of
-`dev` into `main`, and the steps below cannot be followed until then. To build it locally, run `dotnet pack src/XrplVanity.Core -c Release -o artifacts` on `dev`; `artifacts/` is
+The package reaches the `github-staticbit` feed when `dev` is merged into `main`, and the steps
+below cannot be followed before the first such merge. To build it locally, run `dotnet pack src/XrplVanity.Core -c Release -o artifacts` on `dev`; `artifacts/` is
 ignored by git, so a clone does not hold it.
 
 ## Add the package
