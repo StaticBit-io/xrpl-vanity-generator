@@ -8,8 +8,9 @@ on:
 permissions:
   contents: read
 
-# A newer push makes a running PR check pointless. Runs on dev and main stay, so each commit there
-# keeps its own result.
+# A newer push makes a running PR check pointless. On dev and main the running job is kept, but
+# GitHub still replaces a pending run when a newer one queues, so a commit there can end up with
+# no result of its own.
 concurrency:
   group: dotnet-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
