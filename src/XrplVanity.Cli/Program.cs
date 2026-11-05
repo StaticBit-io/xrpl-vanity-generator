@@ -445,16 +445,18 @@ public static class Program
     /// <summary>
     /// Maps a completed session's outcome to the process exit code, writing the matching error
     /// line to <paramref name="stderr"/> when the run did not succeed. Two failure shapes are
-    /// distinguished: no target ever opened (<see cref="SessionOutcome.AllTargetsFailed"/> — the
-    /// pre-existing "no usable device" message), and every target opened but then died mid-run
-    /// (outcome is <see cref="SessionOutcome.Cancelled"/> because it did open, yet every target's
-    /// final <see cref="TargetState"/> is <see cref="TargetState.Failed"/> — reported as a GPU
-    /// search failure when a non-CPU target is among the failures, or a plain search failure for
-    /// a CPU-only run; either way distinguished from a user Ctrl+C).
+    /// distinguished: no device ever opened (<see cref="SessionOutcome.AllTargetsFailed"/> with a
+    /// device among the targets — the pre-existing "no usable device" message), and every target
+    /// failed some other way: devices that opened and then died mid-run (outcome
+    /// <see cref="SessionOutcome.Cancelled"/>), a failed report callback (the same), or a CPU-only
+    /// run whose threads failed (<see cref="SessionOutcome.AllTargetsFailed"/>). Those end with
+    /// every target's final <see cref="TargetState"/> at <see cref="TargetState.Failed"/> and are
+    /// reported as a GPU search failure when a non-CPU target is among the failures, or a plain
+    /// search failure otherwise; either way distinguished from a user Ctrl+C.
     /// </summary>
     internal static int ExitCodeFor(SearchSummary summary, bool multi, TextWriter stderr)
     {
-        if (summary.Outcome == SessionOutcome.AllTargetsFailed)
+        if (summary.Outcome == SessionOutcome.AllTargetsFailed && summary.Final.Targets.Any(t => t.Id != "cpu"))
         {
             string failure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no device could be opened";
             stderr.WriteLine(multi ? "error: --gpu-devices: no device could be opened." : $"error: --gpu requested but no usable device: {failure}");

@@ -175,6 +175,38 @@ public class SearchSessionTests
         Assert.Contains("report callback failed", cpu.Failure);
     }
 
+    private static CpuSearchWorkers WorkersThatCannotStart(int threads, PatternSet patterns, MatchSink sink) =>
+        new(threads, patterns, sink, _ => throw new InvalidOperationException("no more threads"));
+
+    [Fact]
+    public void A_Failed_Cpu_Target_Alone_Ends_As_All_Targets_Failed_And_Not_As_Cancelled()
+    {
+        SearchRequest request = new(OneChar(), new SearchTarget[] { new SearchTarget.Cpu(2) }, count: 1);
+        using SearchSession session = new(request, _ => { }, null, GpuBackends.All, WorkersThatCannotStart);
+
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        Assert.Equal(SessionOutcome.AllTargetsFailed, summary.Outcome);
+        TargetProgress cpu = Assert.Single(summary.Final.Targets);
+        Assert.Equal(TargetState.Failed, cpu.State);
+        Assert.Equal("no more threads", cpu.Failure);
+    }
+
+    [Fact]
+    public void A_Failed_Cpu_Target_And_A_Device_That_Cannot_Open_End_As_All_Targets_Failed()
+    {
+        SearchRequest request = new(OneChar(),
+            new SearchTarget[] { new SearchTarget.Cpu(1), new SearchTarget.Device(new DeviceSelector("broken", 0)) }, count: 1);
+        using SearchSession session = new(request, _ => { }, null, new IGpuBackend[] { new ThrowingBackend() }, WorkersThatCannotStart);
+
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        Assert.Equal(SessionOutcome.AllTargetsFailed, summary.Outcome);
+        Assert.All(summary.Final.Targets, target => Assert.Equal(TargetState.Failed, target.State));
+    }
+
     [Fact]
     public void Dispose_On_A_Never_Started_Session_Completes_With_Cancelled_And_Is_Idempotent()
     {
@@ -271,6 +303,25 @@ public class SearchSessionTests
         // (context creation, and on OpenCL the program compile), so it never exceeds the session.
         Assert.True(device.Seconds > 0, "the device reported no search time of its own");
         Assert.True(device.Seconds <= summary.Final.Elapsed.TotalSeconds + 0.5, $"device seconds {device.Seconds} exceeds the session elapsed time");
+    }
+
+    [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void A_Failed_Cpu_Target_Leaves_A_Device_Searching(string backend)
+    {
+        GpuTestHelper.RequireDevice(backend).Dispose();   // skip when unavailable
+        PatternSet frequent = new PatternSet.Builder().Add(MatchPosition.Starts, "ab", ignoreCase: true).Build();
+        SearchRequest request = new(frequent,
+            new SearchTarget[] { new SearchTarget.Cpu(2), new SearchTarget.Device(new DeviceSelector(backend, 0)) }, count: 5);
+        using SearchSession session = new(request, _ => { }, null, GpuBackends.All, WorkersThatCannotStart);
+
+        session.Start();
+        SearchSummary summary = Await(session.Completion);
+
+        Assert.Equal(SessionOutcome.CountReached, summary.Outcome);
+        Assert.Equal(5, summary.Final.Reported);
+        Assert.Equal(TargetState.Failed, summary.Final.Targets.Single(t => t.Id == "cpu").State);
+        Assert.Equal(TargetState.Finished, summary.Final.Targets.Single(t => t.Id == $"{backend}:0").State);
     }
 
     [Fact]

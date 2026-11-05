@@ -60,9 +60,15 @@ public sealed class SearchSession : IDisposable
     /// <summary>
     /// Takes the backend list as a parameter so tests can substitute a fake backend that fails
     /// deterministically, the same seam <see cref="MultiDeviceSearch"/> and
-    /// <see cref="DeviceCatalog"/> expose.
+    /// <see cref="DeviceCatalog"/> expose. <paramref name="cpuWorkers"/> does the same for the
+    /// CPU target, whose threads have no other way to fail on demand.
     /// </summary>
-    internal SearchSession(SearchRequest request, Action<Match> report, Action<string>? log, IReadOnlyList<IGpuBackend> backends)
+    internal SearchSession(
+        SearchRequest request,
+        Action<Match> report,
+        Action<string>? log,
+        IReadOnlyList<IGpuBackend> backends,
+        Func<int, PatternSet, MatchSink, CpuSearchWorkers>? cpuWorkers = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(backends);
@@ -77,7 +83,8 @@ public sealed class SearchSession : IDisposable
             {
                 case SearchTarget.Cpu cpu:
                     _cpuTarget = cpu;
-                    _cpu = new CpuSearchWorkers(cpu.Threads, request.Patterns, _sink);
+                    _cpu = cpuWorkers?.Invoke(cpu.Threads, request.Patterns, _sink)
+                        ?? new CpuSearchWorkers(cpu.Threads, request.Patterns, _sink);
                     _targetOrder.Add("cpu");
                     break;
                 case SearchTarget.Device device:
@@ -289,7 +296,9 @@ public sealed class SearchSession : IDisposable
         _progress = final;
         RaiseProgress(final);
 
-        bool anyOpened = _cpu is not null || (deviceResult?.DevicesOpened ?? 0) > 0;
+        // A failed CPU counts as one that never opened: nobody cancelled a session that had
+        // nothing left running.
+        bool anyOpened = (_cpu is not null && _cpuFailure is null) || (deviceResult?.DevicesOpened ?? 0) > 0;
         SessionOutcome outcome = _sink.CountSatisfied ? SessionOutcome.CountReached
             : anyOpened ? SessionOutcome.Cancelled
             : SessionOutcome.AllTargetsFailed;
