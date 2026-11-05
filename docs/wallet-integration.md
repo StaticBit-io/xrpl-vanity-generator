@@ -59,6 +59,7 @@ showing it](#check-the-seed-before-showing-it). In the wallet the class derives 
 
 ```csharp
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using XrplVanity.Core;
 
 public partial class VanitySearch : PageBase<object>
@@ -69,6 +70,9 @@ public partial class VanitySearch : PageBase<object>
 
     [Inject]
     private IVanitySearchPlatform _platform { get; set; } = default!;
+
+    [Inject]
+    private ILogger<VanitySearch> _logger { get; set; } = default!;
 
     private bool _running;
     private CancellationTokenSource? _search;
@@ -199,9 +203,11 @@ public partial class VanitySearch : PageBase<object>
 
             outcome = await CpuSearch.FindFirstAsync(patterns, threads, progress, search.Token);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Nothing was found: a match is returned even when a worker fails after it.
+            // Nothing was found: a match is returned even when a worker fails after it. The
+            // status names no cause, so the log has to, for a failure that comes back every time.
+            _logger.LogError("Vanity search failed: {Type}", ex.GetType().Name);
             _status = "Search stopped because of an error. Start it again.";
             StateHasChanged();
             return;
@@ -307,8 +313,9 @@ Notes on the sample:
 - Cancelling the token is an outcome, not an exception: `Found` is `null`.
 - A failure on a search thread, such as the system random number generator or running out of
   memory, ends the search and not the app: `FindFirstAsync` and `MeasureRateAsync` throw the
-  original exception once every thread has stopped. The sample catches it and shows a plain
-  status.
+  original exception once every thread has stopped. The sample catches it, writes its type to
+  the log and shows a plain status. That catch also covers the rest of the `try`, such as the
+  measure and the platform calls, so the log is where the cause is.
 - `FindFirstAsync` throws only when it holds no match. A match it already holds is returned as
   usual and the failure is dropped, so a find always reaches `KeepAsync`. The same is true of an
   exception from `IProgress.Report`. In both cases the final progress report is skipped.
