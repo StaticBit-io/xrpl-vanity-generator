@@ -23,6 +23,11 @@ public class CpuSearchTests
         public void Report(long value) => Reports.Add(value);
     }
 
+    private sealed class ThrowingProgress : IProgress<long>
+    {
+        public void Report(long value) => throw new InvalidOperationException("progress failed");
+    }
+
     [Fact]
     public async Task FindFirst_Returns_The_Match()
     {
@@ -136,16 +141,46 @@ public class CpuSearchTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task A_Worker_Failure_Reaches_The_Caller_As_An_Exception(bool withProgress)
+    public async Task A_Worker_Failure_With_No_Match_Reaches_The_Caller_As_An_Exception(bool withProgress)
     {
         InvalidOperationException failure = new("sink failed");
         MatchSink sink = new(limit: null, _ => throw failure);
+        CpuSearchWorkers workers = new(threads: 2, OneChar(), sink);
         IProgress<long>? progress = withProgress ? new SyncProgress() : null;
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => CpuSearch.RunAsync(OneChar(), threads: 2, sink, limit: null, progress, CancellationToken.None));
+            () => CpuSearch.CollectFirstAsync(workers, () => null, progress, CancellationToken.None));
 
         Assert.Same(failure, thrown);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_Stored_Match_Survives_A_Worker_Failure(bool withProgress)
+    {
+        Match? found = null;
+        MatchSink sink = new(limit: 1, match =>
+        {
+            found = match;
+            throw new InvalidOperationException("failed after the match was stored");
+        });
+        CpuSearchWorkers workers = new(threads: 1, OneChar(), sink);
+        IProgress<long>? progress = withProgress ? new SyncProgress() : null;
+
+        CpuSearchOutcome outcome = await CpuSearch.CollectFirstAsync(workers, () => found, progress, CancellationToken.None);
+
+        Assert.NotNull(outcome.Found);
+        Assert.StartsWith("ra", outcome.Found!.Value.Address);
+        Assert.True(outcome.Elapsed > TimeSpan.Zero, $"elapsed {outcome.Elapsed}");
+    }
+
+    [Fact]
+    public async Task A_Throwing_Progress_Does_Not_Cost_A_Found_Match()
+    {
+        CpuSearchOutcome outcome = await CpuSearch.FindFirstAsync(OneChar(), threads: 2, new ThrowingProgress(), CancellationToken.None);
+
+        Assert.NotNull(outcome.Found);
     }
 
     [Fact]
