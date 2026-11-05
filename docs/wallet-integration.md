@@ -199,6 +199,13 @@ public partial class VanitySearch : PageBase<object>
 
             outcome = await CpuSearch.FindFirstAsync(patterns, threads, progress, search.Token);
         }
+        catch (Exception)
+        {
+            // Nothing was found: a match is returned even when a worker fails after it.
+            _status = "Search stopped because of an error. Start it again.";
+            StateHasChanged();
+            return;
+        }
         finally
         {
             // Every exit gets here, a found seed included, so the screen can sleep again.
@@ -298,6 +305,13 @@ Notes on the sample:
   a set with no pattern. They check these before they look at the token. `Math.Max(1, ...)` keeps
   `threads` valid on a single core.
 - Cancelling the token is an outcome, not an exception: `Found` is `null`.
+- A failure on a search thread, such as the system random number generator or running out of
+  memory, ends the search and not the app: `FindFirstAsync` and `MeasureRateAsync` throw the
+  original exception once every thread has stopped. The sample catches it and shows a plain
+  status.
+- `FindFirstAsync` throws only when it holds no match. A match it already holds is returned as
+  usual and the failure is dropped, so a find always reaches `KeepAsync`. The same is true of an
+  exception from `IProgress.Report`. In both cases the final progress report is skipped.
 - Every classic address starts with `r`, and `PatternSet` matches the part after it. The text the
   user types therefore goes in without the `r`: passing `rAbc` would search for addresses that
   read `rrAbc`. The sample refuses text that starts with a lowercase `r`, so that this cannot
@@ -685,6 +699,7 @@ random and can be several times longer or shorter.
 | Left the screen | Search stopped because the app left the screen. |
 | Low battery | Search stopped because the battery is below 20%. |
 | Heat | Search stopped because the device got too hot. |
+| Error | Search stopped because of an error. Start it again. |
 | Under every stop | Continuing loses nothing: every try has the same chance. |
 | Found | Found and saved in your search history. |
 | Reveal button | Show seed |
