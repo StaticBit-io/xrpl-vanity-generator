@@ -73,7 +73,7 @@ public class CpuSearchWorkersTests
         InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() => workers.Run(stop));
 
         Assert.Same(failure, thrown);
-        Assert.True(stop.IsCancellationRequested, "a failure cancels the other workers");
+        Assert.False(stop.IsCancellationRequested, "a failure stops this pool, not what shares the source");
         Assert.Equal(threads, seen.Count);
         Assert.All(seen, thread => Assert.False(thread.IsAlive, $"{thread.Name} outlived Run"));
     }
@@ -100,22 +100,21 @@ public class CpuSearchWorkersTests
         InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() => workers.Run(stop));
 
         Assert.Same(failure, thrown);
-        Assert.True(stop.IsCancellationRequested, "a failed start cancels the threads already running");
+        Assert.False(stop.IsCancellationRequested, "a failed start stops this pool, not what shares the source");
         Assert.Equal(2, started.Count);
         Assert.All(started, thread => Assert.False(thread.IsAlive, $"{thread.Name} outlived Run"));
     }
 
     [Fact]
-    public void A_Throwing_Cancel_Callback_Does_Not_Replace_The_Failure()
+    public void A_Throwing_Cancel_Callback_At_The_Limit_Ends_The_Run_As_A_Failure()
     {
-        InvalidOperationException failure = new("sink failed");
         using CancellationTokenSource stop = new();
         stop.Token.Register(() => throw new ArithmeticException("cancel callback failed"));
-        MatchSink sink = new(limit: null, _ => throw failure);
+        MatchSink sink = new(limit: 1, _ => { });
         CpuSearchWorkers workers = new(threads: 2, OneChar(), sink);
 
-        InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() => workers.Run(stop));
+        AggregateException thrown = Assert.Throws<AggregateException>(() => workers.Run(stop));
 
-        Assert.Same(failure, thrown);
+        Assert.IsType<ArithmeticException>(Assert.Single(thrown.InnerExceptions));
     }
 }

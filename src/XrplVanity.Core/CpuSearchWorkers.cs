@@ -50,28 +50,32 @@ public sealed class CpuSearchWorkers
     public TimeSpan Elapsed => _elapsed.Elapsed;
 
     /// <summary>
-    /// Runs until <paramref name="stop"/> is cancelled, the sink refuses a match, or a worker fails;
-    /// the last two cancel <paramref name="stop"/>. Every thread has stopped by the time this returns
-    /// or throws. A failure is rethrown here with its original type and stack; when several workers
-    /// fail, the first one wins and the rest are dropped.
+    /// Runs until <paramref name="stop"/> is cancelled, the sink refuses a match (which cancels
+    /// <paramref name="stop"/>), or a worker fails. Every thread has stopped by the time this returns
+    /// or throws. A failure stops these threads and leaves <paramref name="stop"/> as it is, so
+    /// whatever else shares that source carries on. It is rethrown here with its original type and
+    /// stack; when several workers fail, the first one wins and the rest are dropped.
     /// </summary>
     public void Run(CancellationTokenSource stop)
     {
         _failure = null;
         _elapsed.Restart();
+
+        // Disposed only after the joins below: workers read it until they have stopped.
+        using CancellationTokenSource poolStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
         Thread[] workers = new Thread[_threads];
         int started = 0;
         try
         {
             for (; started < workers.Length; started++)
             {
-                workers[started] = new Thread(() => Worker(stop)) { IsBackground = true, Name = $"cpu-{started}" };
+                workers[started] = new Thread(() => Worker(stop, poolStop)) { IsBackground = true, Name = $"cpu-{started}" };
                 _startThread(workers[started]);
             }
         }
         catch (Exception ex)
         {
-            Fail(ex, stop);
+            Fail(ex, poolStop);
         }
         finally
         {
@@ -91,41 +95,34 @@ public sealed class CpuSearchWorkers
     }
 
     // An exception leaving a bare thread ends the process, which on a phone is the whole wallet app.
-    private void Worker(CancellationTokenSource stop)
+    private void Worker(CancellationTokenSource stop, CancellationTokenSource poolStop)
     {
         try
         {
-            Search(stop);
+            Search(stop, poolStop);
         }
         catch (Exception ex)
         {
-            Fail(ex, stop);
+            Fail(ex, poolStop);
         }
     }
 
     // Allocates nothing before the cancel: the failure being handled can be out of memory.
-    private void Fail(Exception failure, CancellationTokenSource stop)
+    // Nothing is registered on poolStop, so the cancel has no callback that could throw.
+    private void Fail(Exception failure, CancellationTokenSource poolStop)
     {
         Interlocked.CompareExchange(ref _failure, failure, null);
-        try
-        {
-            stop.Cancel();
-        }
-        catch (Exception)
-        {
-            // A callback registered on the token threw. The source is cancelled before its callbacks
-            // run, so the workers still stop, and an exception out of here would be unhandled again.
-        }
+        poolStop.Cancel();
     }
 
-    private void Search(CancellationTokenSource stop)
+    private void Search(CancellationTokenSource stop, CancellationTokenSource poolStop)
     {
         CandidateEvaluator evaluator = new(new BouncyCastleDeriver(), _patterns);
         byte[] pool = new byte[EntropyBytes * PoolCandidates];
         int poolPos = pool.Length;
         int sinceRefill = 0;
 
-        while (!stop.IsCancellationRequested)
+        while (!poolStop.IsCancellationRequested)
         {
             if (poolPos >= pool.Length)
             {
