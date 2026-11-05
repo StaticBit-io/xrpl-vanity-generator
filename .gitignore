@@ -24,3 +24,6 @@ app/*.cer
 # Output of site/build.mjs.
 site/dist/
 site/.wrangler/
+
+# Output of dotnet pack -o artifacts.
+artifacts/
