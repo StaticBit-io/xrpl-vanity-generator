@@ -104,6 +104,28 @@ public class CpuSearchTests
     }
 
     [Fact]
+    public async Task MeasureRate_Refuses_A_Duration_Of_Zero()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => CpuSearch.MeasureRateAsync(threads: 1, TimeSpan.Zero, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Bad_Arguments_Throw_Even_With_A_Cancelled_Token()
+    {
+        CancellationToken cancelled = new(canceled: true);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => CpuSearch.FindFirstAsync(OneChar(), threads: 0, progress: null, cancelled));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => CpuSearch.MeasureRateAsync(threads: 0, TimeSpan.FromSeconds(1), cancelled));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => CpuSearch.MeasureRateAsync(threads: 1, TimeSpan.Zero, cancelled));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => CpuSearch.FindFirstAsync(new PatternSet.Builder().Build(), threads: 1, progress: null, cancelled));
+    }
+
+    [Fact]
     public async Task MeasureRate_Returns_Zero_For_A_Token_Already_Cancelled()
     {
         double rate = await CpuSearch.MeasureRateAsync(threads: 2, TimeSpan.FromSeconds(1), new CancellationToken(canceled: true));

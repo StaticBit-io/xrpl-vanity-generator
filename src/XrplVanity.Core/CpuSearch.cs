@@ -24,9 +24,12 @@ public static class CpuSearch
     /// <summary>
     /// Measures candidates per second over <paramref name="duration"/>. Cancelling ends the probe
     /// early and returns the rate measured so far; a token that is already cancelled returns 0.
+    /// Arguments are validated before the token is looked at, so a bad one throws whatever the token's state.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="threads"/> is below 1, or <paramref name="duration"/> is not positive.</exception>
     public static async Task<double> MeasureRateAsync(int threads, TimeSpan duration, CancellationToken cancellationToken)
     {
+        ValidateThreads(threads);
         if (duration <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(duration), duration, "The duration must be positive.");
@@ -49,9 +52,12 @@ public static class CpuSearch
     /// Cancellation is an outcome with <see cref="CpuSearchOutcome.Found"/> null, not an exception.
     /// <paramref name="progress"/> receives the running candidate count about once a second and
     /// once more with the final count, from a thread-pool thread: pass a <see cref="Progress{T}"/>
-    /// created on the UI thread to have it marshalled there.
+    /// created on the UI thread to have it marshalled there. Arguments are validated before the
+    /// token is looked at, so a bad one throws whatever the token's state.
     /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="patterns"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="patterns"/> holds nothing reachable to search for.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="threads"/> is below 1.</exception>
     public static async Task<CpuSearchOutcome> FindFirstAsync(
         PatternSet patterns, int threads, IProgress<long>? progress, CancellationToken cancellationToken)
     {
@@ -61,6 +67,7 @@ public static class CpuSearch
             throw new ArgumentException("The pattern set has no reachable pattern to search for.", nameof(patterns));
         }
 
+        ValidateThreads(threads);
         if (cancellationToken.IsCancellationRequested)
         {
             return default;
@@ -73,6 +80,14 @@ public static class CpuSearch
 
         // Run has returned, so every worker is joined and the sink's write is visible here.
         return new CpuSearchOutcome(found, candidates, elapsed);
+    }
+
+    private static void ValidateThreads(int threads)
+    {
+        if (threads < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(threads), threads, "At least one CPU thread is required.");
+        }
     }
 
     private static async Task<(long Candidates, TimeSpan Elapsed)> RunAsync(
