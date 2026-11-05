@@ -856,9 +856,11 @@ public class SearchViewModelTests
         Assert.False(vm.CanMeasureSpeed);
         Assert.False(vm.CanStart);   // Start refuses while a calibration is running
 
-        WaitUntil(() => !vm.IsCalibrating, "calibration to finish");
+        // OnCalibrationCompleted clears IsCalibrating before it writes the hint, so the flag alone
+        // does not mean the measurement has landed.
+        WaitUntil(() => settings.Current.RateHints.ContainsKey("cpu"), "rate hint stored");
 
-        Assert.True(settings.Current.RateHints.ContainsKey("cpu"), "rate hint stored");
+        Assert.False(vm.IsCalibrating);
         Assert.Null(vm.CalibrationFailure);
         Assert.Empty(vm.Results);
         Assert.Null(vm.LastSummary);
