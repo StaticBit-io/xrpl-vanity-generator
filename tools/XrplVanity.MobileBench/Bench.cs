@@ -115,9 +115,16 @@ internal static class Bench
 
         go.Set();
         Stopwatch watch = Stopwatch.StartNew();
-        Thread.Sleep(TimeSpan.FromSeconds(seconds));
-        stop.Cancel();
-        JoinAll(workers);
+        try
+        {
+            Thread.Sleep(TimeSpan.FromSeconds(seconds));
+        }
+        finally
+        {
+            stop.Cancel();
+            JoinAll(workers);
+        }
+
         watch.Stop();
         return counters.Sum() / watch.Elapsed.TotalSeconds;
     }
@@ -134,19 +141,26 @@ internal static class Bench
         Stopwatch watch = Stopwatch.StartNew();
         long previous = 0;
         double previousAt = 0;
-        while (watch.Elapsed.TotalSeconds < options.SustainSeconds)
+        try
         {
-            Thread.Sleep(TimeSpan.FromSeconds(options.WindowSeconds));
-            long total = ReadAll(counters);
-            double now = watch.Elapsed.TotalSeconds;
-            double rate = (total - previous) / (now - previousAt);
-            log($"  t={now,6:N0}s {rate,10:N0}/s {probe?.Invoke()}");
-            previous = total;
-            previousAt = now;
+            while (watch.Elapsed.TotalSeconds < options.SustainSeconds)
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(options.WindowSeconds));
+                long total = ReadAll(counters);
+                double now = watch.Elapsed.TotalSeconds;
+                double rate = (total - previous) / (now - previousAt);
+                log($"  t={now,6:N0}s {rate,10:N0}/s {probe?.Invoke()}");
+                previous = total;
+                previousAt = now;
+            }
+        }
+        finally
+        {
+            // A failed log or probe must not leave every core busy under a screen held on.
+            stop.Cancel();
+            JoinAll(workers);
         }
 
-        stop.Cancel();
-        JoinAll(workers);
         log($"  average {ReadAll(counters) / watch.Elapsed.TotalSeconds:N0}/s");
     }
 

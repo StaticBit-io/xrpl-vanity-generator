@@ -21,6 +21,12 @@ public sealed class MainActivity : Activity
 {
     private const string LogTag = "XVBench";
 
+    /// <summary>
+    /// Static, because an activity recreated by a configuration change must not start a second run
+    /// that wipes the file and halves the rates of the first.
+    /// </summary>
+    private static int _running;
+
     private TextView _output = null!;
     private string? _resultsPath;
 
@@ -35,6 +41,12 @@ public sealed class MainActivity : Activity
         ScrollView scroll = new(this);
         scroll.AddView(_output);
         SetContentView(scroll);
+
+        if (Interlocked.Exchange(ref _running, 1) != 0)
+        {
+            _output.Text = "A run is already in progress. Its results go to results.txt.";
+            return;
+        }
 
         _resultsPath = Path.Combine(GetExternalFilesDir(null)?.AbsolutePath ?? FilesDir!.AbsolutePath, "results.txt");
         File.WriteAllText(_resultsPath, string.Empty);
@@ -59,6 +71,10 @@ public sealed class MainActivity : Activity
         catch (Exception ex)
         {
             Write($"FAILED: {ex}");
+        }
+        finally
+        {
+            Volatile.Write(ref _running, 0);
         }
     }
 

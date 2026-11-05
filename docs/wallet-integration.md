@@ -12,9 +12,10 @@ It generates Ed25519 family seeds and keeps the first one whose classic address 
 pattern, for example one with the text `Abc` right after the leading `r` that every classic
 address has. It has no GPU code, and on a phone it runs on the CPU only.
 
-The package is packed but not published: `artifacts/StaticBit.XrplVanity.Core.0.1.0.nupkg` in
-this repository holds the final code. It becomes available on the `github-staticbit` feed once
-the repository's owner publishes it, and the steps below cannot be followed until then.
+The package is not published yet. It becomes available on the `github-staticbit` feed once the
+repository's owner publishes it, and the steps below cannot be followed until then. To build it
+locally, run `dotnet pack src/XrplVanity.Core -c Release -o artifacts` on `dev`; `artifacts/` is
+ignored by git, so a clone does not hold it.
 
 ## Add the package
 
@@ -123,9 +124,16 @@ public partial class VanitySearch : PageBase<object>
         PatternSet patterns = new PatternSet.Builder()
             .Add(MatchPosition.Starts, prefix, ignoreCase: true)
             .Build();
-        if (patterns.Unreachable.Count > 0 || !patterns.HasPatterns)
+        if (prefix.Length > PatternSet.MaxBodyLength || patterns.Unreachable.Count > 0 || !patterns.HasPatterns)
         {
             _status = "This text cannot appear in an address.";
+            return;
+        }
+
+        // After a failed save the page holds the only copy of the seed.
+        if (_found is null && _seedShown is not null
+            && !await notificationService.Confirm("Attention!", "The last key was not saved. Search again and lose it?"))
+        {
             return;
         }
 
@@ -159,9 +167,11 @@ public partial class VanitySearch : PageBase<object>
 
             // null for a rate of 0 or an unreachable set; TimeSpan.MaxValue when the
             // division overflows a TimeSpan. Both must be handled before showing a time.
+            string estimate = "";
             if (expected is TimeSpan wait)
             {
-                _status = $"About {Describe(wait)} on this device. It can take three times longer.";
+                estimate = $"About {Describe(wait)} on this device. It can take three times longer. ";
+                _status = estimate;
                 StateHasChanged();
                 if (wait > LongSearch && !await ConfirmLongSearchAsync(Describe(wait)))
                 {
@@ -170,7 +180,7 @@ public partial class VanitySearch : PageBase<object>
                 }
             }
 
-            _status = "Keep the app open while it searches.";
+            _status = estimate + "Keep the app open while it searches.";
             StateHasChanged();
 
             // Only the search holds the screen: not the measure, and not the warning dialog,
@@ -296,6 +306,9 @@ Notes on the sample:
 - `StartAsync` returns at once while a search is active, so a second tap cannot start another
   one. Also disable the Start button while `_running` is true, so the user sees that it is
   busy.
+- Text longer than 12 characters is matched exactly as typed: `PatternSet.CaseFoldingSkipped` names
+  it, so tell the user. Text longer than `PatternSet.MaxBodyLength` can never match, and the
+  sample refuses it.
 - The builder folds the look-alike characters `0`, `O`, `I` and `l` onto the letters that base58
   has. Any other character outside the alphabet, such as `_` or a space, lands in `Unreachable`,
   and so does an empty pattern.
@@ -374,7 +387,17 @@ public partial class VanitySearch
 
     private async Task<string> KeepAsync(Match match)
     {
-        XrplWalletModel wallet = await _xrpl.WalletFromSeed(match.Seed, null, null);
+        XrplWalletModel wallet;
+        try
+        {
+            wallet = await _xrpl.WalletFromSeed(match.Seed, null, null);
+        }
+        catch (Exception)
+        {
+            // A seed that cannot be checked is never shown.
+            return "The seed could not be checked and was discarded. Search again.";
+        }
+
         if (!string.Equals(wallet.ClassicAddress, match.Address, StringComparison.Ordinal))
         {
             return "The seed did not match its address and was discarded. Search again.";
@@ -386,9 +409,10 @@ public partial class VanitySearch
             _found = await _foundKeys.AddAsync(match, CancellationToken.None);
             return "";
         }
-        catch (InvalidOperationException)
+        catch (Exception)
         {
-            // The vault is locked and nothing was stored, so the page is the only copy.
+            // Whatever failed, the seed was checked and the page is now the only sure copy.
+            // Do not log the exception's text: it may quote what was being written.
             _seedShown = match.Seed;
             return "This key could not be saved. Copy the seed now: it is lost when you leave this page.";
         }
@@ -404,10 +428,16 @@ public partial class VanitySearch
 
     private async Task OnNextClickAsync()
     {
+        // After a failed save there is no key to add. Hide Next while _found is null.
+        if (_found is null)
+        {
+            return;
+        }
+
         bool confirmed = await notificationService.Confirm(
             "Attention!",
             "Make sure you save your seed, otherwise you won't be able to restore access to your account.");
-        if (!confirmed || _found is null)
+        if (!confirmed)
         {
             return;
         }
@@ -474,9 +504,10 @@ public interface IFoundKeyStore
 }
 ```
 
-`AddAsync` stores the seed first. If the app dies between the two writes, the result is an entry
-nobody references, and the sweep below collects it. The other order would leave a record that
-points at nothing.
+`AddAsync` stores the seed first. If the app dies or the record write fails between the two, the
+result is an entry nobody references, and the sweep below collects it. The other order would leave
+a record that points at nothing. When `AddAsync` throws for any reason, the sample keeps the seed
+on the page and asks the user to copy it.
 
 ### The vault deletes entries no wallet references
 
@@ -496,14 +527,24 @@ Keep the existing guards as they are, and keep them first: they look at wallets 
 
 **An empty history proves nothing on its own.** The sweep's comments describe a corrupted read that
 returns "loaded successfully, empty" instead of throwing. For wallets the guard is to skip on an
-empty list, but an empty history is also an ordinary state, so that guard cannot work here. Keep
-the number of records in a separate storage key, write it on every change, and have
-`TryGetLiveReferencesAsync` return `null` when the list's length disagrees with it or when the read
-throws. A corrupted read then costs one skipped sweep, not every found key.
+empty list, but an empty history is also an ordinary state, so that guard cannot work here. Use a
+count instead:
+
+1. Keep the number of records in a separate storage key, and write it on every change.
+2. Write that key as 0 in a migration under `Migrations/`, before any found key can exist, and
+   check that it runs before the first sweep. Every install then has the key.
+3. Have `TryGetLiveReferencesAsync` return `null` when the read throws, when the list's length
+   disagrees with the count, and **when the key is missing**.
+
+A missing key must mean lost, not zero. A store that comes back empty has lost the count along with
+the list, and reading a missing count as 0 would make that empty list look valid and delete every
+found key. The two writes are not atomic, so a crash between them leaves a mismatch, and sweeps stay
+skipped until the next change to the history. That is the cheap way to fail: an orphaned entry is
+inert, and a found key is in no backup.
 
 This is code that protects keys, so review it as such, and add tests: a found key survives a sweep
 in a later session; a history that cannot be read skips the sweep; a list that disagrees with the
-count skips the sweep.
+count skips the sweep; a store that lost both the list and the count skips the sweep.
 
 ### The history screen
 
@@ -649,6 +690,7 @@ random and can be several times longer or shorter.
 | Reveal button | Show seed |
 | Make a wallet | Add as a wallet |
 | Could not save | This key could not be saved. Copy the seed now: it is lost when you leave this page. |
+| Searching again after that | The last key was not saved. Search again and lose it? |
 | History note | These keys are only on this phone. They are not in your backups until you add them as wallets. |
 
 ## Store rules and review notes
@@ -713,8 +755,8 @@ per second:
 | 6 characters | about 15 hours |
 
 The table is the best case. It assumes the first character after the `r` is one of the common
-ones. Text that starts with `c`, `i`, `o`, `t`, `v`, `x`, `y` or `z`, or with one of the digits
-`0`, `1`, `2`, `5`, `6`, `7` and `8`, costs far more: `xrpl` takes about 62 minutes at 8,900/s,
+ones. Text that starts with `c`, `i`, `o`, `R`, `t`, `v`, `x`, `y` or `z`, or with one of the digits
+`0`, `1`, `2`, `5`, `6`, `7` and `8`, costs far more, and `q` about three times as much: `xrpl` takes about 62 minutes at 8,900/s,
 where `abcd` takes about 1, and `1234` takes about 8 hours. The estimate that the sample shows
 accounts for this, because it is computed from the pattern.
 
@@ -754,7 +796,10 @@ A tester can follow this list on a current Android phone and on an iPhone.
   the app. This is what proves the sweep leaves it alone.
 - Deleting a history entry removes its seed: after the next restart the vault holds no entry for
   it. A key added as a wallet still signs after its history entry is deleted.
-- A warned search can still be started, and the link opens the site.
+- A warned search can still be started, and the link opens the site. Following the link leaves
+  the app, which stops the search, so the user starts it again on return.
+- With the vault write failing, a find shows the seed and asks to copy it, and starting a new
+  search asks before it clears the seed.
 - A 30-minute search on a current phone stays at a comfortable temperature.
 
 ## Not known yet
