@@ -59,6 +59,7 @@ showing it](#check-the-seed-before-showing-it). In the wallet the class derives 
 
 ```csharp
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using XrplVanity.Core;
 
 public partial class VanitySearch : PageBase<object>
@@ -69,6 +70,9 @@ public partial class VanitySearch : PageBase<object>
 
     [Inject]
     private IVanitySearchPlatform _platform { get; set; } = default!;
+
+    [Inject]
+    private ILogger<VanitySearch> _logger { get; set; } = default!;
 
     private bool _running;
     private CancellationTokenSource? _search;
@@ -199,6 +203,15 @@ public partial class VanitySearch : PageBase<object>
 
             outcome = await CpuSearch.FindFirstAsync(patterns, threads, progress, search.Token);
         }
+        catch (Exception ex)
+        {
+            // Nothing was found: a match is returned even when a worker fails after it. The
+            // status names no cause, so the log has to, for a failure that comes back every time.
+            _logger.LogError("Vanity search failed: {Type}", ex.GetType().Name);
+            _status = "Search stopped because of an error. Start it again.";
+            StateHasChanged();
+            return;
+        }
         finally
         {
             // Every exit gets here, a found seed included, so the screen can sleep again.
@@ -298,6 +311,14 @@ Notes on the sample:
   a set with no pattern. They check these before they look at the token. `Math.Max(1, ...)` keeps
   `threads` valid on a single core.
 - Cancelling the token is an outcome, not an exception: `Found` is `null`.
+- A failure on a search thread, such as the system random number generator or running out of
+  memory, ends the search and not the app: `FindFirstAsync` and `MeasureRateAsync` throw the
+  original exception once every thread has stopped. The sample catches it, writes its type to
+  the log and shows a plain status. That catch also covers the rest of the `try`, such as the
+  measure and the warning dialog, so the log is where the cause is.
+- `FindFirstAsync` throws only when it holds no match. A match it already holds is returned as
+  usual and the failure is dropped, so a find always reaches `KeepAsync`. The same is true of an
+  exception from `IProgress.Report`. In both cases the final progress report is skipped.
 - Every classic address starts with `r`, and `PatternSet` matches the part after it. The text the
   user types therefore goes in without the `r`: passing `rAbc` would search for addresses that
   read `rrAbc`. The sample refuses text that starts with a lowercase `r`, so that this cannot
@@ -588,7 +609,10 @@ public interface IVanitySearchPlatform
     /// <summary>Must not throw; report an unknown battery as null.</summary>
     DeviceCondition ReadCondition();
 
-    /// <summary>Safe to call from any thread.</summary>
+    /// <summary>
+    /// Safe to call from any thread. Must not throw: the sample turns the screen off in a
+    /// finally that runs before a found key is saved, so a throw there would lose the key.
+    /// </summary>
     void SetKeepScreenOn(bool keepOn);
 }
 
@@ -622,7 +646,8 @@ Implement the interface in `SB.MobileApp` with these platform calls:
   plugged state is the extra `BatteryManager.ExtraPlugged`, and a non-zero value means the
   device is on a charger.
 - `DeviceDisplay.Current.KeepScreenOn` changes UI state, so set it on the main thread: wrap the
-  call in `MainThread.BeginInvokeOnMainThread` unless you know the caller is already on it.
+  call in `MainThread.BeginInvokeOnMainThread` unless you know the caller is already on it. A
+  direct call must catch what it throws, because `SetKeepScreenOn` must not throw.
 - What was checked: the Android calls above compile against .NET 10 for Android, and the
   battery broadcast ran on the test phone. The thermal status was never read on a device, and the
   iOS calls were never built, because no iOS build exists.
@@ -685,6 +710,7 @@ random and can be several times longer or shorter.
 | Left the screen | Search stopped because the app left the screen. |
 | Low battery | Search stopped because the battery is below 20%. |
 | Heat | Search stopped because the device got too hot. |
+| Error | Search stopped because of an error. Start it again. |
 | Under every stop | Continuing loses nothing: every try has the same chance. |
 | Found | Found and saved in your search history. |
 | Reveal button | Show seed |

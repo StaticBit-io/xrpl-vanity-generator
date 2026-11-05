@@ -50,4 +50,71 @@ public class CpuSearchWorkersTests
         Assert.True(runner.Join(System.TimeSpan.FromSeconds(10)), "workers did not stop after cancellation");
         Assert.True(workers.CandidatesSearched > 0, "no candidates counted before cancellation");
     }
+
+    [Fact]
+    public void A_Failing_Worker_Is_Rethrown_From_Run_After_Every_Thread_Has_Stopped()
+    {
+        const int threads = 4;
+        HashSet<Thread> seen = new();
+        InvalidOperationException failure = new("sink failed");
+        using CancellationTokenSource stop = new();
+
+        // Throws only once every worker has reported, so the set holds each thread Run started.
+        MatchSink sink = new(limit: null, _ =>
+        {
+            seen.Add(Thread.CurrentThread);
+            if (seen.Count == threads)
+            {
+                throw failure;
+            }
+        });
+        CpuSearchWorkers workers = new(threads, OneChar(), sink);
+
+        InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() => workers.Run(stop));
+
+        Assert.Same(failure, thrown);
+        Assert.False(stop.IsCancellationRequested, "a failure stops this pool, not what shares the source");
+        Assert.Equal(threads, seen.Count);
+        Assert.All(seen, thread => Assert.False(thread.IsAlive, $"{thread.Name} outlived Run"));
+    }
+
+    [Fact]
+    public void A_Thread_That_Cannot_Start_Stops_The_Ones_Already_Running()
+    {
+        PatternSet never = new PatternSet.Builder().Add(MatchPosition.Starts, "zzzzzzzz", ignoreCase: false).Build();
+        List<Thread> started = new();
+        InvalidOperationException failure = new("no more threads");
+        using CancellationTokenSource stop = new();
+        MatchSink sink = new(limit: null, _ => { });
+        CpuSearchWorkers workers = new(threads: 3, never, sink, thread =>
+        {
+            if (started.Count == 2)
+            {
+                throw failure;
+            }
+
+            thread.Start();
+            started.Add(thread);
+        });
+
+        InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() => workers.Run(stop));
+
+        Assert.Same(failure, thrown);
+        Assert.False(stop.IsCancellationRequested, "a failed start stops this pool, not what shares the source");
+        Assert.Equal(2, started.Count);
+        Assert.All(started, thread => Assert.False(thread.IsAlive, $"{thread.Name} outlived Run"));
+    }
+
+    [Fact]
+    public void A_Throwing_Cancel_Callback_At_The_Limit_Ends_The_Run_As_A_Failure()
+    {
+        using CancellationTokenSource stop = new();
+        stop.Token.Register(() => throw new ArithmeticException("cancel callback failed"));
+        MatchSink sink = new(limit: 1, _ => { });
+        CpuSearchWorkers workers = new(threads: 2, OneChar(), sink);
+
+        AggregateException thrown = Assert.Throws<AggregateException>(() => workers.Run(stop));
+
+        Assert.IsType<ArithmeticException>(Assert.Single(thrown.InnerExceptions));
+    }
 }

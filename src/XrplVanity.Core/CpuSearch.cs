@@ -11,8 +11,10 @@ public readonly record struct CpuSearchOutcome(Match? Found, long Candidates, Ti
 /// One-call entry points over <see cref="CpuSearchWorkers"/>. The workers are bare threads, call
 /// back on a worker thread and cancel the source they are given; here the caller's token is only
 /// ever observed, never handed over, the callback merely stores the match, and cancellation is an
-/// outcome, not an exception. Progress is reported on an arbitrary thread, so a caller that owns
-/// UI state must marshal it.
+/// outcome, not an exception. A failure on a worker thread (the system RNG, out of memory) is not
+/// an outcome: it stops the other workers and, once all of them have stopped, faults the returned
+/// task with the original exception, unless a match was already found. Progress is reported on an
+/// arbitrary thread, so a caller that owns UI state must marshal it.
 /// </summary>
 public static class CpuSearch
 {
@@ -26,6 +28,8 @@ public static class CpuSearch
     /// Measures candidates per second over <paramref name="duration"/>. Cancelling ends the probe
     /// early and returns the rate measured so far; a token that is already cancelled returns 0.
     /// Arguments are validated before the token is looked at, so a bad one throws whatever the token's state.
+    /// A failure on a worker thread faults the returned task with the original exception, after
+    /// every worker has stopped.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="threads"/> is below 1, or <paramref name="duration"/> is not positive.</exception>
     public static async Task<double> MeasureRateAsync(int threads, TimeSpan duration, CancellationToken cancellationToken)
@@ -42,7 +46,8 @@ public static class CpuSearch
         }
 
         MatchSink sink = new(limit: null, _ => { });
-        (long candidates, TimeSpan elapsed) = await RunAsync(ProbePatterns, threads, sink, duration, progress: null, cancellationToken)
+        CpuSearchWorkers workers = new(threads, ProbePatterns, sink);
+        (long candidates, TimeSpan elapsed) = await RunAsync(workers, duration, progress: null, cancellationToken)
             .ConfigureAwait(false);
 
         return elapsed > TimeSpan.Zero ? candidates / elapsed.TotalSeconds : 0;
@@ -55,6 +60,10 @@ public static class CpuSearch
     /// once more with the final count, on an arbitrary thread, the final report included: pass a
     /// <see cref="Progress{T}"/> created on the UI thread to have it marshalled there. Arguments
     /// are validated before the token is looked at, so a bad one throws whatever the token's state.
+    /// A failure on a worker thread or in <paramref name="progress"/> faults the returned task with
+    /// the original exception, after every worker has stopped, but only when no match was stored:
+    /// a match is returned as usual and the failure is dropped. Either way the final progress
+    /// report is skipped.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="patterns"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="patterns"/> holds nothing reachable to search for.</exception>
@@ -76,11 +85,31 @@ public static class CpuSearch
 
         Match? found = null;
         MatchSink sink = new(limit: 1, match => found = match);
-        (long candidates, TimeSpan elapsed) = await RunAsync(patterns, threads, sink, limit: null, progress, cancellationToken)
-            .ConfigureAwait(false);
+        CpuSearchWorkers workers = new(threads, patterns, sink);
+        return await CollectFirstAsync(workers, () => found, progress, cancellationToken).ConfigureAwait(false);
+    }
 
-        // Run has returned, so every worker is joined and the sink's write is visible here.
-        return new CpuSearchOutcome(found, candidates, elapsed);
+    /// <summary>
+    /// The search behind <see cref="FindFirstAsync"/>, over workers built by the caller so tests
+    /// can fail one after a match was stored. <paramref name="found"/> is read only after the
+    /// workers have stopped.
+    /// </summary>
+    internal static async Task<CpuSearchOutcome> CollectFirstAsync(
+        CpuSearchWorkers workers, Func<Match?> found, IProgress<long>? progress, CancellationToken cancellationToken)
+    {
+        try
+        {
+            (long candidates, TimeSpan elapsed) = await RunAsync(workers, limit: null, progress, cancellationToken)
+                .ConfigureAwait(false);
+
+            // Run has returned, so every worker is joined and the sink's write is visible here.
+            return new CpuSearchOutcome(found(), candidates, elapsed);
+        }
+        catch (Exception) when (found() is Match match)
+        {
+            // After a long search the key is what the user waited for, and it cannot be found again.
+            return new CpuSearchOutcome(match, workers.CandidatesSearched, workers.Elapsed);
+        }
     }
 
     private static void ValidateThreads(int threads)
@@ -92,10 +121,8 @@ public static class CpuSearch
     }
 
     private static async Task<(long Candidates, TimeSpan Elapsed)> RunAsync(
-        PatternSet patterns, int threads, MatchSink sink, TimeSpan? limit, IProgress<long>? progress, CancellationToken cancellationToken)
+        CpuSearchWorkers workers, TimeSpan? limit, IProgress<long>? progress, CancellationToken cancellationToken)
     {
-        CpuSearchWorkers workers = new(threads, patterns, sink);
-
         // Run cancels the source it is given when the sink refuses a match, so it gets a private
         // one. It is disposed only after Run has returned: workers read it until they are joined.
         using CancellationTokenSource stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
