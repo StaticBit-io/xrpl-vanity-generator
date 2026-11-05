@@ -366,12 +366,6 @@ git commit -m "docs: tell the wallet's developers how to add the search"
 These are the owner's, and no task performs them:
 
 1. Merge the branch into `dev` through a pull request.
-2. Publish the package; it is an outward-facing step:
-
-```bash
-dotnet nuget push artifacts/StaticBit.XrplVanity.Core.0.1.0.nupkg --source https://nuget.pkg.github.com/StaticBit-io/index.json --api-key <token>
-```
-
-`<token>` is a GitHub token with `write:packages`.
-
+2. Merge `dev` into `main`. The `package` job of `.github/workflows/dotnet.yml` publishes the
+   package once both test suites pass.
 3. Pass `docs/wallet-integration.md` to the wallet's developers.

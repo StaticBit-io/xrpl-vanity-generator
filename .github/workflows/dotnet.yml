@@ -45,3 +45,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash linux/run-linux-tests.sh --cpu-only
+
+  # Publishes the package once both suites pass on main, which only merges from dev reach. It runs
+  # on every push there and skips a version the feed already has, so a run that failed or was
+  # replaced is made up for by the next one.
+  package:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      PROJECT: src/XrplVanity.Core/XrplVanity.Core.csproj
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Skipping a version the feed has would otherwise hide a library change merged without a new
+      # one: the run would be green and the package would stay old.
+      - name: a change to the library raises the package version
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          previous=$(git show "$BEFORE:$PROJECT" | grep '<PackageVersion>' || true)
+          current=$(grep '<PackageVersion>' "$PROJECT")
+          if [ "$previous" = "$current" ] && ! git diff --quiet "$BEFORE" "$GITHUB_SHA" -- src/XrplVanity.Core; then
+            echo "::error file=$PROJECT::src/XrplVanity.Core changed but PackageVersion did not, so nothing would be published. Raise it on dev and merge into main again."
+            exit 1
+          fi
+      - run: dotnet pack "$PROJECT" -c Release -o artifacts
+      - run: dotnet nuget push artifacts/*.nupkg --source https://nuget.pkg.github.com/StaticBit-io/index.json --api-key "$FEED_TOKEN" --skip-duplicate
+        env:
+          FEED_TOKEN: ${{ secrets.GITHUB_TOKEN }}
