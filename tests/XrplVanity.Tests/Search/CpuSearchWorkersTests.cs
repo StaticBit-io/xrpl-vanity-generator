@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
 using XrplVanity.Core;
-using XrplVanity.Search;
 using Xunit;
 
 namespace XrplVanity.Tests.Search;
@@ -11,6 +10,14 @@ public class CpuSearchWorkersTests
 {
     // One character matches 1 in 58 candidates: a few milliseconds of CPU work.
     private static PatternSet OneChar() => new PatternSet.Builder().Add(MatchPosition.Starts, "a", ignoreCase: false).Build();
+
+    [Fact]
+    public void The_Cpu_Search_Lives_In_Core_And_Needs_No_Gpu()
+    {
+        Assert.Same(typeof(Seed).Assembly, typeof(CpuSearchWorkers).Assembly);
+        Assert.DoesNotContain(typeof(CpuSearchWorkers).Assembly.GetReferencedAssemblies(),
+            a => a.Name == "XrplVanity.Gpu");
+    }
 
     [Fact]
     public void Stops_Exactly_At_The_Limit_And_Counts_Candidates()

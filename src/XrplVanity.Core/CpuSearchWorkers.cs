@@ -2,16 +2,15 @@ using System;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Threading;
-using XrplVanity.Core;
 
-namespace XrplVanity.Search;
+namespace XrplVanity.Core;
 
 /// <summary>
 /// The CPU search: N threads, each with its own deriver and a 512-candidate CSPRNG pool,
 /// reporting through the shared sink. The candidate counter is bumped once per pool refill,
 /// so it lags the truth by at most 512 per thread.
 /// </summary>
-internal sealed class CpuSearchWorkers
+public sealed class CpuSearchWorkers
 {
     private const int PoolCandidates = 512;
     private const int EntropyBytes = 16;
