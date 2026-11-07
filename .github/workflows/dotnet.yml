@@ -16,9 +16,44 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The same content otherwise runs twice: in its pull request and again on the push to dev or main.
+  # A job that passed on commit tree T leaves an artifact ci-passed-<job>-<T>, and gate skips the job
+  # when it finds one. The tree, not the commit: a pull request runs on the synthetic
+  # refs/pull/N/merge commit, while the squash commit on dev is a different commit with the same
+  # content. If dev moved on while the pull request waited, the trees differ and the job runs again.
+  # An API error finds no marker, so the job runs rather than being skipped.
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tree: ${{ steps.check.outputs.tree }}
+      windows: ${{ steps.check.outputs.windows }}
+      linux: ${{ steps.check.outputs.linux }}
+    steps:
+      - name: Find markers for this tree
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tree=$(gh api "repos/$GITHUB_REPOSITORY/git/commits/$GITHUB_SHA" --jq .tree.sha) || tree=""
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          for job in windows linux; do
+            passed=false
+            if [ -n "$tree" ] && n=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=ci-passed-$job-$tree" \
+                --jq '[.artifacts[] | select(.expired | not)] | length') && [ "$n" -gt 0 ]; then
+              passed=true
+            fi
+            echo "$job: $passed (tree $tree)"
+            echo "$job=$passed" >> "$GITHUB_OUTPUT"
+          done
+
   # The only place the desktop application builds and the DPAPI tests run. Hosted runners have no
   # GPU, so the CUDA and OpenCL rows skip here.
   windows:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.windows != 'true' }}
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -37,11 +72,32 @@ jobs:
           DOTNET_ROLL_FORWARD: LatestMajor
       - run: dotnet run --project tests/XrplVanity.Tests -c Release --no-build
       - run: dotnet run --project tests/XrplVanity.App.Tests -c Release --no-build
+      - name: Mark the tree as tested
+        if: needs.gate.outputs.tree != ''
+        shell: bash
+        run: echo "$GITHUB_RUN_ID" > ci-passed
+      - uses: actions/upload-artifact@v4
+        if: needs.gate.outputs.tree != ''
+        with:
+          name: ci-passed-windows-${{ needs.gate.outputs.tree }}
+          path: ci-passed
+          retention-days: 14
 
   # The documented CPU-only harness: both suites with OpenCL required on pocl, then the CLI smokes.
   linux:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.linux != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - run: bash linux/run-linux-tests.sh --cpu-only
+      - name: Mark the tree as tested
+        if: needs.gate.outputs.tree != ''
+        run: echo "$GITHUB_RUN_ID" > ci-passed
+      - uses: actions/upload-artifact@v4
+        if: needs.gate.outputs.tree != ''
+        with:
+          name: ci-passed-linux-${{ needs.gate.outputs.tree }}
+          path: ci-passed
+          retention-days: 14
