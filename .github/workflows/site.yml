@@ -1,8 +1,8 @@
 name: site
 
 on:
-  # No push trigger: the suite takes seconds, so a gate that skips the repeat after a merge would cost
-  # as much as the repeat. A pull request runs the suite, and publishing runs it again before deploy-site.
+  push:
+    branches: [dev, main]
   pull_request:
   # Publishing is only ever this: Actions > site > Run workflow, with the branch to publish. main is the
   # Pages production branch; dev goes to its preview address.
