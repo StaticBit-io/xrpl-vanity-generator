@@ -73,6 +73,7 @@ public sealed class FormattingTests
         Assert.Equal("> 1 year", Formatting.Duration(TimeSpan.FromDays(400), en));
         Assert.Equal("2.5 days", Formatting.Duration(TimeSpan.FromHours(60), en));
         Assert.Equal("1 day", Formatting.Duration(TimeSpan.FromDays(1), en));
+        Assert.Equal("1 day", Formatting.Duration(TimeSpan.FromHours(25), en));
         Assert.Equal("4 min", Formatting.Duration(TimeSpan.FromMinutes(4.2), en));
         Assert.Equal("12 s", Formatting.Duration(TimeSpan.FromSeconds(12.4), en));
         Assert.Equal("< 1 s", Formatting.Duration(TimeSpan.FromMilliseconds(235), en));

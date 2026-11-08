@@ -29,7 +29,8 @@ public static class Formatting
     {
         if (value is not TimeSpan t) return text[CommonText.NoValue];
         if (t.TotalDays > 365) return text[CommonText.MoreThanAYear];
-        if (t.TotalDays >= 1) return text.Render(UiText.Of(CommonText.Days, ("count", t.TotalDays)));
+        // Rounded to the one decimal shown, so the plural form agrees with the printed number: 25 hours is "1 day", not "1 days".
+        if (t.TotalDays >= 1) return text.Render(UiText.Of(CommonText.Days, ("count", Math.Round(t.TotalDays, 1))));
         if (t.TotalHours >= 1) return text.Render(UiText.Of(CommonText.Hours, ("hours", (int)t.TotalHours), ("minutes", t.Minutes)));
         if (t.TotalMinutes >= 1) return text.Render(UiText.Of(CommonText.Minutes, ("minutes", (int)Math.Round(t.TotalMinutes))));
         double seconds = Math.Round(t.TotalSeconds);
