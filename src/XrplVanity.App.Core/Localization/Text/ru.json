@@ -255,5 +255,9 @@
   "Tutorial.Finish": "Finish",
   "Tutorial.LeaveTitle": "Leave the tutorial?",
   "Tutorial.LeaveMessage": "Your words and settings come back as they were. You can start it again in Settings.",
-  "Tutorial.LeaveConfirm": "Leave"
+  "Tutorial.LeaveConfirm": "Leave",
+  "Tray.Show": "Show",
+  "Tray.Duty": "Duty",
+  "Tray.DutyStep": "{percent} %",
+  "Tray.StopSearch": "Stop search"
 }
