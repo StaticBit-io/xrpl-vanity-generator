@@ -1,3 +1,4 @@
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Tutorial;
 
 namespace XrplVanity.App.Core.Pages;
@@ -93,17 +94,9 @@ public partial class SearchPage
         base.Dispose();
     }
 
-    private string ClearTitle
-    {
-        get
-        {
-            int count = Vm.Patterns.Count;
-            return count == 1 ? "Clear 1 pattern?" : $"Clear {count} patterns?";
-        }
-    }
+    private string ClearTitle => T.Render(UiText.Of(SearchText.ClearTitle, ("count", Vm.Patterns.Count)));
 
-    private static string ClearMessage =>
-        "The pattern set is emptied. Anything saved with save list… is untouched, and a search already running is not affected.";
+    private string ClearMessage => T[SearchText.ClearMessage];
 
     // The tutorial's bubble would cover the QR dialog, so on that step its text goes into the dialog.
     private string? QrNote =>

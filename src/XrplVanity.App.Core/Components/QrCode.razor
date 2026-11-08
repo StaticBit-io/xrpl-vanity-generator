@@ -1,7 +1,8 @@
 @* A light plate under the code: an inverted QR on this application's dark background is not
    reliably scannable, and the plate's padding is the quiet zone. *@
+@inherits LocalizedComponent
 <div class="qr-plate">
-  <svg class="qr" viewBox="0 0 @_modules @_modules" shape-rendering="crispEdges" role="img" aria-label="QR code">
+  <svg class="qr" viewBox="0 0 @_modules @_modules" shape-rendering="crispEdges" role="img" aria-label="@T[QrText.CodeLabel]">
     <path d="@_path" fill="#000000" />
     @if (_logo is not null)
     {

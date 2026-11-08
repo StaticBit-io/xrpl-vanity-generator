@@ -337,7 +337,7 @@ public class SearchViewModelTests
         lock (notes.Sent) match = notes.Sent.First(n => n.Title.Id == NotificationText.MatchFoundTitle);
         SessionResult found = Assert.Single(vm.Results);
         Assert.Equal(
-            UiText.Of(NotificationText.MatchFoundBody, ("address", found.Address), ("pattern", found.Pattern), ("position", found.Position)),
+            UiText.Of(NotificationText.MatchFoundBody, ("address", found.Address), ("pattern", found.Pattern), ("position", PatternsText.Position(found.Position))),
             match.Body);
     }
 

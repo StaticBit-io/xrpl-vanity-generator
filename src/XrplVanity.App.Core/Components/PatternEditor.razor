@@ -7,8 +7,8 @@
 }
 <div class="card-box">
   <div class="head">
-    <div class="card-title">Patterns <span class="count">@chips.Count</span></div>
-    <button class="clear-patterns btn-secondary-dark danger t" disabled="@(chips.Count == 0)" @onclick="() => OnClearRequested.InvokeAsync()">Clear</button>
+    <div class="card-title">@T[PatternsText.Title] <span class="count">@chips.Count</span></div>
+    <button class="clear-patterns btn-secondary-dark danger t" disabled="@(chips.Count == 0)" @onclick="() => OnClearRequested.InvokeAsync()">@T[PatternsText.Clear]</button>
   </div>
   <div class="chips @(_expanded ? "scrolling" : null)">
     @foreach (PatternChip chip in collapsed ? chips.Take(CollapsedChips) : chips)
@@ -16,34 +16,34 @@
       <span class="chip t" @key="chip">
         @if (chip.Position == MatchPosition.Pair)
         {
-          <span class="chip-pos">starts</span>
+          <span class="chip-pos">@T[PatternsText.PositionStarts]</span>
           <span class="mono">@chip.Text</span>
           @if (chip.NearStart)
           {
-            <span class="chip-pos chip-near" title="the starts half may begin at the 2nd or 3rd character of the address">2nd–3rd</span>
+            <span class="chip-pos chip-near" title="@T[PatternsText.NearRangeTitlePair]">@T[PatternsText.NearRange]</span>
           }
-          <span class="chip-pos">ends</span>
+          <span class="chip-pos">@T[PatternsText.PositionEnds]</span>
           <span class="mono">@chip.EndsText</span>
         }
         else if (chip.Position == MatchPosition.NearStart)
         {
-          <span class="chip-pos">starts</span>
+          <span class="chip-pos">@T[PatternsText.PositionStarts]</span>
           <span class="mono">@chip.Text</span>
-          <span class="chip-pos chip-near" title="may begin at the 2nd or 3rd character of the address">2nd–3rd</span>
+          <span class="chip-pos chip-near" title="@T[PatternsText.NearRangeTitle]">@T[PatternsText.NearRange]</span>
         }
         else
         {
-          <span class="chip-pos">@chip.Position.ToString().ToLowerInvariant()</span>
+          <span class="chip-pos">@T.Render(PatternsText.Position(chip.Position.ToString()))</span>
           <span class="mono">@chip.Text</span>
         }
-        @if (chip.Normalized is not null) { <span class="chip-normalized mono" title="0, O, I and l do not exist in the XRPL alphabet, so they are folded onto o, o, i and L">→ @chip.Normalized</span> }
-        @if (!chip.IgnoreCase) { <span class="chip-pos" title="case-sensitive">Aa</span> }
+        @if (chip.Normalized is not null) { <span class="chip-normalized mono" title="@T[PatternsText.NormalizedTitle]">→ @chip.Normalized</span> }
+        @if (!chip.IgnoreCase) { <span class="chip-pos" title="@T[PatternsText.CaseSensitiveTitle]">Aa</span> }
         @if (chip.Warning is not null) { <span class="chip-warn">@chip.Warning</span> }
         @if (chip.NearStartSpeedup is double speedup)
         {
-          <button class="chip-speedup t" title="The first character can rarely follow the r. Allow the pattern at the 2nd or 3rd character of the address." @onclick="() => Vm.AllowNearStart(chip)">≈@(speedup.ToString("0"))× sooner at 2nd–3rd</button>
+          <button class="chip-speedup t" title="@T[PatternsText.NearStartSpeedupTitle]" @onclick="() => Vm.AllowNearStart(chip)">@T.Render(UiText.Of(PatternsText.NearStartSpeedup, ("speedup", speedup)))</button>
         }
-        <button class="remove" title="Remove" @onclick="() => Vm.RemovePattern(chip)">×</button>
+        <button class="remove" title="@T[PatternsText.Remove]" @onclick="() => Vm.RemovePattern(chip)">×</button>
       </span>
     }
   </div>
@@ -53,47 +53,47 @@
   @if (chips.Count > CollapseThreshold)
   {
     <div class="chips-row">
-      <button class="chips-toggle t" @onclick="() => _expanded = !_expanded">@(collapsed ? $"+{chips.Count - CollapsedChips} more" : "show less")</button>
+      <button class="chips-toggle t" @onclick="() => _expanded = !_expanded">@(collapsed ? T.Render(UiText.Of(PatternsText.MoreChips, ("count", chips.Count - CollapsedChips))) : T[PatternsText.ShowLess])</button>
     </div>
   }
   <div class="entry pattern-entry @(Vm.EntryPosition == MatchPosition.Pair ? "paired" : null)">
     <select class="pos form-select" @bind="Vm.EntryPosition">
-      <option value="Starts">starts with</option>
-      <option value="Ends">ends with</option>
-      <option value="Contains">contains</option>
-      <option value="Pair">starts and ends with</option>
+      <option value="Starts">@T[PatternsText.StartsWith]</option>
+      <option value="Ends">@T[PatternsText.EndsWith]</option>
+      <option value="Contains">@T[PatternsText.PositionContains]</option>
+      <option value="Pair">@T[PatternsText.StartsAndEndsWith]</option>
     </select>
     @if (Vm.EntryPosition == MatchPosition.Pair)
     {
-      <input class="pattern form-control mono" placeholder="starts with…" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
-      <input class="pattern-ends form-control mono" placeholder="ends with…" @bind="Vm.EntryEndsText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+      <input class="pattern form-control mono" placeholder="@T[PatternsText.StartsWithPlaceholder]" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+      <input class="pattern-ends form-control mono" placeholder="@T[PatternsText.EndsWithPlaceholder]" @bind="Vm.EntryEndsText" @bind:event="oninput" @onkeydown="OnKeyDown" />
     }
     else
     {
-      <input class="pattern form-control mono" placeholder="type a pattern and press Enter" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
+      <input class="pattern form-control mono" placeholder="@T[PatternsText.EntryPlaceholder]" @bind="Vm.EntryText" @bind:event="oninput" @onkeydown="OnKeyDown" />
     }
     <div class="entry-tools">
       <div class="entry-flags">
-        <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> ignore case</label>
+        <label class="case-label"><input class="case" type="checkbox" @bind="Vm.EntryIgnoreCase" /> @T[PatternsText.IgnoreCase]</label>
         @if (SearchViewModel.AllowsNearStart(Vm.EntryPosition))
         {
-          <label class="near-label" title="The pattern may begin at the 2nd or 3rd character of the address: r?WORD…"><input class="near-start" type="checkbox" @bind="Vm.EntryNearStart" /> 2nd or 3rd char</label>
+          <label class="near-label" title="@T[PatternsText.NearStartOptionTitle]"><input class="near-start" type="checkbox" @bind="Vm.EntryNearStart" /> @T[PatternsText.NearStartOption]</label>
         }
       </div>
       <label class="btn-secondary-dark t">
-        load list…
+        @T[PatternsText.LoadList]
         <InputFile OnChange="OnListChosen" accept=".txt" style="display:none" />
       </label>
-      <button class="save-list btn-secondary-dark t" disabled="@(chips.Count == 0)" @onclick="OnSaveList">save list…</button>
+      <button class="save-list btn-secondary-dark t" disabled="@(chips.Count == 0)" @onclick="OnSaveList">@T[PatternsText.SaveList]</button>
     </div>
   </div>
   @if (_listError is not null)
   {
-    <div class="list-error">@_listError</div>
+    <div class="list-error">@T.Render(_listError)</div>
   }
   @if (_listNote is not null)
   {
-    <div class="list-note">@_listNote</div>
+    <div class="list-note">@T.Render(_listNote)</div>
   }
   @if (Vm.PatternProblem is not null)
   {

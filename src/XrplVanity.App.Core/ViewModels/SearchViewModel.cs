@@ -1370,7 +1370,7 @@ public sealed class SearchViewModel : IDisposable
             {
                 _notifications.Notify(
                     UiText.Of(NotificationText.MatchFoundTitle),
-                    UiText.Of(NotificationText.MatchFoundBody, ("address", last.Address), ("pattern", last.Pattern), ("position", last.Position)));
+                    UiText.Of(NotificationText.MatchFoundBody, ("address", last.Address), ("pattern", last.Pattern), ("position", PatternsText.Position(last.Position))));
             }
             else
             {

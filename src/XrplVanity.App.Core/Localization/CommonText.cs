@@ -13,6 +13,8 @@ public static class CommonText
     public static readonly TextId MoreThanAYear = Id();
     public static readonly TextId LessThanASecond = Id();
 
+    public static readonly TextId Close = Id();
+
     /// <summary>The dash shown in place of a value that is not known yet.</summary>
     public static readonly TextId NoValue = Id();
 

@@ -179,7 +179,7 @@ public class NearStartOptionTests : BunitContext
         cut.Find("input.pattern").KeyDown("Enter");
 
         Assert.Equal(MatchPosition.NearStart, Assert.Single(vm.Patterns).Position);
-        Assert.Contains("2nd–3rd", cut.Find(".chip .chip-near").TextContent);
+        Assert.Contains("2nd or 3rd", cut.Find(".chip .chip-near").TextContent);
 
         cut.Find("select.pos").Change("Contains");
         Assert.Empty(cut.FindAll("input.near-start"));
@@ -311,7 +311,7 @@ public class NearStartOptionTests : BunitContext
         cut.Find("input.pattern").KeyDown("Enter");
 
         Assert.True(Assert.Single(vm.Patterns).NearStart);
-        Assert.Contains("2nd–3rd", cut.Find(".chip .chip-near").TextContent);
+        Assert.Contains("2nd or 3rd", cut.Find(".chip .chip-near").TextContent);
         Assert.Empty(cut.FindAll(".chip-speedup"));
     }
 }

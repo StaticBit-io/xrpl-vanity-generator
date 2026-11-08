@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Components;
 using QRCoder;
+using XrplVanity.App.Core.Localization;
 
 namespace XrplVanity.App.Core.Components;
 
@@ -11,7 +12,7 @@ namespace XrplVanity.App.Core.Components;
 /// "Save image as…" from its context menu, which would put a key on disk in one click. The whole
 /// symbol is one &lt;path&gt; of module-sized squares, so a large code is still a single DOM node.
 /// </summary>
-public partial class QrCode : ComponentBase
+public partial class QrCode
 {
     /// <summary>
     /// Past this many characters the mark is dropped instead of drawn. A logo is damage the error
