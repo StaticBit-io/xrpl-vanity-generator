@@ -104,3 +104,16 @@ a:hover { color: var(--color-accent); }
 @media (prefers-reduced-motion: reduce) {
   .btn, a { transition: none; }
 }
+
+.site-header__tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-lg); }
+/* The language menu: a native disclosure whose panel is plain links, so it opens with no script. The list hangs from the right edge to stay on a phone screen. */
+.lang { position: relative; font-size: var(--text-sm); }
+.lang summary { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 44px; padding-inline: var(--space-sm); border: var(--rule-hair) solid var(--color-rule-2); color: var(--color-ink-2); cursor: pointer; list-style: none; }
+.lang summary::-webkit-details-marker { display: none; }
+.lang summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.lang[open] summary::after { transform: translateY(1px) rotate(225deg); }
+.lang summary:hover, .lang[open] summary { background: var(--color-paper-3); color: var(--color-ink); }
+.lang__list { position: absolute; top: calc(100% + var(--space-2xs)); right: 0; z-index: var(--z-dropdown); display: grid; min-width: 11rem; padding: var(--space-2xs); border: var(--rule-hair) solid var(--color-rule-2); background: var(--color-paper-2); }
+.lang__list a { display: flex; align-items: center; min-height: 44px; padding-inline: var(--space-sm); color: var(--color-ink-2); text-decoration: none; }
+.lang__list a:hover { background: var(--color-paper-3); color: var(--color-ink); }
+.lang__list a[aria-current="true"] { box-shadow: inset 2px 0 0 var(--color-accent); color: var(--color-ink); }

@@ -3,6 +3,8 @@
 
 const COMMENT = /<!--[\s\S]*?-->/g;
 const ABSOLUTE = /^(?:[a-z][a-z0-9+.-]*:)?\/\//i;
+// Links that only name a page: no browser fetches them, so they may carry this site's absolute URL.
+const NAMES_THIS_SITE = new Set(['canonical', 'alternate']);
 const stripComments = (html) => html.replace(COMMENT, '');
 
 function attribute(tag, name) {
@@ -12,7 +14,7 @@ function attribute(tag, name) {
 
 /**
  * URLs on another origin that a browser would fetch by itself. Links a visitor clicks do not count,
- * and neither does rel="canonical", which names this site and is never requested.
+ * and neither do rel="canonical" and rel="alternate" (hreflang), which name pages and are never requested.
  */
 export function findExternalRefs(name, text) {
   const found = [];
@@ -24,7 +26,7 @@ export function findExternalRefs(name, text) {
     }
     for (const [tag] of stripComments(text).matchAll(/<link\b[^>]*>/gi)) {
       const href = attribute(tag, 'href');
-      if (href !== null && ABSOLUTE.test(href) && attribute(tag, 'rel')?.toLowerCase() !== 'canonical') report(href);
+      if (href !== null && ABSOLUTE.test(href) && !NAMES_THIS_SITE.has(attribute(tag, 'rel')?.toLowerCase())) report(href);
     }
   }
   for (const match of text.matchAll(/url\(\s*["']?([^"')\s]+)/gi)) {
