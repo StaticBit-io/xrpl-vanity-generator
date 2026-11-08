@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using XrplVanity.Core;
 
-namespace XrplVanity.Search;
+namespace XrplVanity.Core;
 
 /// <summary>
 /// Expected work per match. A candidate matches one concrete target with probability 58^-n for

@@ -141,6 +141,8 @@ public class SearchViewModelTests
         vm.Start();
 
         WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+        // OnCompleted goes Idle first and notifies last, so this is the end of the completion work.
+        WaitUntil(() => { lock (notes.Sent) return notes.Sent.Any(n => n.Title == "Search finished"); }, "the finish notification");
         Assert.Equal(SessionOutcome.CountReached, vm.LastSummary!.Outcome);
         Assert.Equal(3, vm.Results.Count);
         Assert.All(vm.Results, r => Assert.StartsWith("ra", r.Address));
@@ -856,9 +858,11 @@ public class SearchViewModelTests
         Assert.False(vm.CanMeasureSpeed);
         Assert.False(vm.CanStart);   // Start refuses while a calibration is running
 
-        WaitUntil(() => !vm.IsCalibrating, "calibration to finish");
+        // OnCalibrationCompleted clears IsCalibrating before it writes the hint, so the flag alone
+        // does not mean the measurement has landed.
+        WaitUntil(() => settings.Current.RateHints.ContainsKey("cpu"), "rate hint stored");
 
-        Assert.True(settings.Current.RateHints.ContainsKey("cpu"), "rate hint stored");
+        Assert.False(vm.IsCalibrating);
         Assert.Null(vm.CalibrationFailure);
         Assert.Empty(vm.Results);
         Assert.Null(vm.LastSummary);

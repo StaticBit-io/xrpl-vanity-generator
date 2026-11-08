@@ -305,8 +305,8 @@ The test suite runs on Linux inside Docker, with two modes:
   suite without GPU passthrough; CUDA rows are skipped (59 tests) with the
   reason "CUDA driver library not found"; OpenCL rows run on pocl. The run
   asserts OpenCL is present and the remaining 106 tests pass, 0 failed. This
-  exercises the "machine without NVIDIA" scenario and makes a CPU-only CI
-  job now possible. The same CLI smokes run against `opencl:0` only
+  exercises the "machine without NVIDIA" scenario and is what the `linux` job
+  in `.github/workflows/dotnet.yml` runs. The same CLI smokes run against `opencl:0` only
   (`--gpu-devices all` reports `on 1 device(s)`), plus two additional exit-2
   smokes specific to this mode: `--gpu-devices cuda` and `--backend cuda`
   each fail with a "no matching device" / "no usable device" reason, since
@@ -403,6 +403,41 @@ one double-click, without administrator rights.
 See [docs/desktop-app.md](docs/desktop-app.md) for the requirements, how to build
 and run it from source, how to sign and install the MSIX, and the manual smoke
 checklist.
+
+## Use as a library
+
+The search engine is also packaged as a NuGet package, `StaticBit.XrplVanity.Core`,
+for .NET 10 applications that want to generate vanity addresses themselves, such as
+a wallet. It runs on the CPU in managed code and pulls in no native or GPU code. It
+has been measured on an Android phone, see [docs/benchmarks.md](docs/benchmarks.md);
+it has not been built or run on iOS. It goes to the StaticBit GitHub Packages feed,
+`https://nuget.pkg.github.com/StaticBit-io/index.json`, when `dev` is merged into
+`main` and both test suites pass. A change to `src/XrplVanity.Core` needs a new `PackageVersion`: until it has one, the
+run fails on every push to `main`. A `core-v<version>` tag marks what each version was
+published from.
+
+```csharp
+using System.Threading;
+using XrplVanity.Core;
+
+PatternSet patterns = new PatternSet.Builder()
+    .Add(MatchPosition.Starts, "abc", ignoreCase: true)
+    .Build();
+
+CpuSearchOutcome outcome = await CpuSearch.FindFirstAsync(
+    patterns, threads: 4, progress: null, CancellationToken.None);
+
+if (outcome.Found is Match match)
+{
+    Console.WriteLine(match.Address);
+}
+```
+
+The result carries the seed too. Treat it as a secret: store it encrypted and keep
+it out of logs.
+
+See [docs/wallet-integration.md](docs/wallet-integration.md) for how to add the
+package to an application and run a search from its user interface.
 
 ## Acknowledgements
 
