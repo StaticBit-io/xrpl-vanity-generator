@@ -58,4 +58,21 @@ public sealed class LocalizerTests
 
         Assert.Equal("[ru] Language", catalog[SettingsText.LanguageTitle]);
     }
+
+    [Fact]
+    public void Transformed_Catalog_Fills_Placeholders_And_Picks_Plurals()
+    {
+        TextCatalog source = TextCatalog.FromJson(UiLanguage.English, """
+            {
+              "T.Greeting": "Hello {name}",
+              "T.Files": { "one": "{count} file", "other": "{count} files" }
+            }
+            """);
+        TextCatalog catalog = TextCatalog.Transformed(UiLanguage.Russian, p => "[ru] " + p, source);
+
+        Assert.Equal("[ru] Hello Ann", catalog.Render(UiText.Of(new TextId("T.Greeting"), ("name", "Ann"))));
+        Assert.Equal("[ru] 1 file", catalog.Render(UiText.Of(new TextId("T.Files"), ("count", 1))));
+        Assert.Equal("[ru] 5 files", catalog.Render(UiText.Of(new TextId("T.Files"), ("count", 5))));
+        Assert.Same(UiLanguage.Russian.Culture, catalog.Culture);
+    }
 }

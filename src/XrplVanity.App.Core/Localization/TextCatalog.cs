@@ -32,6 +32,9 @@ public sealed class TextCatalog
 
     public UiLanguage Language { get; }
 
+    /// <summary>The locale numbers and dates are formatted in; the language's own, never the ambient culture.</summary>
+    public CultureInfo Culture => Language.Culture;
+
     /// <summary>The keys of this catalog, for the completeness tests.</summary>
     internal IReadOnlyDictionary<string, Phrase> Phrases => _phrases;
 
@@ -98,9 +101,10 @@ public sealed class TextCatalog
     /// <paramref name="phrase"/>. Tests use it to tell languages apart while the shipped catalogs still
     /// hold English text; it is never cached and never reaches a screen.
     /// </summary>
-    internal static TextCatalog Transformed(UiLanguage language, Func<string, string> phrase)
+    /// <param name="source">The catalog whose phrases are transformed; English when null. Tests pass their own to cover placeholders and plurals before the shipped catalogs have any.</param>
+    internal static TextCatalog Transformed(UiLanguage language, Func<string, string> phrase, TextCatalog? source = null)
     {
-        TextCatalog english = For(UiLanguage.English);
+        TextCatalog english = source ?? For(UiLanguage.English);
         Dictionary<string, Phrase> phrases = english._phrases.ToDictionary(
             entry => entry.Key,
             entry => new Phrase(
@@ -108,6 +112,13 @@ public sealed class TextCatalog
                 entry.Value.Forms?.ToDictionary(form => form.Key, form => phrase(form.Value))),
             StringComparer.Ordinal);
         return new TextCatalog(language, phrases, english);
+    }
+
+    /// <summary>A catalog read from JSON text, uncached; for tests that need phrases the shipped catalogs lack.</summary>
+    internal static TextCatalog FromJson(UiLanguage language, string json)
+    {
+        using MemoryStream stream = new(Encoding.UTF8.GetBytes(json));
+        return new TextCatalog(language, Parse(stream), null);
     }
 
     internal static IReadOnlyDictionary<string, Phrase> Parse(Stream json)

@@ -59,6 +59,21 @@ public sealed partial class CatalogTests
         Assert.True(wrong.Count == 0, string.Join(Environment.NewLine, wrong));
     }
 
+    [Theory]
+    [MemberData(nameof(AllLanguages))]
+    public void Every_Plural_Phrase_Has_The_Forms_Its_Language_Needs(string code)
+    {
+        UiLanguage language = UiLanguage.FromCode(code)!;
+        IReadOnlyList<PluralForm> needed = PluralRules.FormsOf(language);
+
+        string[] wrong = TextCatalog.For(language).Phrases
+            .Where(entry => entry.Value.Forms is { } forms && !forms.Keys.Order().SequenceEqual(needed.Order()))
+            .Select(entry => $"{entry.Key}: {string.Join("/", entry.Value.Forms!.Keys)} not {string.Join("/", needed)}")
+            .ToArray();
+
+        Assert.True(wrong.Length == 0, string.Join(Environment.NewLine, wrong));
+    }
+
     [Fact]
     public void Every_Declared_Id_Exists_In_English()
     {
