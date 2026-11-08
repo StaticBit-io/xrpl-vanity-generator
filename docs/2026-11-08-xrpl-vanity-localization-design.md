@@ -9,7 +9,7 @@ person who installs the desktop application or opens the site should get the int
 language when we have it. This change adds Русский, Deutsch, Español, Português and 中文 to the desktop
 application and to the site, with English as the default and the fallback.
 
-The approach is not new to StaticBit: `xrpl-file` (`E:\GIT\XRPL\xrpl-file`) ships the same stack (a MAUI
+The approach is not new to StaticBit: `xrpl-file` (`StaticBit-io/xrpl-file`) ships the same stack (a MAUI
 Blazor Hybrid desktop application and a static site with a `build.mjs`) in the same six languages. This
 repository's `site/build.mjs` was itself taken from `xrpl-file` with its language logic removed
 (`docs/2026-11-04-xrpl-vanity-site-plan.md`). The work brings that approach back, adapted where this

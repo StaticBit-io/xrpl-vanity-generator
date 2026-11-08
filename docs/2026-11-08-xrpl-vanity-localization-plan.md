@@ -8,7 +8,7 @@
 
 **Tech Stack:** .NET 10, MAUI Blazor Hybrid, bUnit 2.9, xUnit v3; Node 22 `node:test`, plain ES modules, Cloudflare Pages.
 
-**Spec:** `docs/2026-11-08-xrpl-vanity-localization-design.md` (approved 2026-11-08). Reference implementation: `E:\GIT\XRPL\xrpl-file` (`app/XrplFile.App.Core/Localization`, `site/src/js/languages.mjs`, `site/src/js/prefs.mjs`, `site/build.mjs`).
+**Spec:** `docs/2026-11-08-xrpl-vanity-localization-design.md` (approved 2026-11-08). Reference implementation: the `xrpl-file` repository (`app/XrplFile.App.Core/Localization`, `site/src/js/languages.mjs`, `site/src/js/prefs.mjs`, `site/build.mjs`).
 
 ## Global Constraints
 
