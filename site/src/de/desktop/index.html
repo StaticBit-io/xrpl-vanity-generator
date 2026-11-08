@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+<head>
+<title>Vanity-Adressen-Generator für Windows | XRPL Vanity</title>
+<meta name="description" content="So finden Sie eine XRP-Ledger-Vanity-Adresse mit der Windows-Anwendung XRPL Vanity: Suche, Ergebnisse, Seeds und QR-Export.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Desktop-Anwendung</h1>
+<p class="lead">Suchen Sie eine Vanity-Adresse, bewahren Sie die Ergebnisse verschlüsselt auf und übertragen Sie eine Wallet auf Ihr Telefon.</p>
+
+<h2 id="get-it">Bezugsquelle</h2>
+<p>Die Anwendung kommt in den Microsoft Store. Bis dahin lässt sie sich <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">aus dem Quellcode bauen</a>.</p>
+<ul>
+<li>Windows 10 Version 1809 (Build 17763) oder neuer, x64.</li>
+<li>Die Microsoft-Edge-WebView2-Laufzeit. Windows 11 und aktuelle Windows-10-Updates bringen sie mit.</li>
+<li>Für die Suche auf der Grafikkarte ein NVIDIA-Treiber (CUDA, Turing-Karten ab 2018) oder eine beliebige installierte OpenCL-Plattform. Ohne beides sucht die Anwendung auf dem Prozessor und sagt das auch.</li>
+</ul>
+
+<h2 id="tutorial">Einführung</h2>
+<p>Beim ersten Öffnen bietet die Anwendung einen kurzen Rundgang durch eine echte Suche an, vom Hinzufügen eines Worts bis zum Ergebnis und seinem QR-Code. Der gefundene Treffer wird nicht gespeichert, und Ihre eigenen Wörter und Einstellungen sind danach wieder da. Das Angebot kommt einmal: Für eine Wiederholung drücken Sie <strong>Einführung starten</strong> auf der Seite „Einstellungen“.</p>
+
+<h2 id="search">Suche</h2>
+<h3>Wörter hinzufügen</h3>
+<p>Geben Sie ein Wort ein, wählen Sie die Position und fügen Sie es als Regel hinzu: <em>beginnt mit</em>, <em>endet mit</em>, <em>irgendwo</em> oder <em>beginnt und endet mit</em>, wofür beide Hälften in derselben Adresse stehen müssen. Regeln ignorieren Groß- und Kleinschreibung, solange Sie das nicht abschalten, und eine Suche kann viele Regeln enthalten.</p>
+<p>Die Zeichen <code>0</code>, <code>O</code>, <code>I</code> und <code>l</code> gibt es in Adressen nicht. Sie werden durch <code>o</code>, <code>i</code> und <code>L</code> ersetzt, und die Regel zeigt das Ergebnis neben Ihrer Eingabe.</p>
+<p>Das Zeichen direkt nach dem führenden <code>r</code> ist eingeschränkt, deshalb sind manche Wörter etwa 23-mal seltener, als ihre Länge vermuten lässt. Das Kästchen <em>ab 2. oder 3. Zeichen</em> lässt das Wort ein Zeichen später beginnen. Findet die Suche es so mindestens doppelt so schnell, schlägt die Anwendung das an der Regel vor. Standardmäßig ist es aus, weil es das Schriftbild der Adresse ändert.</p>
+<p><strong>Liste speichern</strong> und <strong>Liste laden</strong> halten einen Satz Regeln in einer Textdatei. Laden ergänzt die Regeln auf dem Bildschirm und überspringt Duplikate.</p>
+
+<h3>Wählen, wo gesucht wird</h3>
+<p>Haken Sie den Prozessor mit einer Zahl an Threads an und dazu alle CUDA- und OpenCL-Geräte, die die Anwendung gefunden hat. Alle können gleichzeitig laufen.</p>
+<p>Der Regler <em>GPU-Auslastung</em> legt fest, welchen Anteil der Zeit die Grafikkarte arbeitet, von 25 bis 100 %. Ein niedrigerer Wert hält die Karte für andere Programme frei, und eine Änderung erreicht eine laufende Suche sofort.</p>
+
+<h3>Schätzung prüfen</h3>
+<p>Vor dem Start zeigt die Seite, wie viele Adressen ein Treffer im Mittel braucht und wie lange das auf den gewählten Geräten dauert. Sie nutzt die zuletzt gemessene Geschwindigkeit jedes Geräts. Beim ersten Mal gibt es noch keine, drücken Sie also <strong>Geschwindigkeit messen</strong> oder suchen Sie einmal.</p>
+
+<h3>Suche starten</h3>
+<p>Die Seite zeigt die aktuelle Geschwindigkeit, die geprüften Adressen und die Treffer. Jeder Treffer landet mit Adresse, Regel, Gerät und Uhrzeit in der Ergebnisliste. <em>Nach N Treffern stoppen</em> in den Einstellungen beendet die Suche von selbst.</p>
+<p>Eine lange Suche kann im Infobereich weiterlaufen, dort liegt auch die Auslastung. Eine Benachrichtigung meldet jeden Treffer und das Ende einer Suche.</p>
+
+<h2 id="results">Ergebnisse und Verlauf</h2>
+<p>Der Verlauf enthält jedes Ergebnis, das die Anwendung gespeichert hat. Grenzen Sie ihn mit dem Textfeld ein, das Adressen und Muster durchsucht, und mit der Musterliste. Haken Sie Zeilen an oder nutzen Sie <em>alle angezeigten wählen</em>, um sie gemeinsam zu exportieren oder zu löschen.</p>
+<p><strong>Ein gelöschtes Ergebnis lässt sich nicht zurückholen:</strong> Der Seed ist weg und mit ihm das Konto, sofern Sie ihn nicht anderswo gesichert haben.</p>
+<p><strong>Ein TSV-Export enthält Seeds im Klartext.</strong> Er landet, wo Sie wollen, und ist nicht geschützt, behandeln Sie die Datei also als das Geheimnis, das sie ist.</p>
+
+<h2 id="seeds">Seeds</h2>
+<p>Ein Seed steuert sein Konto. Er ist überall verdeckt, bis Sie ihn anzeigen, und verbirgt sich nach 15 Sekunden oder beim Verlassen der Seite wieder. Ein kopierter Seed wird nach 30 Sekunden aus der Zwischenablage gelöscht, sofern Sie bis dahin nichts anderes kopiert haben. Beide Zeiten lassen sich in den Einstellungen ändern.</p>
+<p>Ein kopierter Seed bleibt aus dem Windows-Zwischenablageverlauf und der Synchronisierung der Zwischenablage heraus.</p>
+<p>Ergebnisse liegen in einer Datei, <code>results.dat</code>, verschlüsselt mit der Windows Data Protection API (DPAPI). Nur das Windows-Konto, das die Datei geschrieben hat, kann sie lesen, die Ergebnisse wandern also nicht auf ein anderes Konto oder einen anderen Computer. Kein Seed erscheint in einem Protokoll, einer Benachrichtigung oder dem Menü im Infobereich.</p>
+<p><strong>Beim Deinstallieren wird <code>results.dat</code> gelöscht, mit jedem Seed darin.</strong> Sichern Sie vorher die Seeds, die Sie behalten wollen.</p>
+
+<h2 id="qr">Wallet aufs Telefon übertragen</h2>
+<p>Die QR-Schaltfläche an einem Ergebnis zeigt diese Wallet, <strong>QR anzeigen</strong> zeigt alle gewählten Zeilen. Scannen Sie den Code mit der Mobil-Wallet <a href="https://staticbit.io">StaticBit</a>, die die Wallets aus dem Sicherungsformat im Code wiederherstellt. Ein Code fasst bis zu 22 Wallets, mit Passwort 21.</p>
+<p><strong>Setzen Sie ein Passwort, wenn jemand Ihren Bildschirm sehen könnte.</strong> Es ist optional und verschlüsselt den Code. Ohne Passwort ist der Code unverschlüsselt, und der Dialog sagt das. Der Code wird nie auf die Festplatte geschrieben und verbirgt sich nach 60 Sekunden.</p>
+<p>Ein einzelner Seed lässt sich auch als Code für eine Wallet zeigen. Dieser Code ist nie verschlüsselt: Er nimmt kein Passwort, und der Dialog sagt das. Die Wallet <a href="https://staticbit.io">StaticBit</a> kann ihn ebenfalls scannen.</p>
+
+<h2 id="settings">Einstellungen</h2>
+<p>Jede Änderung gilt sofort: Eine Speichern-Schaltfläche gibt es nicht. Dort wählen Sie auch die Sprache der Anwendung.</p>
+<div class="reference" role="region" aria-label="Einstellungen" tabindex="0">
+<table>
+<thead><tr><th scope="col">Einstellung</th><th scope="col">Wirkung</th><th scope="col">Standard</th></tr></thead>
+<tbody>
+<tr><th scope="row">Schließen-Schaltfläche</th><td>Fragen, in den Infobereich verkleinern oder beenden.</td><td>Jedes Mal fragen</td></tr>
+<tr><th scope="row">Benachrichtigungen</th><td>Eine Benachrichtigung bei einem Treffer und am Ende einer Suche.</td><td>An</td></tr>
+<tr><th scope="row">GPU-Auslastung</th><td>Anteil der Zeit, in dem die Grafikkarte arbeitet, von 25 bis 100 %.</td><td>100</td></tr>
+<tr><th scope="row">Nach N Treffern stoppen</th><td>Beendet die Suche von selbst. Leer oder 0: Die Suche läuft, bis Sie „Stoppen“ drücken.</td><td>Leer</td></tr>
+<tr><th scope="row">Zwischenablage nach dem Kopieren eines Seeds leeren</th><td>Sekunden, bis ein kopierter Seed gelöscht wird.</td><td>30</td></tr>
+<tr><th scope="row">Angezeigten Seed verbergen nach</th><td>Sekunden, bis ein angezeigter Seed wieder verdeckt wird.</td><td>15</td></tr>
+<tr><th scope="row">Gemerkte Geschwindigkeiten</th><td>Die zuletzt gemessene Geschwindigkeit je Gerät, für die Schätzung. <strong>Geschwindigkeiten vergessen</strong> löscht sie.</td><td>Keine</td></tr>
+<tr><th scope="row">Datenordner</th><td>Wo Einstellungen und Ergebnisse liegen. <strong>Ordner öffnen</strong> öffnet ihn.</td><td>Keiner</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="more">Etwas funktioniert nicht?</h2>
+<p>Häufige Probleme stehen auf der Seite <a href="/de/support/">Hilfe</a>. Bauen und Verpacken beschreiben die <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">Entwicklernotizen auf GitHub</a> (auf Englisch).</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

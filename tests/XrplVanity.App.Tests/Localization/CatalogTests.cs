@@ -111,7 +111,7 @@ public sealed partial class CatalogTests
     }
 
     /// <summary>The languages whose catalogs are written; the others still carry English text.</summary>
-    public static TheoryData<string> Translated() => new("ru");
+    public static TheoryData<string> Translated() => new("ru", "de");
 
     // Words that read the same in every language; a phrase made only of these, placeholders and
     // punctuation is allowed to equal English.

@@ -20,4 +20,13 @@ export const CHROME_STRINGS = {
     source: 'Исходники на GitHub',
     ogImageAlt: 'Адрес XRP Ledger со словом STATiCBiT среди символов адресов',
   },
+  de: {
+    skip: 'Zum Inhalt springen',
+    nav: { desktop: 'Desktop-Anwendung', cli: 'Kommandozeile', privacy: 'Datenschutz', support: 'Hilfe' },
+    language: 'Sprache',
+    published: 'Herausgegeben von {publisher}.',
+    licence: 'Lizenz Apache-2.0.',
+    source: 'Quellcode auf GitHub',
+    ogImageAlt: 'Eine XRP-Ledger-Adresse mit dem Wort STATiCBiT in einem Feld aus Adresszeichen',
+  },
 };
