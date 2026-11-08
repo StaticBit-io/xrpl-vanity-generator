@@ -2,7 +2,6 @@ using Bunit;
 using XrplVanity.App.Core.Components;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
-using XrplVanity.Search;
 using Xunit;
 
 namespace XrplVanity.App.Tests;

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using XrplVanity.Core;
-using XrplVanity.Search;
 using Xunit;
 
 namespace XrplVanity.Tests.Search;

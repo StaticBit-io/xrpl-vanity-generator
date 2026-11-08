@@ -110,6 +110,20 @@ public class CliProgramTests
     }
 
     [Fact]
+    public void ExitCodeFor_All_Targets_Failed_On_A_Cpu_Only_Run_Does_Not_Mention_A_Device()
+    {
+        StringWriter stderr = new();
+        TargetProgress cpu = new("cpu", "CPU", TargetState.Failed, 100, 50, "no more threads", Seconds: 2);
+        SearchSummary summary = SummaryWith(SessionOutcome.AllTargetsFailed, cpu);
+
+        int rc = Program.ExitCodeFor(summary, multi: false, stderr);
+
+        Assert.Equal(2, rc);
+        Assert.Contains("error: search failed: no more threads", stderr.ToString());
+        Assert.DoesNotContain("--gpu", stderr.ToString());
+    }
+
+    [Fact]
     public void ExitCodeFor_Cpu_Only_Failed_Writes_Search_Failed_Not_Gpu_And_Returns_2()
     {
         StringWriter stderr = new();
