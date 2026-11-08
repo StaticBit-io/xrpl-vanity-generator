@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<title>Suporte | XRPL Vanity</title>
+<meta name="description" content="Como conseguir ajuda com o XRPL Vanity e soluções para problemas comuns do aplicativo para Windows.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Suporte</h1>
+<p class="lead">Escreva para <!--@support-email-->.</p>
+<p>Achou um erro? <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/issues">Abra uma issue no GitHub</a> com a sua versão do Windows e a placa de vídeo em que você busca.</p>
+<p><strong>Nunca envie uma seed a ninguém, nem por e-mail, nem em uma issue, nem em uma captura de tela.</strong> Ninguém precisa dela para ajudar você, e quem tem a seed controla a conta.</p>
+
+<h2 id="problems">Problemas comuns</h2>
+
+<h3>A janela abre em branco ou diz que não foi possível acessar a página</h3>
+<p>Falta o runtime do WebView2. Instale o <a href="https://developer.microsoft.com/microsoft-edge/webview2/">runtime Evergreen do WebView2</a> e abra o aplicativo de novo.</p>
+
+<h3>Só o processador aparece na lista de dispositivos</h3>
+<p>O aplicativo encontra o CUDA pelo driver da NVIDIA e o OpenCL pelos drivers instalados. Instale ou atualize o driver da placa de vídeo e clique no botão de atualizar no cartão “Dispositivos”. Não precisa reiniciar.</p>
+
+<h3>A linha de um dispositivo fica vermelha durante a busca</h3>
+<p>Esse dispositivo falhou, por exemplo depois de uma reinicialização do driver, e a mensagem está na linha. Os outros dispositivos continuam rodando. A busca só termina se todos falharem.</p>
+
+<h3>O histórico está somente leitura</h3>
+<p>O aplicativo não conseguiu ler ou gravar o arquivo de resultados, e o aviso na página “Histórico” mostra o motivo. Normalmente o arquivo foi gravado por outra conta do Windows ou copiado de outro computador: os resultados só abrem na conta que os gravou. Mova o arquivo para outro lugar para começar um histórico novo.</p>
+
+<h3>As notificações nunca aparecem</h3>
+<p>A página “Configurações” diz se o Windows as aceitou. Se aceitou, confira nas configurações do Windows, em “Sistema” e “Notificações”, que as notificações do XRPL Vanity estão ligadas e que o “Não incomodar” está desligado. Uma busca longa com uma palavra curta pode acumular centenas de notificações, e o Windows mostra uma de cada vez.</p>
+
+<h3>Uma palavra está demorando muito mais que a estimativa</h3>
+<p>A estimativa é uma média, e uma busca pode passar bastante dela. Uma palavra cuja primeira letra raramente vem depois do <code>r</code> é cerca de 23 vezes mais rara do que o tamanho sugere, então experimente a opção <em>a partir do 2º ou 3º caractere</em>. Veja o <a href="/pt/desktop/#search">guia do aplicativo</a>.</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>
