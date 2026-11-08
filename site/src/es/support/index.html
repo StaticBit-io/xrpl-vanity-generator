@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<title>Ayuda | XRPL Vanity</title>
+<meta name="description" content="Cómo conseguir ayuda con XRPL Vanity y soluciones a problemas habituales de la aplicación de escritorio.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Ayuda</h1>
+<p class="lead">Escribe a <!--@support-email-->.</p>
+<p>¿Has encontrado un error? <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/issues">Abre una incidencia en GitHub</a> con tu versión de Windows y la tarjeta gráfica con la que buscas.</p>
+<p><strong>No envíes nunca una semilla a nadie, ni por correo, ni en una incidencia, ni en una captura de pantalla.</strong> Nadie la necesita para ayudarte, y quien la tenga controla la cuenta.</p>
+
+<h2 id="problems">Problemas habituales</h2>
+
+<h3>La ventana se abre en blanco o dice que no se puede acceder a la página</h3>
+<p>Falta el entorno de ejecución WebView2. Instala el <a href="https://developer.microsoft.com/microsoft-edge/webview2/">entorno de ejecución Evergreen de WebView2</a> y vuelve a abrir la aplicación.</p>
+
+<h3>Solo aparece el procesador en la lista de dispositivos</h3>
+<p>La aplicación encuentra CUDA a través del controlador de NVIDIA y OpenCL a través de los controladores instalados. Instala o actualiza el controlador de tu tarjeta gráfica y pulsa el botón de actualizar en la tarjeta «Dispositivos». No hace falta reiniciar.</p>
+
+<h3>La fila de un dispositivo se pone roja durante una búsqueda</h3>
+<p>Ese dispositivo ha fallado, por ejemplo tras un reinicio del controlador, y el mensaje está en la fila. Los demás dispositivos siguen funcionando. La búsqueda solo termina si fallan todos.</p>
+
+<h3>El historial es de solo lectura</h3>
+<p>La aplicación no pudo leer ni escribir su archivo de resultados, y el aviso de la página «Historial» da el motivo. Suele pasar porque otra cuenta de Windows escribió el archivo o porque se copió de otro ordenador: los resultados solo los puede abrir la cuenta que los escribió. Aparta el archivo para empezar un historial nuevo.</p>
+
+<h3>Las notificaciones no aparecen nunca</h3>
+<p>La página «Ajustes» indica si Windows las aceptó. Si es así, comprueba en la configuración de Windows, en «Sistema» y «Notificaciones», que las notificaciones de XRPL Vanity están activadas y que «No molestar» está desactivado. Una búsqueda larga con una palabra corta puede acumular cientos de notificaciones, y Windows las muestra de una en una.</p>
+
+<h3>Una palabra tarda mucho más de lo estimado</h3>
+<p>La estimación es una media, y una búsqueda puede alargarse bastante más. Una palabra cuya primera letra rara vez sigue a la <code>r</code> es unas 23 veces más rara de lo que indica su longitud, así que prueba la opción <em>desde el 2.º o 3.er carácter</em>. Consulta la <a href="/es/desktop/#search">guía de la aplicación</a>.</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

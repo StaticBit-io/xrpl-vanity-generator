@@ -29,4 +29,13 @@ export const CHROME_STRINGS = {
     source: 'Quellcode auf GitHub',
     ogImageAlt: 'Eine XRP-Ledger-Adresse mit dem Wort STATiCBiT in einem Feld aus Adresszeichen',
   },
+  es: {
+    skip: 'Saltar al contenido',
+    nav: { desktop: 'Aplicación', cli: 'Línea de comandos', privacy: 'Privacidad', support: 'Ayuda' },
+    language: 'Idioma',
+    published: 'Publicado por {publisher}.',
+    licence: 'Licencia Apache-2.0.',
+    source: 'Código en GitHub',
+    ogImageAlt: 'Una dirección de XRP Ledger con la palabra STATiCBiT, encontrada en un campo de caracteres de dirección',
+  },
 };

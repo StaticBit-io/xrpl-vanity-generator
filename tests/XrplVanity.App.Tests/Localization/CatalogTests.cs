@@ -111,11 +111,15 @@ public sealed partial class CatalogTests
     }
 
     /// <summary>The languages whose catalogs are written; the others still carry English text.</summary>
-    public static TheoryData<string> Translated() => new("ru", "de");
+    public static TheoryData<string> Translated() => new("ru", "de", "es");
 
     // Words that read the same in every language; a phrase made only of these, placeholders and
     // punctuation is allowed to equal English.
     private static readonly string[] SameInEveryLanguage = ["XRPL Vanity", "OpenCL", "CUDA", "CPU", "GPU", "QR", "TSV"];
+
+    // Unit symbols that several languages write as English does ("1 h 30 min", "< 1 s"); matched as
+    // whole words only, so an English sentence never passes for one.
+    private static readonly HashSet<string> SameUnits = new(["h", "min", "s"], StringComparer.Ordinal);
 
     [Theory]
     [MemberData(nameof(Translated))]
@@ -138,8 +142,11 @@ public sealed partial class CatalogTests
     {
         string rest = PlaceholderPattern().Replace(text, string.Empty);
         foreach (string word in SameInEveryLanguage) rest = rest.Replace(word, string.Empty, StringComparison.Ordinal);
-        return rest.Any(char.IsLetter);
+        return WordPattern().Matches(rest).Any(word => !SameUnits.Contains(word.Value));
     }
+
+    [GeneratedRegex(@"\p{L}+")]
+    private static partial Regex WordPattern();
 
     private static (List<string> Declared, List<string> Misnamed) DeclaredIds()
     {
