@@ -1,10 +1,11 @@
+@inherits LocalizedComponent
 <div class="card-box">
   <div class="card-title">Live</div>
   <div class="tiles">
-    <div class="tile"><div class="label">rate</div><div class="num total-rate">@(Progress is null ? "—" : Formatting.Rate(Progress.TotalRatePerSecond))</div></div>
-    <div class="tile"><div class="label">candidates</div><div class="num total-candidates">@(Progress is null ? "—" : Formatting.Candidates(Progress.TotalCandidates))</div></div>
-    <div class="tile"><div class="label">elapsed</div><div class="num elapsed">@(Progress is null ? "—" : Formatting.Duration(Progress.Elapsed))</div></div>
-    <div class="tile"><div class="label">found</div><div class="num found">@(Progress is null ? "—" : Progress.Reported.ToString())</div></div>
+    <div class="tile"><div class="label">rate</div><div class="num total-rate">@(Progress is null ? T[CommonText.NoValue] : Formatting.Rate(Progress.TotalRatePerSecond, T))</div></div>
+    <div class="tile"><div class="label">candidates</div><div class="num total-candidates">@(Progress is null ? T[CommonText.NoValue] : Formatting.Candidates(Progress.TotalCandidates, T))</div></div>
+    <div class="tile"><div class="label">elapsed</div><div class="num elapsed">@(Progress is null ? T[CommonText.NoValue] : Formatting.Duration(Progress.Elapsed, T))</div></div>
+    <div class="tile"><div class="label">found</div><div class="num found">@(Progress is null ? T[CommonText.NoValue] : Progress.Reported.ToString())</div></div>
   </div>
   @if (Progress is not null)
   {
@@ -13,7 +14,7 @@
       <div class="target-row @t.State.ToString().ToLowerInvariant()" @key="t.Id">
         <span class="id mono">@t.Id</span><span class="name">@t.Name</span>
         <span class="state">@t.State</span>
-        <span class="num small">@Formatting.Rate(t.RatePerSecond)</span>
+        <span class="num small">@Formatting.Rate(t.RatePerSecond, T)</span>
         @if (t.Failure is not null) { <span class="failure">@t.Failure</span> }
       </div>
     }

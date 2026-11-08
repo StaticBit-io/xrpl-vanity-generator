@@ -11,7 +11,7 @@ public enum PluralForm
 
 /// <summary>
 /// The CLDR cardinal rules of the six languages, for integers -- every count the application shows is
-/// a whole number. The compact-exponent <c>many</c> of Spanish and Portuguese ("1 M de archivos") never
+/// a whole number; a fractional count takes <c>other</c> in every language (see TextCatalog). The compact-exponent <c>many</c> of Spanish and Portuguese ("1 M de archivos") never
 /// arises from a plain integer and is not used.
 /// </summary>
 public static class PluralRules
@@ -19,7 +19,7 @@ public static class PluralRules
     /// <summary>The forms a plural phrase in <paramref name="language"/> must carry, no more and no fewer.</summary>
     public static IReadOnlyList<PluralForm> FormsOf(UiLanguage language) => language.Code switch
     {
-        "ru" => [PluralForm.One, PluralForm.Few, PluralForm.Many],
+        "ru" => [PluralForm.One, PluralForm.Few, PluralForm.Many, PluralForm.Other],
         "zh" => [PluralForm.Other],
         _ => [PluralForm.One, PluralForm.Other],
     };

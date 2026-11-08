@@ -235,8 +235,22 @@ public sealed class TextCatalog
 
             object count = text.Arg("count")
                 ?? throw new FormatException($"Plural phrase '{text.Id.Key}' needs a 'count' value.");
-            PluralForm form = PluralRules.FormOf(language, Convert.ToInt64(count, CultureInfo.InvariantCulture));
+            PluralForm form = HasFraction(count)
+                ? PluralForm.Other
+                : PluralRules.FormOf(language, Convert.ToInt64(count, CultureInfo.InvariantCulture));
             return Forms!.TryGetValue(form, out string? chosen) ? chosen : Forms[PluralForm.Other];
         }
+
+        /// <summary>
+        /// CLDR gives a count with a visible fraction ("1.5 days") the <c>other</c> form in all six
+        /// languages, whatever its integer part would pick.
+        /// </summary>
+        private static bool HasFraction(object count) => count switch
+        {
+            double d => double.IsFinite(d) && d != Math.Truncate(d),
+            float f => float.IsFinite(f) && f != MathF.Truncate(f),
+            decimal m => m != decimal.Truncate(m),
+            _ => false,
+        };
     }
 }
