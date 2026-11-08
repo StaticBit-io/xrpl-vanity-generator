@@ -11,7 +11,7 @@ export const LANGS = ['en', 'ru', 'de', 'es', 'pt', 'zh'];
  * and no page in the build, and getLang never picks it, so the site stays consistent while its
  * strings and pages are being written.
  */
-export const ACTIVE_LANGS = ['en', 'ru', 'de', 'es', 'pt'];
+export const ACTIVE_LANGS = ['en', 'ru', 'de', 'es', 'pt', 'zh'];
 
 export const DEFAULT_LANG = 'en';
 

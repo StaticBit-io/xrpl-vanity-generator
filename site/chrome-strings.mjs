@@ -47,4 +47,13 @@ export const CHROME_STRINGS = {
     source: 'Código no GitHub',
     ogImageAlt: 'Um endereço do XRP Ledger com a palavra STATiCBiT, em meio a um campo de caracteres de endereço',
   },
+  zh: {
+    skip: '跳到正文',
+    nav: { desktop: '桌面应用', cli: '命令行', privacy: '隐私', support: '支持' },
+    language: '语言',
+    published: '发布者：{publisher}。',
+    licence: 'Apache-2.0 许可证。',
+    source: 'GitHub 上的源代码',
+    ogImageAlt: '一个包含单词 STATiCBiT 的 XRP Ledger 地址，位于由地址字符组成的字阵中',
+  },
 };

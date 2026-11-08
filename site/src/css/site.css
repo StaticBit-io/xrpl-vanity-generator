@@ -2,6 +2,9 @@
  * hero: Settled, head and actions left, the glyph field right · nav: edge-aligned (no search on this site, swapped from search-led) · footer: letter close · imagery: none, the keyspace printed in base58 · signature: the letter r printed in the address alphabet, resolving from noise
  * axes: dark/mono/chromatic-green · posture: committed · contrast: pass · fold: pass · copy: writing-site-copy · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V3 · weakest: V, the section order is fixed by the spec; each section takes a different device (a diff, a reference table, rows, a figure table) */
+/* Martian Mono has no Chinese glyphs and none is shipped; name the system Simplified Chinese faces
+   so the browser does not fall back to a generic monospace face with Japanese glyph shapes. */
+:root:lang(zh) { --font-display: "Martian Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif; }
 
 body { font-stretch: var(--stretch-body); font-variant-numeric: tabular-nums; line-height: 1.65; }
 h1, h2, h3 { font-stretch: var(--stretch-display); line-height: 1.12; text-wrap: balance; }

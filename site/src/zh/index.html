@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<title>XRPL Vanity：XRP Ledger 靓号地址生成器</title>
+<meta name="description" content="生成包含你所选单词的 XRP Ledger 地址。完全离线运行在你的处理器和显卡上。">
+<!--@chrome:head-->
+<script type="module" src="/js/home.mjs"></script>
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main">
+
+<section class="hero">
+<div class="container stage">
+<div class="intro">
+<h1>把你的单词放进 XRP Ledger 地址</h1>
+<p class="lead">一款在处理器和显卡上离线运行的靓号地址生成器。</p>
+<div class="actions">
+<button class="btn btn--primary" type="button" data-store disabled><span data-label>从 Microsoft Store 获取</span> <span class="tag">即将推出</span></button>
+<a class="btn" href="https://github.com/StaticBit-io/xrpl-vanity-generator">GitHub 上的源代码</a>
+</div>
+</div>
+<div class="art"><!--@glyph-field--></div>
+</div>
+</section>
+
+<section id="get" class="section">
+<div class="container">
+<div class="head-block">
+<h2>一个读得出来的地址</h2>
+<p class="lead">靓号地址和其他 XRP Ledger 地址用法完全一样。你会同时拿到控制它的种子。</p>
+</div>
+<figure class="well diff">
+<div class="diff-head">--- a/address<br>+++ b/address</div>
+<p class="del"><code class="addr" data-example-address>rGx8uTnF5VqKj3dYpWm2bZsL7cRhN4eAaQ</code></p>
+<p class="add"><code class="addr" data-example-address>r<mark>DiAMond</mark>Hgs4kQe7tWvNpYcX3bLm9fZuT2</code></p>
+<figcaption>仅为示例：任何钱包都不会接受这些地址。</figcaption>
+</figure>
+</div>
+</section>
+
+<section id="modes" class="section">
+<div class="container">
+<div class="head-block">
+<h2>单词放在你想要的位置</h2>
+<p class="lead">可以严格区分大小写，也可以忽略。一次搜索可以包含多个单词。</p>
+</div>
+<div class="reference" role="region" aria-label="匹配方式" tabindex="0">
+<table>
+<thead><tr><th scope="col">方式</th><th scope="col">找到的地址</th></tr></thead>
+<tbody>
+<tr><th scope="row">开头为</th><td><code>r<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">从第 2 或第 3 个字符开始</th><td><code>r9<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">结尾为</th><td><code>r...<mark>DiAMond</mark></code></td></tr>
+<tr><th scope="row">任意位置</th><td><code>r...<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">开头和结尾为</th><td><code>r<mark>DiA</mark>...<mark>Mond</mark></code></td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">每多一个字符，等待时间最多增加到 58 倍。桌面应用会在开始前显示预计用时。</p>
+</div>
+</section>
+
+<section id="safe" class="section">
+<div class="container split-rows">
+<div class="head-block">
+<h2>种子只留在你的电脑上</h2>
+<p class="lead">谁拥有种子，谁就控制账户。</p>
+</div>
+<dl class="rows">
+<div><dt>没有联网代码</dt><dd>没有账户、服务器、遥测，也不检查更新。</dd></div>
+<div><dt>安全的随机数</dt><dd>密钥来自系统的加密随机数生成器。</dd></div>
+<div><dt>桌面应用更安全</dt><dd>结果按你的 Windows 账户加密，种子默认隐藏。命令行会以明文输出种子。</dd></div>
+<div><dt>用二维码代替文件</dt><dd>扫码把钱包转入 <a href="https://staticbit.io">StaticBit</a> 应用，可选设置密码。</dd></div>
+<div><dt>可阅读的源代码</dt><dd>在密钥存放真实资金之前，你可以自己编译。</dd></div>
+</dl>
+</div>
+</section>
+
+<section id="runs-on" class="section">
+<div class="container">
+<div class="head-block">
+<h2>运行环境</h2>
+<p class="lead">短词用处理器就够了。长词需要显卡才现实。</p>
+</div>
+<div class="reference" role="region" aria-label="搜索硬件和实测速度" tabindex="0">
+<table>
+<thead><tr><th scope="col">搜索设备</th><th scope="col">支持情况</th><th scope="col" class="num">每秒检查地址数</th></tr></thead>
+<tbody>
+<tr><th scope="row">CPU</th><td>全部核心或指定线程数</td><td class="num"><span data-source="docs/benchmarks.md" data-value="118,885">118,885</span><small>Core i5-11400F</small></td></tr>
+<tr><th scope="row">CUDA</th><td>NVIDIA，Turing（2018）或更新</td><td class="num"><span data-source="docs/benchmarks.md" data-value="32,375,668">32,375,668</span><small>RTX 5070 Ti</small></td></tr>
+<tr><th scope="row">OpenCL</th><td>已在 NVIDIA 上验证。</td><td class="num"><span data-source="docs/benchmarks.md" data-value="32,211,960">32,211,960</span><small>RTX 5070 Ti</small></td></tr>
+</tbody>
+</table>
+</div>
+<div class="needs">
+<div><h3>桌面应用</h3><p>Windows 10 1809 或更高版本，x64，需要 WebView2 运行时。</p></div>
+<div><h3>命令行</h3><p>使用 .NET 10 SDK 从源代码编译。已在 Windows 和 Linux 上验证。</p></div>
+<div><h3>显卡负载</h3><p>可以同时使用多个设备，也可以限制负载，边搜索边工作。</p></div>
+</div>
+<p class="note">仅支持 Ed25519 密钥。不支持 secp256k1 地址。</p>
+</div>
+</section>
+
+<section class="band">
+<div class="container band-grid">
+<h2>从一个单词开始</h2>
+<div class="actions">
+<button class="btn btn--primary" type="button" data-store disabled><span data-label>从 Microsoft Store 获取</span> <span class="tag">即将推出</span></button>
+<a class="btn" href="/zh/cli/">使用命令行</a>
+</div>
+</div>
+</section>
+
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

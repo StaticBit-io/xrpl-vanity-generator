@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<title>支持 | XRPL Vanity</title>
+<meta name="description" content="如何获得 XRPL Vanity 的帮助，以及桌面应用常见问题的解决方法。">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>支持</h1>
+<p class="lead">请发邮件至 <!--@support-email-->。</p>
+<p>发现了错误？请<a href="https://github.com/StaticBit-io/xrpl-vanity-generator/issues">在 GitHub 上提交 issue</a>，并注明你的 Windows 版本和用于搜索的显卡。</p>
+<p><strong>永远不要把种子发给任何人，无论是邮件、issue 还是截图。</strong>帮你解决问题不需要它，而谁拥有种子，谁就控制账户。</p>
+
+<h2 id="problems">常见问题</h2>
+
+<h3>窗口打开后一片空白，或提示无法访问此页面</h3>
+<p>缺少 WebView2 运行时。请安装 <a href="https://developer.microsoft.com/microsoft-edge/webview2/">Evergreen WebView2 运行时</a>，然后重新打开应用。</p>
+
+<h3>除了处理器之外没有列出其他设备</h3>
+<p>应用通过 NVIDIA 驱动查找 CUDA，通过已安装的驱动查找 OpenCL。请安装或更新显卡驱动，然后点击“设备”卡片上的刷新按钮。无需重启。</p>
+
+<h3>搜索时某个设备行变红</h3>
+<p>该设备出错了，例如驱动重置之后，错误信息显示在该行中。其他设备会继续运行。只有全部设备都失败时，搜索才会结束。</p>
+
+<h3>历史记录为只读</h3>
+<p>应用无法读取或写入结果文件，“历史”页面上的横幅会说明原因。通常是文件由另一个 Windows 账户写入，或从另一台电脑复制而来：结果只能由写入它的账户打开。把该文件移到别处，即可开始新的历史记录。</p>
+
+<h3>从来没有收到通知</h3>
+<p>“设置”页面会显示 Windows 是否接受了通知。如果已接受，请在 Windows 设置的“系统”和“通知”中确认 XRPL Vanity 的通知已开启，且“勿扰”已关闭。用短词进行长时间搜索可能积攒数百条通知，Windows 会逐条显示。</p>
+
+<h3>一个单词的用时远超估算</h3>
+<p>估算是平均值，搜索可能远超这个时间。如果一个单词的首字母很少出现在 <code>r</code> 之后，它会比按长度推算的稀有约 23 倍，可以试试<em>从第 2 或第 3 个字符开始</em>选项。详见<a href="/zh/desktop/#search">桌面应用指南</a>。</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>
