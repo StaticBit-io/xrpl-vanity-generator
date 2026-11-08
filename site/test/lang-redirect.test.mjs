@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
-import { ACTIVE_LANGS } from '../src/js/languages.mjs';
+import { ACTIVE_LANGS, ENGLISH_ONLY, LANGS } from '../src/js/languages.mjs';
 import { LANG_KEY } from '../src/js/prefs.mjs';
 import { renderChrome } from '../chrome-markup.mjs';
 
@@ -96,6 +96,19 @@ test('its language list and key equal ACTIVE_LANGS and LANG_KEY', () => {
   assert.deepEqual(list, ACTIVE_LANGS);
   assert.equal(SOURCE.match(/const KEY = '([^']*)';/)[1], LANG_KEY);
   assert.match(SOURCE, KEY_RE);
+});
+
+test('its page list is every English page that has translations', () => {
+  const src = new URL('../src/', import.meta.url);
+  const english = readdirSync(src, { recursive: true })
+    .map((file) => String(file).replaceAll('\\', '/'))
+    .filter((file) => file === 'index.html' || /^[^/]+\/index\.html$/.test(file))
+    .filter((file) => !LANGS.includes(file.split('/')[0]))
+    .map((file) => `/${file.replace(/index\.html$/, '')}`)
+    .filter((path) => !ENGLISH_ONLY.includes(path))
+    .sort();
+  const pages = JSON.parse(SOURCE.match(/const PAGES = (\[[^\]]*\]);/)[1].replaceAll("'", '"'));
+  assert.deepEqual([...pages].sort(), english);
 });
 
 test('lang.mjs stores the clicked language', async () => {
