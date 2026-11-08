@@ -101,3 +101,60 @@ jobs:
           name: ci-passed-linux-${{ needs.gate.outputs.tree }}
           path: ci-passed
           retention-days: 14
+
+  # Publishes the package once both suites pass on main, which only merges from dev reach. A tag
+  # marks the commit a version was published from, so every run compares with that commit and not
+  # with the previous push: a run that failed or was replaced is made up for by the next one, and a
+  # library change without a new version keeps failing until the version is raised. The feed itself
+  # is not read, so a version deleted from it stays tagged, and the job will not publish it again.
+  # If the tag cannot be pushed after a publish, the next run fails on the duplicate: check that the
+  # version is on the feed, then add the tag by hand.
+  # A merge from dev usually gives main a tree dev already tested, so gate skips both suites; a
+  # marker counts as a pass here, because it was left by a passing run on this same tree.
+  package:
+    needs: [gate, windows, linux]
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && (needs.windows.result == 'success' || needs.gate.outputs.windows == 'true')
+      && (needs.linux.result == 'success' || needs.gate.outputs.linux == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      PROJECT: src/XrplVanity.Core/XrplVanity.Core.csproj
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: find out whether there is a version to publish
+        id: release
+        run: |
+          version=$(sed -n 's:.*<PackageVersion>\(.*\)</PackageVersion>.*:\1:p' "$PROJECT")
+          : "${version:?no PackageVersion in $PROJECT}"
+          if ! git rev-parse --quiet --verify "refs/tags/core-v$version" > /dev/null; then
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          elif ! git diff --quiet "core-v$version" "$GITHUB_SHA" -- src/XrplVanity.Core; then
+            echo "::error file=$PROJECT::src/XrplVanity.Core changed since $version was published. Raise PackageVersion on dev and merge into main again."
+            exit 1
+          fi
+      - if: steps.release.outputs.version
+        run: dotnet pack "$PROJECT" -c Release -o artifacts
+      # No --skip-duplicate: with no tag for this version, finding it on the feed is a real conflict.
+      - if: steps.release.outputs.version
+        run: dotnet nuget push "artifacts/StaticBit.XrplVanity.Core.$VERSION.nupkg" --source https://nuget.pkg.github.com/StaticBit-io/index.json --api-key "$FEED_TOKEN"
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          FEED_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: steps.release.outputs.version
+        run: |
+          git tag "core-v$VERSION" "$GITHUB_SHA"
+          git push origin "core-v$VERSION"
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
