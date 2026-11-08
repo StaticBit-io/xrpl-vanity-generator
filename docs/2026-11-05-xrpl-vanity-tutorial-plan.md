@@ -102,7 +102,7 @@ Region names: `title`, `nav`, `start`, `patterns`, `estimate`, `devices`, `duty`
 | Step | Route | Lit | Interactive | Moves on | Title | Body |
 |---|---|---|---|---|---|---|
 | Offer | `/` | none | no | **Start tutorial** or **Not now** | Take a short tutorial? | You will run one real search and see what to do with the result. Nothing from it is kept. You can start it any time from Settings. |
-| AddWord | `/` | patterns | yes | a pattern exists | Add a word | Type a word of ten letters or more and press Enter. |
+| AddWord | `/` | patterns | yes | a reachable word of ten characters or more exists | Add a word | Type a word of ten letters or more and press Enter. |
 | ListFiles | `/` | patterns | yes | Next | Keep your list | Save list writes your words to a file. Load list adds them back later. |
 | Devices | `/` | devices | yes | calibration ended with an estimate; Next when an estimate already exists | Choose what searches | Tick the CPU and any graphics cards, then press measure speed. The estimate needs that number. |
 | LongWord | `/` | patterns, estimate | yes | Next, enabled above 1 day | Check the time | This is how long a match should take. If it looks quick, replace your word with one of ten letters or more. |

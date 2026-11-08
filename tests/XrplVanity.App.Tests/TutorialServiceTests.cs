@@ -336,6 +336,54 @@ public class TutorialServiceTests
     }
 
     [Fact]
+    public void AddWord_Waits_For_A_Word_Of_Ten_Characters()
+    {
+        Rig rig = Create();
+        Assert.True(rig.Tutorial.Begin());
+
+        Assert.True(rig.Vm.AddPattern("test", MatchPosition.Starts, true));
+        Assert.Equal(TutorialStep.AddWord, StepOf(rig));
+
+        Assert.True(rig.Vm.AddPattern(LongWord, MatchPosition.Starts, true));
+        Assert.Equal(TutorialStep.ListFiles, StepOf(rig));
+    }
+
+    [Fact]
+    public void LongWord_Explains_That_The_Shortest_Word_Sets_The_Time()
+    {
+        Rig rig = Create();
+        Reach(rig, TutorialStep.LongWord);
+        Assert.Null(rig.Tutorial.Hint);
+        int changes = 0;
+        rig.Tutorial.Changed += () => changes++;
+
+        Assert.True(rig.Vm.AddPattern("test", MatchPosition.Starts, true));
+        SetEstimate(rig, TimeSpan.FromSeconds(1));
+
+        Assert.Equal(TutorialStep.LongWord, StepOf(rig));
+        Assert.Contains("shortest", rig.Tutorial.Hint);
+        Assert.True(changes > 0);
+
+        rig.Vm.RemovePattern(rig.Vm.Patterns.Single(p => p.Text == "test"));
+        SetEstimate(rig, TimeSpan.FromDays(400));
+
+        Assert.Null(rig.Tutorial.Hint);
+        Assert.True(rig.Tutorial.CanGoNext);
+    }
+
+    [Fact]
+    public void LongWord_Has_No_Hint_With_A_Single_Word()
+    {
+        Rig rig = Create();
+        Reach(rig, TutorialStep.LongWord);
+
+        SetEstimate(rig, TimeSpan.FromSeconds(1));
+
+        Assert.Single(rig.Vm.Patterns);
+        Assert.Null(rig.Tutorial.Hint);
+    }
+
+    [Fact]
     public void LongWord_Next_Needs_An_Estimate_Above_One_Day()
     {
         Rig rig = Create();

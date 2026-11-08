@@ -16,6 +16,12 @@ public sealed class TutorialService : IDisposable
     private static readonly TimeSpan TooLong = TimeSpan.FromDays(1);
     private static readonly TimeSpan ShortEnough = TimeSpan.FromSeconds(10);
 
+    /// <summary>The length the first step asks for: shorter words are found too quickly to show a long wait.</summary>
+    private const int LongWordLength = 10;
+
+    private const string ShortestWordHint =
+        "An address needs only one of your words, so the shortest one sets the time. Remove the short words.";
+
     private readonly SearchViewModel _vm;
     private readonly IResultStore _results;
     private readonly object _lock = new();
@@ -23,6 +29,7 @@ public sealed class TutorialService : IDisposable
     private int _dutyAtEntry;
     private bool _calibrationSeen;
     private bool _lastCanGoNext;
+    private string? _lastHint;
     private bool _lastLeaving;
     private bool _beginning;
     private bool _pageDialogOpen;
@@ -58,6 +65,12 @@ public sealed class TutorialService : IDisposable
 
     /// <summary>Whether the step's <b>Next</b> button is enabled; false on steps that move on by themselves.</summary>
     public bool CanGoNext { get { lock (_lock) return ComputeCanGoNext(); } }
+
+    /// <summary>
+    /// A line shown under the step's text when the user's own state needs it, or null. Adding a long
+    /// word next to a short one changes nothing, because any one word is enough for a match.
+    /// </summary>
+    public string? Hint { get { lock (_lock) return ComputeHint(); } }
 
     /// <summary>1-based position among the numbered steps, which exclude the offer; 0 on the offer or when inactive.</summary>
     public int StepNumber
@@ -321,7 +334,8 @@ public sealed class TutorialService : IDisposable
 
     /// <summary>
     /// Applies the rules until no step moves on by itself, and notes whether <see cref="CanGoNext"/>
-    /// flipped. The caller holds the lock and raises <see cref="Changed"/> when this returns true.
+    /// or <see cref="Hint"/> changed. The caller holds the lock and raises <see cref="Changed"/> when
+    /// this returns true.
     /// </summary>
     private bool Settle()
     {
@@ -337,7 +351,10 @@ public sealed class TutorialService : IDisposable
         bool canGoNext = ComputeCanGoNext();
         bool flipped = canGoNext != _lastCanGoNext;
         _lastCanGoNext = canGoNext;
-        return moved || flipped;
+        string? hint = ComputeHint();
+        bool hintChanged = !string.Equals(hint, _lastHint, StringComparison.Ordinal);
+        _lastHint = hint;
+        return moved || flipped || hintChanged;
     }
 
     /// <summary>The step the user's own actions have already earned, or null to stay.</summary>
@@ -367,8 +384,9 @@ public sealed class TutorialService : IDisposable
         {
             case TutorialStep.AddWord:
                 // A chip no address can match leaves no estimate, and Devices does not light the
-                // pattern card, so only a reachable word moves on.
-                return _vm.ExpectedCandidates is not null ? TutorialStep.ListFiles : null;
+                // pattern card, so only a reachable word moves on. It must also be long: the estimate
+                // step needs a wait of years, which a short word next to it would hide.
+                return _vm.ExpectedCandidates is not null && HasLongWord() ? TutorialStep.ListFiles : null;
             case TutorialStep.ListFiles:
                 return _vm.ExpectedCandidates is null ? TutorialStep.AddWord : null;
             case TutorialStep.ShortWord:
@@ -426,6 +444,15 @@ public sealed class TutorialService : IDisposable
                 return false;
         }
     }
+
+    private string? ComputeHint()
+    {
+        if (_current?.Step != TutorialStep.LongWord || _vm.Patterns.Count < 2) return null;
+        return _vm.EstimatedTime is TimeSpan wait && wait <= TooLong ? ShortestWordHint : null;
+    }
+
+    private bool HasLongWord() =>
+        _vm.Patterns.Any(p => p.Text.Length + (p.EndsText?.Length ?? 0) >= LongWordLength);
 
     private bool ComputeIsLeaving() => _current is null && !_beginning && _vm.IsSandbox;
 

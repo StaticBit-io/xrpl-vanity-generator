@@ -69,6 +69,8 @@ has a **Next** button.
 4. **Estimate.** The user sees a wait of years for the long word, then simplifies the pattern until
    the wait is short, and the bubble suggests a word of two or three characters. The step reads
    `SearchViewModel.EstimatedTime`, and **Start** stays unlit until the wait is short.
+   If the wait looks short because a shorter word is also in the list, the bubble adds that the
+   shortest word sets the time and asks to remove the short words.
 5. **Search.** The user presses **Start** and gets a real match within seconds. The search stops at
    the first match. An estimate is an average, so an unlucky run can take longer: **Stop** stays
    lit, and after stopping the pattern and the estimate stay lit, so the user can simplify and start

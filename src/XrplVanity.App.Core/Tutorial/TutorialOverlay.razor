@@ -18,6 +18,10 @@
     }
     <h3 id="tutorial-title">@step.Title</h3>
     <p id="tutorial-body">@step.Body</p>
+    @if (_hint is not null)
+    {
+      <p class="tutorial-note tutorial-hint" role="status">@_hint</p>
+    }
     @if (_busy)
     {
       <p class="tutorial-note" role="status">A search is still running. Stop it, then try again.</p>
