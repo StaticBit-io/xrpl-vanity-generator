@@ -77,3 +77,8 @@ test('a language-prefixed link resolves when the page exists and is broken when 
 test('an hreflang alternate to this site is not an external reference', () => {
   assert.deepEqual(findExternalRefs('a.html', '<link rel="alternate" hreflang="ru" href="https://xrpl-vanity.staticbit.io/ru/">'), []);
 });
+
+test('an alternate or canonical that names another origin is still an external reference', () => {
+  assert.equal(findExternalRefs('a.html', '<link rel="alternate" hreflang="ru" href="https://evil.example/ru/">').length, 1);
+  assert.equal(findExternalRefs('a.html', '<link rel="canonical" href="https://evil.example/">').length, 1);
+});
