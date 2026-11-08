@@ -8,6 +8,8 @@ import {
 import { LANG_KEY, equivalentPath, getLang, safeLocalStorage, setLang } from '../src/js/prefs.mjs';
 
 const ALL = ['en', 'ru', 'de', 'es', 'pt', 'zh'];
+// A language the site does not ship yet, for the checks that an inactive one is ignored; none once all ship.
+const INACTIVE = ALL.find((lang) => !ACTIVE_LANGS.includes(lang));
 
 function memoryStorage(initial = {}) {
   const data = new Map(Object.entries(initial));
@@ -23,23 +25,24 @@ const throwingStorage = {
   setItem() { throw new Error('blocked'); },
 };
 
-test('the language list starts with English only and the key is xv-lang', () => {
+test('the active languages start with English, follow the menu order, and the key is xv-lang', () => {
   assert.deepEqual(LANGS, ALL);
-  assert.deepEqual(ACTIVE_LANGS, ['en']);
+  assert.equal(ACTIVE_LANGS[0], 'en');
+  assert.deepEqual(ACTIVE_LANGS, LANGS.filter((lang) => ACTIVE_LANGS.includes(lang)));
   assert.equal(DEFAULT_LANG, 'en');
   assert.equal(LANG_KEY, 'xv-lang');
-  assert.equal(activeLang('ru'), 'en', 'an inactive language reads English');
+  if (INACTIVE) assert.equal(activeLang(INACTIVE), 'en', 'an inactive language reads English');
 });
 
 test('getLang takes a stored active language, ignores an inactive one', () => {
   assert.equal(getLang(memoryStorage({ [LANG_KEY]: 'ru' }), ['en-US'], ALL), 'ru');
-  assert.equal(getLang(memoryStorage({ [LANG_KEY]: 'ru' }), ['en-US']), 'en', 'ru is not active in production yet');
+  if (INACTIVE) assert.equal(getLang(memoryStorage({ [LANG_KEY]: INACTIVE }), ['en-US']), 'en', `${INACTIVE} is not active yet`);
   assert.equal(getLang(memoryStorage({ [LANG_KEY]: 'xx' }), ['de-DE'], ALL), 'de');
 });
 
 test('zh-TW is Chinese only when zh is active', () => {
   assert.equal(getLang(null, ['zh-TW'], ALL), 'zh');
-  assert.equal(getLang(null, ['zh-TW']), 'en');
+  assert.equal(getLang(null, ['zh-TW']), ACTIVE_LANGS.includes('zh') ? 'zh' : 'en');
   assert.equal(getLang(null, ['fr', 'pt-PT', 'ru'], ALL), 'pt');
 });
 
@@ -61,7 +64,7 @@ test('getLang does not throw when localStorage access throws, and reads navigato
   try {
     assert.equal(safeLocalStorage(), null);
     assert.equal(getLang(undefined, undefined, ALL), 'ru');
-    assert.equal(getLang(), 'en');
+    assert.equal(getLang(), ACTIVE_LANGS.includes('ru') ? 'ru' : 'en');
   } finally {
     if (storageDescriptor) Object.defineProperty(globalThis, 'localStorage', storageDescriptor);
     else delete globalThis.localStorage;
@@ -74,8 +77,16 @@ test('setLang stores an active language and anything else as English', () => {
   const storage = memoryStorage();
   setLang('en', storage);
   assert.equal(storage.data.get(LANG_KEY), 'en');
-  setLang('ru', storage);
+  setLang('xx', storage);
   assert.equal(storage.data.get(LANG_KEY), 'en');
+  if (INACTIVE) {
+    setLang(INACTIVE, storage);
+    assert.equal(storage.data.get(LANG_KEY), 'en');
+  }
+  for (const lang of ACTIVE_LANGS) {
+    setLang(lang, storage);
+    assert.equal(storage.data.get(LANG_KEY), lang);
+  }
 });
 
 test('equivalentPath maps between languages and sends English-only pages home', () => {

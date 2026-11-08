@@ -81,11 +81,13 @@ test('a reader whose first matching language is English stays on English', () =>
   assert.deepEqual(run({ languages: ['fr'] }).replaced, []);
 });
 
-test('with the production list (English only) the script does nothing', () => {
+test('with the production list the script sends only to a shipped language', () => {
+  const inactive = LANGS.find((lang) => !ACTIVE_LANGS.includes(lang));
+  if (!inactive) return;
   const replaced = [];
   vm.runInNewContext(SOURCE, {
     location: { pathname: '/', search: '', hash: '', replace: (url) => replaced.push(url) },
-    navigator: { languages: ['ru'] },
+    navigator: { languages: [inactive] },
     localStorage: memoryStorage(),
   });
   assert.deepEqual(replaced, []);

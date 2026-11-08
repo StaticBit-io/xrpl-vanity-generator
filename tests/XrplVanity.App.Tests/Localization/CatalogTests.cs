@@ -110,6 +110,37 @@ public sealed partial class CatalogTests
         Assert.Equal(PluralForm.Other, PluralRules.FormOf(UiLanguage.Chinese, 1));
     }
 
+    /// <summary>The languages whose catalogs are written; the others still carry English text.</summary>
+    public static TheoryData<string> Translated() => new("ru");
+
+    // Words that read the same in every language; a phrase made only of these, placeholders and
+    // punctuation is allowed to equal English.
+    private static readonly string[] SameInEveryLanguage = ["XRPL Vanity", "OpenCL", "CUDA", "CPU", "GPU", "QR", "TSV"];
+
+    [Theory]
+    [MemberData(nameof(Translated))]
+    public void Translated_Catalogs_Differ_From_English(string code)
+    {
+        TextCatalog english = TextCatalog.For(UiLanguage.English);
+        TextCatalog other = TextCatalog.For(UiLanguage.FromCode(code)!);
+
+        string[] untranslated = other.Phrases
+            .Where(entry => english.Phrases.TryGetValue(entry.Key, out TextCatalog.Phrase? reference)
+                            && entry.Value.Texts.Any(text => HasWords(text) && reference.Texts.Contains(text, StringComparer.Ordinal)))
+            .Select(entry => entry.Key)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.True(untranslated.Length == 0, $"{code} still has English: {string.Join(", ", untranslated)}");
+    }
+
+    private static bool HasWords(string text)
+    {
+        string rest = PlaceholderPattern().Replace(text, string.Empty);
+        foreach (string word in SameInEveryLanguage) rest = rest.Replace(word, string.Empty, StringComparison.Ordinal);
+        return rest.Any(char.IsLetter);
+    }
+
     private static (List<string> Declared, List<string> Misnamed) DeclaredIds()
     {
         List<string> declared = [];

@@ -26,6 +26,8 @@ const PAGE = `<!doctype html>
 `;
 
 const NAV_PAGES = ['desktop', 'cli', 'privacy', 'support'];
+// The English-only fixtures name their language list, so shipping a language does not break them.
+const EN = ['en'];
 
 async function fixture(pages = { 'index.html': PAGE }) {
   const root = await mkdtemp(join(tmpdir(), 'xrpl-vanity-site-'));
@@ -48,7 +50,7 @@ const exists = (path) => stat(path).then(() => true, () => false);
 test('every marker is replaced and none survives into the output', async (t) => {
   const { root, siteDir, outDir } = await fixture();
   t.after(() => rm(root, { recursive: true, force: true }));
-  await build({ siteDir, outDir });
+  await build({ siteDir, outDir, langs: EN });
   const html = await readFile(join(outDir, 'index.html'), 'utf8');
   assert.doesNotMatch(html, /<!--@/);
   assert.match(html, /<header/);
@@ -102,7 +104,7 @@ for (const [label, name, text, message] of refusals) {
   test(`${label} refuses the build and leaves no output`, async (t) => {
     const { root, siteDir, outDir } = await fixture({ [name]: text });
     t.after(() => rm(root, { recursive: true, force: true }));
-    await assert.rejects(build({ siteDir, outDir }), message);
+    await assert.rejects(build({ siteDir, outDir, langs: EN }), message);
     assert.equal(await exists(outDir), false);
   });
 }
@@ -110,14 +112,14 @@ for (const [label, name, text, message] of refusals) {
 test('a file over the size limit refuses the build', async (t) => {
   const { root, siteDir, outDir } = await fixture();
   t.after(() => rm(root, { recursive: true, force: true }));
-  await assert.rejects(build({ siteDir, outDir, maxFileBytes: 8 }), /limit/);
+  await assert.rejects(build({ siteDir, outDir, langs: EN, maxFileBytes: 8 }), /limit/);
   assert.equal(await exists(outDir), false);
 });
 
 test('an output folder that contains the sources is refused and the sources survive', async (t) => {
   const { root, siteDir } = await fixture();
   t.after(() => rm(root, { recursive: true, force: true }));
-  await assert.rejects(build({ siteDir, outDir: root }), /refusing/);
+  await assert.rejects(build({ siteDir, outDir: root, langs: EN }), /refusing/);
   assert.equal(await exists(join(siteDir, 'src', 'index.html')), true);
 });
 
@@ -166,7 +168,7 @@ test('a page in the site root with lang="ru" is refused', async (t) => {
 test('a language folder for a language that is not active is refused', async (t) => {
   const fx = await bilingualFixture();
   t.after(() => rm(fx.root, { recursive: true, force: true }));
-  await assert.rejects(build({ siteDir: fx.siteDir, outDir: fx.outDir }), /ru.*not in ACTIVE_LANGS/);
+  await assert.rejects(build({ siteDir: fx.siteDir, outDir: fx.outDir, langs: EN }), /ru.*not in ACTIVE_LANGS/);
 });
 
 test('an active language missing desktop/ is refused', async (t) => {
@@ -178,7 +180,7 @@ test('an active language missing desktop/ is refused', async (t) => {
 test('an active language without chrome strings is refused', async (t) => {
   const fx = await bilingualFixture();
   t.after(() => rm(fx.root, { recursive: true, force: true }));
-  await assert.rejects(build({ siteDir: fx.siteDir, outDir: fx.outDir, langs: ['en', 'ru'] }), /"ru".*chrome strings/i);
+  await assert.rejects(build({ siteDir: fx.siteDir, outDir: fx.outDir, langs: ['en', 'ru'], chromeStrings: { en: CHROME_STRINGS.en } }), /"ru".*chrome strings/i);
 });
 
 test('hreflang alternates list every active language and x-default', async (t) => {
@@ -247,7 +249,7 @@ test('the 404 page keeps the switcher on the language homes', async (t) => {
 test('with English alone the menu has one entry and the head one alternate plus x-default', async (t) => {
   const { root, siteDir, outDir } = await fixture();
   t.after(() => rm(root, { recursive: true, force: true }));
-  await build({ siteDir, outDir });
+  await build({ siteDir, outDir, langs: EN });
   const html = await readFile(join(outDir, 'cli', 'index.html'), 'utf8');
   assert.equal([...html.matchAll(/data-lang="/g)].length, 1);
   assert.equal([...html.matchAll(/rel="alternate"/g)].length, 2);

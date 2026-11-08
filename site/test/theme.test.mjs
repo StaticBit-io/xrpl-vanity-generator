@@ -21,6 +21,19 @@ test('the font comes from the site and carries the full width axis', () => {
   assert.ok(existsSync(new URL(file, FONTS)), file);
 });
 
+test('every font face is a shipped file, listed with its hash, and the Cyrillic one exists', () => {
+  const faces = css('base.css').match(/@font-face\s*{[^}]*}/g) ?? [];
+  const sources = readFileSync(new URL('SOURCES.txt', FONTS), 'utf8');
+  const files = faces.map((face) => /url\("?\/fonts\/([^")]+)/.exec(face)?.[1]);
+  for (const [i, file] of files.entries()) {
+    assert.ok(file, `face ${i} names a file under /fonts/`);
+    assert.ok(existsSync(new URL(file, FONTS)), file);
+    assert.match(sources, new RegExp(`-> ${file.replaceAll('.', '\\.')} .*\\n.*\\n\\s+sha256 [0-9a-f]{64}`), `${file} in SOURCES.txt`);
+    assert.match(faces[i], /unicode-range: U\+/, `${file} names its range, so faces split by script`);
+  }
+  assert.ok(files.some((file) => /cyrillic/.test(file)), 'a Cyrillic face ships for the Russian pages');
+});
+
 test('no stylesheet asks Google for a font', () => {
   for (const name of readdirSync(new URL('../src/css/', import.meta.url))) {
     assert.doesNotMatch(css(name), /googleapis|gstatic/, name);

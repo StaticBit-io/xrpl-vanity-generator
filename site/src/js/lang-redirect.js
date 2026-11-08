@@ -7,7 +7,7 @@
 // language menu stores the choice before navigating (lang.mjs), so picking English is never undone.
 // This script stores nothing itself.
 (function () {
-  const ACTIVE = ['en'];
+  const ACTIVE = ['en', 'ru'];
   const KEY = 'xv-lang';
   // The pages that exist without a language prefix. Anything else (the 404, /privacy/, a mistyped
   // path) is left alone: its prefixed twin may not exist.

@@ -63,7 +63,7 @@ public sealed class FormattingTests
 
     [Fact]
     public void Russian_Days_Render_The_Decimal_Comma() =>
-        Assert.Equal("1,5 days", Catalog(UiLanguage.Russian).Render(UiText.Of(CommonText.Days, ("count", 1.5))));
+        Assert.Equal("1,5 дня", Catalog(UiLanguage.Russian).Render(UiText.Of(CommonText.Days, ("count", 1.5))));
 
     [Fact]
     public void Durations_Cover_Every_Branch_In_English()

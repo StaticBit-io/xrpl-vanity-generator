@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<title>Генератор красивых адресов XRP Ledger в командной строке | XRPL Vanity</title>
+<meta name="description" content="Как собрать и запустить xrpl-vanity, поиск красивых адресов XRP Ledger в командной строке Windows или Linux.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Командная строка xrpl-vanity</h1>
+<p class="lead">Тот же поиск красивых адресов, что и в приложении, но из терминала Windows или Linux.</p>
+
+<h2 id="build">Сборка</h2>
+<p>Готовых сборок нет: запускайте из исходников с .NET 10 SDK.</p>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> git clone https://github.com/StaticBit-io/xrpl-vanity-generator.git
+<span class="prompt">$</span> cd xrpl-vanity-generator
+<span class="prompt">$</span> dotnet run --project src/XrplVanity.Cli -c Release -- --contains xrp --count 1</pre></div>
+<p>Первый запуск собирает программу. В примерах ниже <code>xrpl-vanity</code> означает <code>dotnet run --project src/XrplVanity.Cli -c Release --</code>.</p>
+
+<h2 id="search">Где должно стоять слово</h2>
+<p>Слово без флага должно стоять в начале адреса, сразу после начальной <code>r</code>. В одном запуске можно смешивать позиции: адрес подходит, если совпал хотя бы один шаблон.</p>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> xrpl-vanity ripple hodl xrp
+<span class="prompt">$</span> xrpl-vanity --ends xyz --contains dao
+<span class="prompt">$</span> xrpl-vanity --starts-ends abc:xyz
+<span class="prompt">$</span> xrpl-vanity --list words.txt 5</pre></div>
+<p><code>--starts-ends</code> требует обе половины в одном адресе, поэтому ищется так же долго, как одно слово их общей длины. Последняя строка берёт слова из файла и оставляет те, в которых не меньше 5 символов.</p>
+
+<h2 id="flags">Параметры</h2>
+<div class="reference" role="region" aria-label="Параметры командной строки" data-table="options" tabindex="0">
+<table>
+<thead><tr><th scope="col">Параметр</th><th scope="col">По умолчанию</th><th scope="col">Что делает</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>--starts P</code></th><td>нет</td><td>Совпадение в начале адреса, после <code>r</code>. Можно повторять. Слова без флага работают так же.</td></tr>
+<tr><th scope="row"><code>--near-start P</code></th><td>нет</td><td>Слово может начинаться со 2-го или 3-го символа. Можно повторять.</td></tr>
+<tr><th scope="row"><code>--ends P</code></th><td>нет</td><td>Совпадение в конце адреса. Можно повторять.</td></tr>
+<tr><th scope="row"><code>--contains P</code></th><td>нет</td><td>Совпадение в любом месте. Можно повторять.</td></tr>
+<tr><th scope="row"><code>--starts-ends PREFIX:SUFFIX</code></th><td>нет</td><td>Начало и конец в одном адресе. Можно повторять.</td></tr>
+<tr><th scope="row"><code>--near-starts-ends PREFIX:SUFFIX</code></th><td>нет</td><td>То же, но начало может стоять со 2-го или 3-го символа. Можно повторять.</td></tr>
+<tr><th scope="row"><code>--list FILE [minLen]</code></th><td>minLen 4</td><td>Загрузить слова для начала адреса из файла.</td></tr>
+<tr><th scope="row"><code>--case-sensitive</code></th><td>выкл.</td><td>Искать точно как введено. По умолчанию подходит любое сочетание регистров, для слов до 12 символов.</td></tr>
+<tr><th scope="row"><code>--threads N</code></th><td>все ядра</td><td>Число потоков для поиска на процессоре. С <code>--gpu</code> не действует.</td></tr>
+<tr><th scope="row"><code>--out FILE</code></th><td>нет</td><td>Дописывать совпадения в файл, а не только выводить их.</td></tr>
+<tr><th scope="row"><code>--count N</code></th><td>нет</td><td>Остановиться после N совпадений. Без него поиск идёт, пока вы не нажмёте Ctrl+C.</td></tr>
+<tr><th scope="row"><code>--gpu</code></th><td>выкл.</td><td>Искать на видеокарте: сначала CUDA, затем OpenCL.</td></tr>
+<tr><th scope="row"><code>--backend NAME</code></th><td>нет</td><td>Принудительно <code>cuda</code> или <code>opencl</code>. Включает <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--device N</code></th><td>нет</td><td>Выбрать устройство по номеру. Включает <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--list-devices</code></th><td>нет</td><td>Вывести все устройства и выйти.</td></tr>
+<tr><th scope="row"><code>--gpu-devices SPEC</code></th><td>нет</td><td>Несколько устройств сразу: <code>all</code>, <code>cuda</code>, <code>opencl</code> или список через запятую. Включает <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--gpu-duty N</code></th><td>100</td><td>Держать видеокарту занятой примерно N% времени, от 1 до 100.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="words">Какие слова подходят</h2>
+<p>В адресах 58 символов. <code>0</code>, <code>O</code>, <code>I</code> и <code>l</code> в них нет, поэтому слово подправляется: <code>l</code> становится <code>L</code>, <code>0</code> и <code>O</code> становятся <code>o</code>, а <code>I</code> становится <code>i</code>. Если в слове всё равно остался невозможный символ, программа сообщает об этом и пропускает его.</p>
+<p>Каждый лишний символ увеличивает ожидание: до 58 раз с <code>--case-sensitive</code> и меньше без него, потому что совпадением считается больше написаний.</p>
+<p>Первый символ после <code>r</code> обычно один из <code>pshnaf39wBUDNEGHJKLM4PQ</code>. Слово, которое начинается с другого символа, встречается примерно в 23 раза реже, чем можно ждать по его длине. <code>--near-start</code> разрешает ему начаться на символ позже, и тогда оно находится примерно в 24 раза быстрее.</p>
+
+<h2 id="gpu">Поиск на видеокарте</h2>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> xrpl-vanity --list-devices
+<span class="prompt">$</span> xrpl-vanity --gpu --contains dao --count 1
+<span class="prompt">$</span> xrpl-vanity --gpu-devices cuda --starts abc
+<span class="prompt">$</span> xrpl-vanity --gpu --gpu-duty 80 --contains dao --count 1 --out dao.tsv</pre></div>
+<p>Каждое совпадение с видеокарты заново выводится на процессоре и печатается, только если результаты сошлись: сбойное устройство отнимает скорость, но никогда не выдаст неверный ключ. Если подходящего устройства нет, <code>--gpu</code> завершается с кодом 2 и не переходит на процессор.</p>
+<p>Первый запуск OpenCL может занять десятки секунд, пока драйвер компилирует программу. Следующие запуски быстрые. <code>--gpu-duty</code> оставляет место другим программам, и скорость падает примерно пропорционально. <code>--gpu-devices all</code> открывает каждую карту по разу на каждый бэкенд, поэтому, чтобы задействовать каждую карту NVIDIA ровно один раз, используйте <code>--gpu-devices cuda</code>.</p>
+
+<h2 id="output">Результаты и коды выхода</h2>
+<p>Каждое совпадение выводится в терминал одной строкой:</p>
+<div class="well" tabindex="0"><pre>Address: r...	Seed: sEd...</pre></div>
+<p><code>--out FILE</code> дописывает ту же пару через табуляцию, без подписей. Предупреждения и итоговая скорость идут в stderr, поэтому в stdout остаются только совпадения.</p>
+<p><strong>У кого seed, тот и распоряжается счётом.</strong> Совпадения хранятся открытым текстом, в терминале и в этом файле, и больше нигде. Не показывайте их никому.</p>
+<div class="reference" role="region" aria-label="Коды выхода" tabindex="0">
+<table>
+<thead><tr><th scope="col">Код</th><th scope="col">Значение</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>0</code></th><td>Набрано нужное число совпадений из <code>--count</code>.</td></tr>
+<tr><th scope="row"><code>2</code></th><td>Неверные параметры, ни одного достижимого шаблона, нет подходящей видеокарты или поиск прервался с ошибкой.</td></tr>
+<tr><th scope="row"><code>130</code></th><td>Прервано через Ctrl+C до того, как набралось число из <code>--count</code>.</td></tr>
+</tbody>
+</table>
+</div>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>
