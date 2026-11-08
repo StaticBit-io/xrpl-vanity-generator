@@ -10,6 +10,7 @@ import { BASE58_ALPHABET } from '../src/js/glyph-field.mjs';
 import { initStore } from '../src/js/home.mjs';
 import { REPOSITORY_URL, STORE_URL } from '../src/js/config.mjs';
 import { checksumValid } from './support/checksum.mjs';
+import { ACTIVE_LANGS, localeOf, pathPrefix } from '../src/js/languages.mjs';
 
 const SITE_DIR = fileURLToPath(new URL('..', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -169,3 +170,44 @@ test('several physical cards are not claimed as tested', () => {
   assert.doesNotMatch(textOf(html), /several cards/i);
   assert.match(textOf(html), /several devices/i);
 });
+
+/** The number a language writes, read with that language's group and decimal separators. */
+function parseLocalized(text, lang) {
+  const parts = new Intl.NumberFormat(localeOf(lang)).formatToParts(1234567.5);
+  const group = parts.find((part) => part.type === 'group')?.value ?? ',';
+  const decimal = parts.find((part) => part.type === 'decimal').value;
+  const stripped = text
+    .trim()
+    .split(group).join('')
+    .replace(/[\u00a0\u202f\s]/g, '')
+    .replace(decimal, '.');
+  return Number(stripped);
+}
+
+/** The figures of a home page: the written number, and the English-formatted value the repository file holds. */
+function figuresOf(markup) {
+  return [...markup.matchAll(/<span data-source="([^"]+)" data-value="([^"]+)">([^<]*)<\/span>/g)]
+    .map((match) => ({ source: match[1], value: match[2], written: match[3] }));
+}
+
+test('the number reader follows the language separators', () => {
+  assert.equal(parseLocalized('118,885', 'en'), 118885);
+  assert.equal(parseLocalized('32 375 668', 'ru'), 32375668);
+  assert.equal(parseLocalized('32\u00a0375\u00a0668', 'ru'), 32375668);
+  assert.equal(parseLocalized('32.375.668', 'de'), 32375668);
+  assert.equal(parseLocalized('1,5', 'de'), 1.5);
+  assert.notEqual(parseLocalized('118,885', 'de'), 118885);
+});
+
+for (const lang of ACTIVE_LANGS) {
+  test(`${lang}: every speed on the home page is the number docs/benchmarks.md holds`, async () => {
+    const page = await readFile(join(out, ...pathPrefix(lang).split('/').filter(Boolean), 'index.html'), 'utf8');
+    const figures = figuresOf(page);
+    assert.equal(figures.length, 3);
+    for (const { source, value, written } of figures) {
+      const text = readFileSync(join(REPO_ROOT, source), 'utf8');
+      assert.ok(text.includes(value), `${source}: ${value}`);
+      assert.equal(parseLocalized(written, lang), parseLocalized(value, 'en'), `${lang}: ${written}`);
+    }
+  });
+}
