@@ -38,7 +38,7 @@
         }
         @if (chip.Normalized is not null) { <span class="chip-normalized mono" title="@T[PatternsText.NormalizedTitle]">→ @chip.Normalized</span> }
         @if (!chip.IgnoreCase) { <span class="chip-pos" title="@T[PatternsText.CaseSensitiveTitle]">Aa</span> }
-        @if (chip.Warning is not null) { <span class="chip-warn">@chip.Warning</span> }
+        @if (chip.Warning is not null) { <span class="chip-warn">@T.Render(chip.Warning)</span> }
         @if (chip.NearStartSpeedup is double speedup)
         {
           <button class="chip-speedup t" title="@T[PatternsText.NearStartSpeedupTitle]" @onclick="() => Vm.AllowNearStart(chip)">@T.Render(UiText.Of(PatternsText.NearStartSpeedup, ("speedup", speedup)))</button>

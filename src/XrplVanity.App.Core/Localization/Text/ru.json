@@ -106,7 +106,7 @@
   "Devices.RefreshDevices": "Refresh devices",
   "Devices.NoGpuFound": "No CUDA driver or OpenCL platform found, searching on the CPU.",
   "Devices.CpuTag": "[cpu]",
-  "Devices.Threads": { "one": "thread", "few": "threads", "many": "threads", "other": "threads" },
+  "Devices.Threads": { "one": "{count} thread", "few": "{count} threads", "many": "{count} threads", "other": "{count} threads" },
   "Devices.DutyTitle": "GPU duty",
   "Devices.DutyValue": "{percent}%",
   "Devices.DutyNote": "Pauses between launches so the card stays free for other applications about {percent}% of the time. Changes apply immediately.",
@@ -148,5 +148,10 @@
   "Qr.Change": "Change",
   "Qr.PasswordsDoNotMatch": "The passwords do not match.",
   "Qr.NothingToEncode": "Nothing to encode.",
-  "Qr.TooManyWallets": "Too many wallets for one code. Select at most {count} of them."
+  "Qr.TooManyWallets": "Too many wallets for one code. Select at most {count} of them.",
+  "Patterns.WarningUnreachable": "cannot occur in an XRPL address",
+  "Patterns.WarningEmpty": "empty pattern",
+  "Patterns.WarningCaseFoldCap": { "one": "longer than {count} characters: searched case-sensitively", "few": "longer than {count} characters: searched case-sensitively", "many": "longer than {count} characters: searched case-sensitively", "other": "longer than {count} characters: searched case-sensitively" },
+  "Devices.LogicalProcessors": { "one": "{count} logical processor", "few": "{count} logical processors", "many": "{count} logical processors", "other": "{count} logical processors" },
+  "Devices.DeviceDetails": "{backend} · {details}"
 }

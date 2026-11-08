@@ -69,7 +69,7 @@ public class SearchViewModelTests
         vm.AddPattern("@", MatchPosition.Starts, ignoreCase: false);
 
         PatternChip chip = Assert.Single(vm.Patterns);
-        Assert.Equal("cannot occur in an XRPL address", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningUnreachable), chip.Warning);
         Assert.False(vm.CanStart);
     }
 
@@ -622,7 +622,7 @@ public class SearchViewModelTests
         vm.AddPair("abc", "@", ignoreCase: false);
 
         PatternChip chip = Assert.Single(vm.Patterns);
-        Assert.Equal("cannot occur in an XRPL address", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningUnreachable), chip.Warning);
         Assert.False(vm.CanStart);
     }
 
@@ -635,7 +635,7 @@ public class SearchViewModelTests
         vm.AddPair("ab", "cdefghijkmnpqr", ignoreCase: true);
 
         PatternChip chip = Assert.Single(vm.Patterns);
-        Assert.Equal($"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningCaseFoldCap, ("count", PatternSet.MaxIgnoreCaseLength)), chip.Warning);
     }
 
     [Fact]
@@ -658,7 +658,7 @@ public class SearchViewModelTests
 
         vm.UpdatePattern(chip, MatchPosition.Pair, ignoreCase: false);
 
-        Assert.Equal("empty pattern", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningEmpty), chip.Warning);
         Assert.False(vm.CanStart);
     }
 

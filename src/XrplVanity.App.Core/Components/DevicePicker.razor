@@ -13,10 +13,10 @@
     <label class="target t @(t.Selected ? "selected" : "")" @key="t.Id">
       <input class="select" type="checkbox" checked="@t.Selected" disabled="@Busy" @onchange="e => Vm.SetTargetSelected(t.Id, (bool)e.Value!)" />
       <span class="name">@t.Name @if (t.IsCpuDevice) { <span class="tag">@T[DevicesText.CpuTag]</span> }</span>
-      <span class="details muted">@t.Details</span>
+      <span class="details muted">@T.Render(t.Details)</span>
       @if (t.IsCpu)
       {
-        <span class="threads-wrap"><input class="threads" type="range" min="1" max="@Environment.ProcessorCount" value="@Vm.CpuThreads" disabled="@Busy" @onchange="e => Vm.CpuThreads = int.Parse((string)e.Value!)" /> <span class="num small">@Vm.CpuThreads</span> @T.Render(UiText.Of(DevicesText.Threads, ("count", Vm.CpuThreads)))</span>
+        <span class="threads-wrap"><input class="threads" type="range" min="1" max="@Environment.ProcessorCount" value="@Vm.CpuThreads" disabled="@Busy" @onchange="e => Vm.CpuThreads = int.Parse((string)e.Value!)" /> <span class="num small">@T.Render(UiText.Of(DevicesText.Threads, ("count", Vm.CpuThreads)))</span></span>
       }
       else
       {

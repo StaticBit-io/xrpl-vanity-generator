@@ -29,6 +29,11 @@ public static class PatternsText
     public static readonly TextId NearRangeTitle = Id();
     public static readonly TextId NormalizedTitle = Id();
     public static readonly TextId CaseSensitiveTitle = Id();
+    public static readonly TextId WarningUnreachable = Id();
+    public static readonly TextId WarningEmpty = Id();
+
+    /// <summary>Plural over <c>count</c>, the longest pattern that is folded to ignore case.</summary>
+    public static readonly TextId WarningCaseFoldCap = Id();
 
     /// <summary>Value: <c>speedup</c> (a factor, shown without decimals).</summary>
     public static readonly TextId NearStartSpeedup = Id();

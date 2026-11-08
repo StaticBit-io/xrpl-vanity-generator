@@ -12,8 +12,14 @@ public static class DevicesText
     public static readonly TextId NoGpuFound = Id();
     public static readonly TextId CpuTag = Id();
 
-    /// <summary>Plural over <c>count</c>; the number itself is drawn beside it.</summary>
+    /// <summary>Plural over <c>count</c>, the number of CPU threads, with the number in the phrase.</summary>
     public static readonly TextId Threads = Id();
+
+    /// <summary>Plural over <c>count</c>, the CPU's logical processors.</summary>
+    public static readonly TextId LogicalProcessors = Id();
+
+    /// <summary>Values: <c>backend</c> and <c>details</c>, both the device layer's own text.</summary>
+    public static readonly TextId DeviceDetails = Id();
     public static readonly TextId DutyTitle = Id();
 
     /// <summary>Value: <c>percent</c>.</summary>

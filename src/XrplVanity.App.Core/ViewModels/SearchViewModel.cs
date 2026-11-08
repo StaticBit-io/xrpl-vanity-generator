@@ -669,10 +669,10 @@ public sealed class SearchViewModel : IDisposable
             // nothing is auto-selected on a fresh install except the CPU.
             HashSet<string> selected = new(_targets.Count == 0 ? _settings.Targets : _targets.Where(t => t.Selected).Select(t => t.Id), StringComparer.Ordinal);
             _targets.Clear();
-            _targets.Add(new TargetChoice("cpu", "CPU", $"{Environment.ProcessorCount} logical processors", false, selected.Contains("cpu")));
+            _targets.Add(new TargetChoice("cpu", "CPU", UiText.Of(DevicesText.LogicalProcessors, ("count", Environment.ProcessorCount)), false, selected.Contains("cpu")));
             foreach (DeviceCatalogEntry e in entries)
             {
-                _targets.Add(new TargetChoice(e.Id, e.Name, $"{e.Selector.Backend} · {e.Details}", e.IsCpuDevice, selected.Contains(e.Id)));
+                _targets.Add(new TargetChoice(e.Id, e.Name, UiText.Of(DevicesText.DeviceDetails, ("backend", e.Selector.Backend), ("details", e.Details)), e.IsCpuDevice, selected.Contains(e.Id)));
             }
 
             NoGpuFound = !entries.Any(e => !e.IsCpuDevice);
@@ -1160,22 +1160,22 @@ public sealed class SearchViewModel : IDisposable
     }
 
     /// <summary>"cannot occur in an XRPL address" / "empty pattern" for one half, or null.</summary>
-    private static string? UnreachableWarning(NormalizedPattern normalized) =>
-        !normalized.Reachable ? "cannot occur in an XRPL address"
-        : normalized.Value.Length == 0 ? "empty pattern"
+    private static UiText? UnreachableWarning(NormalizedPattern normalized) =>
+        !normalized.Reachable ? UiText.Of(PatternsText.WarningUnreachable)
+        : normalized.Value.Length == 0 ? UiText.Of(PatternsText.WarningEmpty)
         : null;
 
     /// <summary>The case-folding cap warning for one half, or null. Applied per half for a pair.</summary>
-    private static string? CaseFoldWarning(NormalizedPattern normalized, bool ignoreCase) =>
+    private static UiText? CaseFoldWarning(NormalizedPattern normalized, bool ignoreCase) =>
         ignoreCase && normalized.Value.Length > PatternSet.MaxIgnoreCaseLength
-            ? $"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively"
+            ? UiText.Of(PatternsText.WarningCaseFoldCap, ("count", PatternSet.MaxIgnoreCaseLength))
             : null;
 
     /// <summary>
     /// A paired chip reports the first half that cannot occur before either half's folding cap:
     /// an unreachable half drops the whole rule, while the cap only changes how it is searched.
     /// </summary>
-    private static string? ChipWarning(PatternChip chip)
+    private static UiText? ChipWarning(PatternChip chip)
     {
         if (chip.Position != MatchPosition.Pair)
         {
@@ -1183,7 +1183,7 @@ public sealed class SearchViewModel : IDisposable
             return UnreachableWarning(single) ?? CaseFoldWarning(single, chip.IgnoreCase);
         }
 
-        if (string.IsNullOrWhiteSpace(chip.EndsText)) return "empty pattern";
+        if (string.IsNullOrWhiteSpace(chip.EndsText)) return UiText.Of(PatternsText.WarningEmpty);
         NormalizedPattern starts = PatternNormalizer.Normalize(chip.Text);
         NormalizedPattern ends = PatternNormalizer.Normalize(chip.EndsText.Trim());
         return UnreachableWarning(starts)

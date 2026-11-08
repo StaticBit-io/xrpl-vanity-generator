@@ -1,3 +1,4 @@
+using XrplVanity.App.Core.Localization;
 using XrplVanity.Core;
 
 namespace XrplVanity.App.Core.ViewModels;
@@ -35,8 +36,8 @@ public sealed class PatternChip
 
     /// <summary>True for a pair chip whose starts half may begin at the 2nd or 3rd character.</summary>
     public bool IsNearStartPair => Position == MatchPosition.Pair && NearStart;
-    /// <summary>"cannot occur in an XRPL address", "empty pattern", "longer than 12 characters: searched case-sensitively", or null.</summary>
-    public string? Warning { get; internal set; }
+    /// <summary>Why the chip is not searched as typed (an unreachable or empty half, the case-folding cap), or null.</summary>
+    public UiText? Warning { get; internal set; }
     /// <summary>
     /// What <see cref="Text"/> is actually searched as, once the four base58 look-alikes
     /// (l, 0, O, I) are folded onto the alphabet — set by <c>SearchViewModel.RebuildPatternSet</c>
