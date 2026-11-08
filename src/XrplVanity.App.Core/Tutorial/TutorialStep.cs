@@ -1,3 +1,5 @@
+using XrplVanity.App.Core.Localization;
+
 namespace XrplVanity.App.Core.Tutorial;
 
 /// <summary>
@@ -33,5 +35,5 @@ public sealed record TutorialStepInfo(
     string Route,
     IReadOnlyList<string> Lit,
     bool Interactive,
-    string Title,
-    string Body);
+    TextId Title,
+    UiText Body);

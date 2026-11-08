@@ -221,7 +221,7 @@ public class SearchPageTests : BunitContext
 
         cut.Find("button.show-qr").Click();
 
-        string body = TutorialScript.Steps.Single(s => s.Step == TutorialStep.QrDialog).Body;
+        string body = TextCatalog.For(UiLanguage.English).Render(TutorialScript.Steps.Single(s => s.Step == TutorialStep.QrDialog).Body);
         Assert.Equal(body, cut.Find(".qr-box .tutorial-note").TextContent);
     }
 

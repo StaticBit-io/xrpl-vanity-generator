@@ -100,7 +100,7 @@ public partial class SearchPage
 
     // The tutorial's bubble would cover the QR dialog, so on that step its text goes into the dialog.
     private string? QrNote =>
-        Tutorial.Current is { Step: TutorialStep.QrDialog } step ? step.Body : null;
+        Tutorial.Current is { Step: TutorialStep.QrDialog } step ? T.Render(step.Body) : null;
 
     // ResultsList raises OnShowQr from its row button and its selection bar; both land here.
     private void ShowQr(IReadOnlyList<ViewModels.SessionResult> rows)

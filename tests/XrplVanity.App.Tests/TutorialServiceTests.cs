@@ -362,7 +362,7 @@ public class TutorialServiceTests
         SetEstimate(rig, TimeSpan.FromSeconds(1));
 
         Assert.Equal(TutorialStep.LongWord, StepOf(rig));
-        Assert.Contains("shortest", rig.Tutorial.Hint);
+        Assert.Contains("shortest", TextCatalog.For(UiLanguage.English).Render(rig.Tutorial.Hint));
         Assert.True(changes > 0);
 
         rig.Vm.RemovePattern(rig.Vm.Patterns.Single(p => p.Text == "test"));
@@ -746,12 +746,15 @@ public class TutorialServiceTests
     [Fact]
     public void Copy_Has_No_Long_Dash()
     {
+        TextCatalog english = TextCatalog.For(UiLanguage.English);
         foreach (TutorialStepInfo info in TutorialScript.Steps)
         {
-            Assert.DoesNotContain('—', info.Title + info.Body);
-            Assert.DoesNotContain('–', info.Title + info.Body);
-            Assert.False(string.IsNullOrWhiteSpace(info.Title));
-            Assert.False(string.IsNullOrWhiteSpace(info.Body));
+            string title = english[info.Title];
+            string body = english.Render(info.Body);
+            Assert.DoesNotContain('—', title + body);
+            Assert.DoesNotContain('–', title + body);
+            Assert.False(string.IsNullOrWhiteSpace(title));
+            Assert.False(string.IsNullOrWhiteSpace(body));
         }
     }
 }
