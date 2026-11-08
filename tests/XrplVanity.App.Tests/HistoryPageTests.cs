@@ -72,8 +72,29 @@ public class HistoryPageTests : BunitContext
         string[] options = cut.FindAll("select.pattern-filter option").Select(o => o.TextContent.Trim()).ToArray();
 
         Assert.Equal(
-            new[] { "All patterns — 5", "abc:xyz (pair) — 1", "fast (ends) — 1", "fast (starts) — 2", "slow (starts) — 1" },
+            new[] { "All patterns: 5", "abc:xyz (pair): 1", "fast (ends): 1", "fast (starts): 2", "slow (starts): 1" },
             options);
+    }
+
+    [Fact]
+    public void Filter_Labels_Are_Built_From_The_Catalog_With_The_Translated_Position()
+    {
+        MemoryResultStore store = new();
+        SeedMixed(store);
+        Services.AddSingleton<IResultStore>(store);
+        Services.AddSingleton(new SearchViewModel(new MemorySettingsStore(), store, new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>()));
+        Services.AddSingleton<IClipboardService>(new FakeClipboard());
+        Services.AddSingleton<IFileDialogService>(new FakeFileDialog());
+        Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        TextCatalog german = TextCatalog.Transformed(UiLanguage.German, phrase => "[de] " + phrase);
+
+        IRenderedComponent<HistoryPage> cut = Render<HistoryPage>(p => p.AddCascadingValue(german));
+
+        string[] options = cut.FindAll("select.pattern-filter option").Select(o => o.TextContent.Trim()).ToArray();
+        Assert.Equal("[de] [de] abc:xyz ([de] pair): 1", options[1]);
+        Assert.StartsWith("[de] ", cut.Find("button.clear").TextContent, StringComparison.Ordinal);
+        Assert.StartsWith("[de] ", cut.Find(".storage-note").TextContent, StringComparison.Ordinal);
+        Assert.Equal("results.dat", cut.Find(".storage-note .mono").TextContent);
     }
 
     [Fact]

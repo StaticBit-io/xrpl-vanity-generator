@@ -16,7 +16,8 @@ public partial class ConfirmDialog
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public string Message { get; set; } = string.Empty;
     [Parameter] public IReadOnlyList<string>? Addresses { get; set; }
-    [Parameter] public string ConfirmLabel { get; set; } = "Delete";
+    /// <summary>The confirming button's text; the language's word for "Delete" when null.</summary>
+    [Parameter] public string? ConfirmLabel { get; set; }
     [Parameter] public EventCallback OnConfirm { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
 

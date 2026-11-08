@@ -1,13 +1,14 @@
+@inherits LocalizedComponent
 @if (Visible)
 {
   <div class="modal-backdrop"></div>
   <div class="modal-box card-box">
-    <h3>Close XRPL Vanity?</h3>
-    <p>A search keeps running while the window is in the tray.</p>
-    <label><input class="remember" type="checkbox" @bind="_remember" /> Remember my choice</label>
+    <h3>@T[ShellText.ClosePromptTitle]</h3>
+    <p>@T[ShellText.ClosePromptBody]</p>
+    <label><input class="remember" type="checkbox" @bind="_remember" /> @T[ShellText.RememberChoice]</label>
     <div class="buttons">
-      <button class="btn-primary-mint tray t" @onclick="() => OnChoice.InvokeAsync((CloseBehavior.MinimizeToTray, _remember))">Minimise to tray</button>
-      <button class="btn-secondary-dark exit t" @onclick="() => OnChoice.InvokeAsync((CloseBehavior.Exit, _remember))">Exit</button>
+      <button class="btn-primary-mint tray t" @onclick="() => OnChoice.InvokeAsync((CloseBehavior.MinimizeToTray, _remember))">@T[ShellText.MinimiseToTray]</button>
+      <button class="btn-secondary-dark exit t" @onclick="() => OnChoice.InvokeAsync((CloseBehavior.Exit, _remember))">@T[ShellText.Exit]</button>
     </div>
   </div>
 }

@@ -1,5 +1,6 @@
 using Bunit;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using Xunit;
 
 namespace XrplVanity.App.Tests;
@@ -62,6 +63,22 @@ public class ConfirmDialogTests : BunitContext
         {
             Assert.Contains(expected, listed);
         }
+    }
+
+    [Fact]
+    public void Cancel_And_The_More_Line_Follow_The_Language()
+    {
+        TextCatalog german = TextCatalog.Transformed(UiLanguage.German, phrase => "[de] " + phrase);
+        string[] addresses = Enumerable.Range(0, 12).Select(i => $"rAddress{i}").ToArray();
+
+        IRenderedComponent<ConfirmDialog> cut = Render<ConfirmDialog>(p => p
+            .AddCascadingValue(german)
+            .Add(x => x.Visible, true)
+            .Add(x => x.Addresses, addresses));
+
+        Assert.Equal("[de] Cancel", cut.Find("button.cancel").TextContent.Trim());
+        Assert.Equal("[de] Delete", cut.Find("button.confirm").TextContent.Trim());
+        Assert.Equal("[de] …and 2 more", cut.Find(".more").TextContent.Trim());
     }
 
     [Fact]
