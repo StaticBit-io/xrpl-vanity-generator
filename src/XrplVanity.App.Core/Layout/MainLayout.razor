@@ -1,9 +1,14 @@
 @inherits LayoutComponentBase
 @implements IDisposable
+@implements IAsyncDisposable
+@using Microsoft.JSInterop
 @inject SearchViewModel Vm
 @inject IWindowService Window
 @inject TutorialService Tutorial
+@inject Localizer Localizer
+@inject IJSRuntime Js
 
+<CascadingValue Value="Localizer.Text">
 <div class="shell">
   <TutorialRegion Name="@TutorialRegions.Nav">
     <NavRail />
@@ -12,17 +17,64 @@
 </div>
 <TutorialOverlay />
 <ClosePrompt Visible="_askClose" OnChoice="OnCloseChoice" />
+</CascadingValue>
 
 @code {
     private bool _askClose;
     private volatile bool _disposed;
+    private IJSObjectReference? _languageModule;
+    private string? _appliedTag;
 
-    protected override void OnInitialized() => Window.CloseRequested += OnCloseRequested;
+    protected override void OnInitialized()
+    {
+        Window.CloseRequested += OnCloseRequested;
+        Localizer.Changed += OnLanguageChanged;
+    }
+
+    // Changed may come from any thread; a notification already in flight at teardown is dropped.
+    private void OnLanguageChanged()
+    {
+        if (_disposed) return;
+
+        try
+        {
+            _ = InvokeAsync(() =>
+            {
+                if (!_disposed) StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // The renderer is gone; nothing to refresh.
+        }
+        catch (InvalidOperationException)
+        {
+            // The layout is no longer attached to a renderer.
+        }
+    }
+
+    private async Task ApplyDocumentLanguageAsync()
+    {
+        string tag = Localizer.Language.HtmlTag;
+        if (string.Equals(tag, _appliedTag, StringComparison.Ordinal)) return;
+
+        _appliedTag = tag;
+        try
+        {
+            _languageModule ??= await Js.InvokeAsync<IJSObjectReference>("import", "./_content/XrplVanity.App.Core/js/language.js");
+            await _languageModule.InvokeVoidAsync("setLang", tag);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException or TaskCanceledException)
+        {
+            // Only the lang attribute is lost; the screens still show the chosen language.
+        }
+    }
 
     // ShouldOffer reads the whole result store, so it runs off the UI thread; the offer is raised
     // back here, and only if the layout is still alive.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await ApplyDocumentLanguageAsync();
         if (!firstRender) return;
 
         bool offer = await Task.Run(Tutorial.ShouldOffer);
@@ -36,6 +88,24 @@
     {
         _disposed = true;
         Window.CloseRequested -= OnCloseRequested;
+        Localizer.Changed -= OnLanguageChanged;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+        if (_languageModule is null) return;
+
+        try
+        {
+            await _languageModule.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException or TaskCanceledException)
+        {
+            // The window is closing; the module goes with it.
+        }
+
+        _languageModule = null;
     }
 
     private void OnCloseRequested()

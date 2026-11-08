@@ -37,6 +37,20 @@ public class SearchViewModelSandboxTests
     }
 
     [Fact]
+    public void A_Language_Chosen_During_The_Tutorial_Survives_Its_End()
+    {
+        (SearchViewModel vm, _, _, MemorySettingsStore settings) = Create();
+        Assert.True(vm.BeginSandbox());
+
+        vm.SaveSettings(s => s with { Language = "ru" });
+        vm.EndSandbox();
+
+        Assert.False(vm.IsSandbox);
+        Assert.Equal("ru", vm.Settings.Language);
+        Assert.Equal("ru", settings.Current.Language);
+    }
+
+    [Fact]
     public void Begin_Empties_The_Patterns_And_Stops_At_One_Match()
     {
         (SearchViewModel vm, _, _, _) = Create();

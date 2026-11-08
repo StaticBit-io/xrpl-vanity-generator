@@ -23,6 +23,29 @@ public class JsonSettingsStoreTests
     }
 
     [Fact]
+    public void A_File_Without_Language_Loads_As_Null()
+    {
+        string folder = TempFolder();
+        File.WriteAllText(Path.Combine(folder, "settings.json"), """{ "DutyPercent": 80, "CloseBehavior": "Exit" }""");
+
+        AppSettings settings = new JsonSettingsStore(folder).Load();
+
+        Assert.Null(settings.Language);
+        Assert.Equal(80, settings.DutyPercent);
+    }
+
+    [Fact]
+    public void Language_Round_Trips()
+    {
+        string folder = TempFolder();
+        JsonSettingsStore store = new(folder);
+
+        store.Save(store.Load() with { Language = "de" });
+
+        Assert.Equal("de", new JsonSettingsStore(folder).Load().Language);
+    }
+
+    [Fact]
     public void Round_Trips_Every_Field_Atomically()
     {
         string folder = TempFolder();

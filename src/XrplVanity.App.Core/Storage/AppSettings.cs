@@ -28,6 +28,8 @@ public sealed record AppSettings
 
     /// <summary>Set when the first-run tutorial offer is first shown, whatever the answer or whether it is answered at all; the offer never reappears by itself.</summary>
     public bool TutorialOffered { get; init; }
+    /// <summary>The interface language code chosen in Settings; null until the user chooses, so the system language applies.</summary>
+    public string? Language { get; init; }
     public IReadOnlyDictionary<string, double> RateHints { get; init; } = new Dictionary<string, double>();
 
     public bool Equals(AppSettings? other) =>
@@ -38,7 +40,7 @@ public sealed record AppSettings
         && WindowWidth == other.WindowWidth && WindowHeight == other.WindowHeight
         && CloseBehavior == other.CloseBehavior && NotificationsEnabled == other.NotificationsEnabled
         && ClipboardClearSeconds == other.ClipboardClearSeconds && SeedRevealSeconds == other.SeedRevealSeconds
-        && TutorialOffered == other.TutorialOffered
+        && TutorialOffered == other.TutorialOffered && string.Equals(Language, other.Language, StringComparison.Ordinal)
         && RateHints.Count == other.RateHints.Count && RateHints.All(kv => other.RateHints.TryGetValue(kv.Key, out double v) && v == kv.Value);
 
     public override int GetHashCode() => HashCode.Combine(CpuThreads, DutyPercent, Count, WindowWidth, WindowHeight, CloseBehavior, TutorialOffered);

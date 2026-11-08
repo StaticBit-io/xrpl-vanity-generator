@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text.Json;
+using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.Localization;
 using Xunit;
 
@@ -30,6 +32,16 @@ public sealed class LocalizerTests
     {
         Assert.Same(UiLanguage.English, Localizer.Pick(null, CultureInfo.GetCultureInfo("fr-FR")));
         Assert.Same(UiLanguage.English, Localizer.Pick(null, CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public void The_Settings_Language_Feeds_The_Localizer()
+    {
+        AppSettings settings = JsonSerializer.Deserialize<AppSettings>("""{ "Language": "fr" }""")!;
+
+        Localizer localizer = new(settings.Language, RuRu);
+
+        Assert.Same(UiLanguage.Russian, localizer.Language);
     }
 
     [Fact]

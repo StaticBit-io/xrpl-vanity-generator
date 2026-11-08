@@ -191,6 +191,9 @@ public sealed class SearchViewModel : IDisposable
         : _historyWriteError;
     public AppSettings Settings => _settings;
 
+    /// <summary>The settings store's last write failure, or null when the last save succeeded.</summary>
+    public string? SettingsSaveError => _settingsStore.LastError;
+
     public int DutyPercent
     {
         get => _dutyPercent;
