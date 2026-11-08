@@ -78,6 +78,13 @@ public sealed class TrayCoordinator : IDisposable
 
     private void OnTrayActivated(TrayAction action)
     {
+        // The tutorial's search is a practice run on a sandbox; the tray must not start, stop or
+        // retune it behind the tutorial's back.
+        if (!_viewModel.AcceptsTrayAction(action))
+        {
+            return;
+        }
+
         switch (action)
         {
             case TrayAction.Show:

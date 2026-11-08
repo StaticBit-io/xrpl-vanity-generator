@@ -108,6 +108,15 @@ The application has three pages:
 - **Settings** — everything in the table below. There is no Save button: each control
   writes to `settings.json` as it changes.
 
+### Tutorial
+
+On the first start of an empty installation the application offers a short walk through one real
+search: adding a word, measuring speed, reading the estimate, starting the search, a result and its QR
+code, the GPU duty and the settings that matter first. It runs on the live interface, from an empty
+pattern list, and its match is never stored: when it ends, however it ends, your own patterns and
+settings are back as they were. It is offered once; to run it again, use **Start tutorial** on the
+Settings page, which is disabled while a search or a speed measurement is running.
+
 ### Settings
 
 | Setting | Meaning | Default |
@@ -120,6 +129,7 @@ The application has three pages:
 | Hide a revealed seed after | Seconds before a revealed seed masks itself again. It is also masked when you leave the page. | 15 |
 | Rate hints | The last measured speed per device, used for the estimate before a run. **Forget rate hints** clears them. | — |
 | Data folder | Where `settings.json` and `results.dat` live, with **Open folder**. | — |
+| Tutorial | **Start tutorial** runs the first-run walk-through again on an empty practice workspace. Disabled while a search or a speed measurement is running. | — |
 | About | Version, search engines, font licences, and links to the project on GitHub, StaticBit on GitHub, X and staticbit.io. | — |
 
 Seeds are masked everywhere by default. A row reveals its seed only on request and hides
@@ -135,7 +145,7 @@ page prints the resolved path, and **Open folder** opens it):
 
 | File | Contents |
 | --- | --- |
-| `settings.json` | Pattern and target drafts, thread count, duty, match count limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, and the last measured rate per device. Plain JSON, no secrets. |
+| `settings.json` | Pattern and target drafts, thread count, duty, match count limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, whether the tutorial has been offered, and the last measured rate per device. Plain JSON, no secrets. |
 | `results.dat` | The stored results, including seeds. Encrypted with DPAPI (`ProtectedData.Protect`, `DataProtectionScope.CurrentUser`), so only the Windows account that wrote the file can read it. |
 
 `results.dat` is the only file the application writes that contains a seed. Nothing else

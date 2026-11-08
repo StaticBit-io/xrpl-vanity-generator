@@ -23,4 +23,9 @@
 .stores { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 12px; }
 .stores a { color: var(--text-secondary); text-decoration: none; }
 .stores a:hover { color: var(--mint); }
-.buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+/* The box scrolls when the window is too short for it, and the buttons stay in view while it does:
+   Close must never be something the reader has to scroll to find. The padding and the background
+   keep the content that scrolls under them from showing through. */
+.buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; position: sticky; bottom: 0; padding-top: 8px; background: var(--box-bg); }
+/* Shown by the first-run tutorial instead of its speech bubble, which would cover this dialog. */
+.tutorial-note { margin: 0 0 12px; font-size: 13px; text-align: left; color: var(--text-secondary); }

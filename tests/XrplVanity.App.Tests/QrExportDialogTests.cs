@@ -51,6 +51,101 @@ public class QrExportDialogTests : BunitContext
     }
 
     [Fact]
+    public void Note_Is_Shown_Only_When_Set()
+    {
+        IRenderedComponent<QrExportDialog> plain = Open(R(1));
+        Assert.Empty(plain.FindAll(".tutorial-note"));
+
+        IRenderedComponent<QrExportDialog> noted = Render<QrExportDialog>(p => p
+            .Add(x => x.Rows, new[] { R(1) })
+            .Add(x => x.Note, "Close the dialog to continue."));
+
+        Assert.Equal("Close the dialog to continue.", noted.Find(".tutorial-note").TextContent);
+    }
+
+    [Fact]
+    public void Focus_Returns_To_Close_When_The_Clicked_Button_Goes_Away()
+    {
+        const string FocusIdentifier = "Blazor._internal.domWrapper.focus";
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        cut.WaitForAssertion(() => Assert.Equal(1, JSInterop.Invocations.Count(i => i.Identifier == FocusIdentifier)));
+
+        // Show code is replaced by the code; focus left on a removed button falls to the page body,
+        // where Escape never reaches the dialog.
+        cut.Find("button.show-code").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("svg.qr")));
+        cut.WaitForAssertion(() => Assert.True(JSInterop.Invocations.Count(i => i.Identifier == FocusIdentifier) >= 2));
+    }
+
+    [Fact]
+    public void Focus_Moves_Only_When_Show_Code_Or_Change_Takes_The_Clicked_Button_Away()
+    {
+        const string FocusIdentifier = "Blazor._internal.domWrapper.focus";
+        int FocusCalls() => JSInterop.Invocations.Count(i => i.Identifier == FocusIdentifier);
+
+        // The build renders twice (button disabled, then the code), so the count is read once it stops moving.
+        int Settled()
+        {
+            int last = FocusCalls();
+            for (int quiet = 0; quiet < 4; quiet++)
+            {
+                Thread.Sleep(25);
+                int now = FocusCalls();
+                quiet = now == last ? quiet : -1;
+                last = now;
+            }
+
+            return last;
+        }
+
+        IRenderedComponent<QrExportDialog> cut = Open(R(1));
+        cut.WaitForAssertion(() => Assert.Equal(1, FocusCalls()));
+
+        cut.Find("button.show-code").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("svg.qr")));
+        int afterShow = Settled();
+        Assert.True(afterShow >= 2, "Show code must put focus back on Close");
+
+        // The seed format keeps its own button under the pointer; a format change moves nothing.
+        cut.Find("button.format-seed").Click();
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("svg.qr")));
+        Assert.Equal(afterShow, Settled());
+
+        cut.Find("button.format-backup").Click();
+        cut.Find("button.show-code").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("svg.qr")));
+        int afterSecondShow = Settled();
+        Assert.True(afterSecondShow > afterShow);
+
+        // The 60 second hide fires while the user may be typing or reading elsewhere.
+        _time.Advance(TimeSpan.FromSeconds(60));
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("svg.qr")));
+        Assert.Equal(afterSecondShow, Settled());
+
+        cut.Find("button.show-code").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("svg.qr")));
+        int afterThirdShow = Settled();
+        cut.Find("button.change-code").Click();
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("svg.qr")));
+        Assert.True(Settled() > afterThirdShow, "Change must put focus back on Close");
+    }
+
+    [Fact]
+    public void The_Note_Is_Tied_To_The_Dialog_As_Its_Description()
+    {
+        IRenderedComponent<QrExportDialog> noted = Render<QrExportDialog>(p => p
+            .Add(x => x.Rows, new[] { R(1) })
+            .Add(x => x.Note, "Close the dialog to continue."));
+
+        string? describedBy = noted.Find(".qr-box").GetAttribute("aria-describedby");
+        Assert.False(string.IsNullOrEmpty(describedBy));
+        Assert.Equal(describedBy, noted.Find(".tutorial-note").Id);
+
+        IRenderedComponent<QrExportDialog> plain = Open(R(1));
+        Assert.Null(plain.Find(".qr-box").GetAttribute("aria-describedby"));
+    }
+
+    [Fact]
     public void One_Wallet_Offers_Both_Formats_And_Several_Offer_Only_The_Backup()
     {
         Assert.False(Open(R(1)).Find("button.format-seed").HasAttribute("disabled"));
@@ -344,8 +439,10 @@ public class QrExportDialogTests : BunitContext
         string first = cut.FindComponent<QrCode>().Instance.Text;
 
         cut.Find("button.change-code").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("button.show-code")));
         cut.Find("input.password").Input("correct horse");
         cut.Find("input.password-confirm").Input("correct horse");
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("button.show-code")));
         cut.Find("button.show-code").Click();
 
         cut.WaitForAssertion(() => Assert.NotEqual(first, cut.FindComponent<QrCode>().Instance.Text));

@@ -1,0 +1,59 @@
+@using Microsoft.JSInterop
+@implements IDisposable
+@implements IAsyncDisposable
+@inject TutorialService Tutorial
+@inject IJSRuntime Js
+@inject NavigationManager Nav
+
+@* The QR dialog step has no bubble: it would sit over the dialog, so SearchPage hands the text to
+   the dialog instead. *@
+@if (_step is { } step && step.Step != TutorialStep.QrDialog)
+{
+  <div class="tutorial-bubble @(_position is null ? null : "positioned") @(_placed ? null : "unplaced") @(BehindDialog ? "behind" : null)"
+       data-tutorial-bubble role="dialog" aria-labelledby="tutorial-title" aria-describedby="tutorial-body"
+       tabindex="-1" style="@BubbleStyle" inert="@BehindDialog" @ref="_bubble">
+    @if (_stepNumber > 0)
+    {
+      <div class="tutorial-step">Step @_stepNumber of @_stepCount</div>
+    }
+    <h3 id="tutorial-title">@step.Title</h3>
+    <p id="tutorial-body">@step.Body</p>
+    @if (_hint is not null)
+    {
+      <p class="tutorial-note tutorial-hint" role="status">@_hint</p>
+    }
+    @if (_busy)
+    {
+      <p class="tutorial-note" role="status">A search is still running. Stop it, then try again.</p>
+    }
+    <div class="tutorial-buttons">
+      @if (step.Step == TutorialStep.Offer)
+      {
+        <button class="btn-secondary-dark tutorial-decline t" @onclick="Leave">Not now</button>
+        <button class="btn-primary-mint tutorial-start t" @onclick="Start">Start tutorial</button>
+      }
+      else
+      {
+        @if (step.Step != TutorialStep.Done)
+        {
+          <button class="btn-secondary-dark tutorial-skip t" @onclick="Leave">Skip</button>
+        }
+        @if (_canGoNext)
+        {
+          <button class="btn-primary-mint tutorial-next t" @onclick="Advance">@(step.Step == TutorialStep.Done ? "Finish" : "Next")</button>
+        }
+      }
+    </div>
+  </div>
+}
+
+@* A leave that had to stop a run first: the page stays locked until the run has ended and the
+   user's words are back, and this says why. *@
+@if (_leaving)
+{
+  <div class="tutorial-status" role="status">Leaving the tutorial...</div>
+}
+
+<ConfirmDialog Visible="_confirming && _step is not null" Title="Leave the tutorial?"
+               Message="Your words and settings come back as they were. You can start it again in Settings."
+               ConfirmLabel="Leave" OnConfirm="ConfirmLeave" OnCancel="CancelLeave" />

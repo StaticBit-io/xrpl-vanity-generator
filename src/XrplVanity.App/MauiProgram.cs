@@ -2,6 +2,7 @@ using H.NotifyIcon;
 using Microsoft.Extensions.Logging;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
+using XrplVanity.App.Core.Tutorial;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.App.Services;
 using XrplVanity.Search;
@@ -36,6 +37,7 @@ public static class MauiProgram
             sp.GetRequiredService<IResultStore>(),
             sp.GetRequiredService<INotificationService>(),
             DeviceCatalog.Enumerate));
+        builder.Services.AddSingleton(sp => new TutorialService(sp.GetRequiredService<SearchViewModel>(), sp.GetRequiredService<IResultStore>()));
         builder.Services.AddSingleton<TrayCoordinator>();
 
         MauiApp app = builder.Build();

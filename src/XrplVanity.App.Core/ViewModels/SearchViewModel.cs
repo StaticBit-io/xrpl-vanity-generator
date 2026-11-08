@@ -46,6 +46,32 @@ public sealed class SearchViewModel : IDisposable
     private int? _count;
     private SearchSession? _calibrationSession;
     private int _calibrationStopArmed;
+    private bool _sandbox;
+    private bool _sandboxEndPending;
+    private bool _sessionIsSandbox;
+    private SandboxSnapshot? _sandboxSnapshot;
+
+    /// <summary>
+    /// The live fields a sandbox replaces, taken when it begins. <c>_settings</c> is not part of it:
+    /// a sandbox never writes the user's values there, so there is nothing to put back on disk.
+    /// </summary>
+    private sealed record SandboxSnapshot(
+        PatternChip[] Patterns,
+        string[] SelectedTargets,
+        int CpuThreads,
+        int? Count,
+        int DutyPercent,
+        string EntryText,
+        string EntryEndsText,
+        MatchPosition EntryPosition,
+        bool EntryIgnoreCase,
+        bool EntryNearStart,
+        SessionResult[] Results,
+        SearchSummary? LastSummary,
+        SearchProgress? Progress,
+        string? LastFailure,
+        string? HistoryWriteError,
+        string? CalibrationFailure);
 
     public SearchViewModel(ISettingsStore settingsStore, IResultStore resultStore, INotificationService notifications, Func<IReadOnlyList<DeviceCatalogEntry>> deviceSource)
     {
@@ -171,16 +197,18 @@ public sealed class SearchViewModel : IDisposable
         set
         {
             int clamped = Math.Clamp(value, 1, DutyCycle.Full);
+            bool sandbox;
             lock (_gate)
             {
                 _dutyPercent = clamped;
+                sandbox = _sandbox;
                 if (_session is not null)
                 {
                     _session.DutyPercent = clamped;
                 }
             }
 
-            SaveSettings(s => s with { DutyPercent = clamped });
+            if (!sandbox) SaveSettings(s => s with { DutyPercent = clamped });
             Changed?.Invoke();
         }
     }
@@ -692,7 +720,9 @@ public sealed class SearchViewModel : IDisposable
                 LastFailure = null;
                 _progress = null;
                 State = SearchState.Starting;
-                session = new SearchSession(request, OnMatch, OnLog);
+                bool sandboxSession = _sandbox;
+                _sessionIsSandbox = sandboxSession;
+                session = new SearchSession(request, match => OnMatch(match, sandboxSession), OnLog);
                 _session = session;
                 session.ProgressChanged += OnProgress;
                 session.Completion.ContinueWith(OnSessionCompleted);
@@ -706,6 +736,9 @@ public sealed class SearchViewModel : IDisposable
                 LastFailure = ex.Message;
                 State = SearchState.Idle;
                 _session = null;
+                // A leave that arrived while the session was starting waits for a completion that
+                // will now never come.
+                if (_sandboxEndPending) RestoreSandbox();
             }
 
             session?.Dispose();
@@ -762,6 +795,7 @@ public sealed class SearchViewModel : IDisposable
                 CalibrationFailure = ex.Message;
                 IsCalibrating = false;
                 _calibrationSession = null;
+                if (_sandboxEndPending) RestoreSandbox();
             }
 
             session?.Dispose();
@@ -829,25 +863,34 @@ public sealed class SearchViewModel : IDisposable
         }
 
         SearchSession? finished;
+        bool abandoned;
         lock (_gate)
         {
             finished = _calibrationSession;
             _calibrationSession = null;
             IsCalibrating = false;
+            abandoned = _sandboxEndPending;
+            if (abandoned) RestoreSandbox();
         }
 
-        if (summary is not null)
+        // A run the tutorial's leave cut short is dropped: a rate taken from a truncated window would
+        // overwrite a good hint with a low one, and the restore has already put back the failure the
+        // user had before the tutorial.
+        if (!abandoned)
         {
-            IReadOnlyList<TargetProgress> targets = summary.Final.Targets;
-            ApplyRateHints(targets);
-            bool allFailed = targets.Count > 0 && targets.All(t => t.State == TargetState.Failed);
-            CalibrationFailure = allFailed
-                ? targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no target could be measured"
-                : null;
-        }
-        else
-        {
-            CalibrationFailure = failure;
+            if (summary is not null)
+            {
+                IReadOnlyList<TargetProgress> targets = summary.Final.Targets;
+                ApplyRateHints(targets);
+                bool allFailed = targets.Count > 0 && targets.All(t => t.State == TargetState.Failed);
+                CalibrationFailure = allFailed
+                    ? targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no target could be measured"
+                    : null;
+            }
+            else
+            {
+                CalibrationFailure = failure;
+            }
         }
 
         Changed?.Invoke();
@@ -864,6 +907,138 @@ public sealed class SearchViewModel : IDisposable
         }
 
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// True from <see cref="BeginSandbox"/> until the live fields are back, which after
+    /// <see cref="EndSandbox"/> can be later than the call when a run had to be stopped first.
+    /// </summary>
+    public bool IsSandbox { get { lock (_gate) return _sandbox; } }
+
+    /// <summary>
+    /// Switches to a throwaway workspace for the tutorial: an empty pattern list, a stop count of
+    /// one, and nothing persisted. Only the live fields change; <c>_settings</c> keeps the user's
+    /// values, so a crash mid-tutorial leaves <c>settings.json</c> needing no repair. Matches stay
+    /// out of the result store and raise no notification. Returns false, changing nothing, unless the
+    /// view model is idle, not measuring speed and not already in a sandbox.
+    /// </summary>
+    public bool BeginSandbox()
+    {
+        lock (_gate)
+        {
+            if (_sandbox || State != SearchState.Idle || IsCalibrating) return false;
+
+            _sandboxSnapshot = new SandboxSnapshot(
+                _patterns.ToArray(),
+                _targets.Where(t => t.Selected).Select(t => t.Id).ToArray(),
+                _cpuThreads,
+                _count,
+                _dutyPercent,
+                _entryText,
+                _entryEndsText,
+                _entryPosition,
+                _entryIgnoreCase,
+                _entryNearStart,
+                _results.ToArray(),
+                LastSummary,
+                _progress,
+                LastFailure,
+                _historyWriteError,
+                CalibrationFailure);
+            _sandbox = true;
+            _patterns.Clear();
+            RebuildPatternSet();
+            _count = 1;
+            // Mirrors what Start clears: the tutorial advances on "a result exists and the search is
+            // idle", so a real result left here would let it skip Start and show a real seed.
+            _results.Clear();
+            _resultsSnapshot = Array.Empty<SessionResult>();
+            _resultsDirty = false;
+            _pendingPersist.Clear();
+            _unnotifiedMatches = 0;
+            _lastMatch = null;
+            _historyWriteError = null;
+            LastSummary = null;
+            LastFailure = null;
+            CalibrationFailure = null;
+            _progress = null;
+            _entryText = string.Empty;
+            _entryEndsText = string.Empty;
+            _entryPosition = MatchPosition.Starts;
+            _entryIgnoreCase = true;
+            _entryNearStart = false;
+        }
+
+        Changed?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// Leaves the sandbox and puts every live field back. When a search or a speed measurement is
+    /// running it is stopped first and the restore happens on its completion path, in the same
+    /// critical section that returns the view model to idle, so no moment exists in which it is idle
+    /// yet still holding the tutorial's state. <see cref="IsSandbox"/> turns false at that point.
+    /// </summary>
+    public void EndSandbox()
+    {
+        bool stopSearch = false;
+        lock (_gate)
+        {
+            if (!_sandbox) return;
+            if (State == SearchState.Idle && !IsCalibrating)
+            {
+                RestoreSandbox();
+            }
+            else
+            {
+                _sandboxEndPending = true;
+                stopSearch = State != SearchState.Idle;
+                _calibrationSession?.Stop();
+            }
+        }
+
+        if (stopSearch) Stop();
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// False for the tray's load and stop actions while a sandbox is active: the tutorial owns the
+    /// duty and the search, and a tray click must neither touch them nor persist a tutorial value.
+    /// </summary>
+    public bool AcceptsTrayAction(TrayAction action) =>
+        !(IsSandbox && action is TrayAction.Duty25 or TrayAction.Duty50 or TrayAction.Duty80 or TrayAction.Duty100 or TrayAction.StopSearch);
+
+    /// <summary>The caller holds <c>_gate</c> and no session is running.</summary>
+    private void RestoreSandbox()
+    {
+        SandboxSnapshot snapshot = _sandboxSnapshot!;
+        _patterns.Clear();
+        _patterns.AddRange(snapshot.Patterns);
+        RebuildPatternSet();
+        HashSet<string> selected = new(snapshot.SelectedTargets, StringComparer.Ordinal);
+        foreach (TargetChoice target in _targets) target.Selected = selected.Contains(target.Id);
+        _cpuThreads = snapshot.CpuThreads;
+        _count = snapshot.Count;
+        _dutyPercent = snapshot.DutyPercent;
+        _entryText = snapshot.EntryText;
+        _entryEndsText = snapshot.EntryEndsText;
+        _entryPosition = snapshot.EntryPosition;
+        _entryIgnoreCase = snapshot.EntryIgnoreCase;
+        _entryNearStart = snapshot.EntryNearStart;
+        _results.Clear();
+        _results.AddRange(snapshot.Results);
+        _resultsDirty = true;
+        _pendingPersist.Clear();
+        _unnotifiedMatches = 0;
+        _lastMatch = null;
+        LastSummary = snapshot.LastSummary;
+        _progress = snapshot.Progress;
+        LastFailure = snapshot.LastFailure;
+        CalibrationFailure = snapshot.CalibrationFailure;
+        _historyWriteError = snapshot.HistoryWriteError;
+        _sandbox = false;
+        _sandboxEndPending = false;
+        _sandboxSnapshot = null;
     }
 
     public void SaveSettings(Func<AppSettings, AppSettings> update)
@@ -1066,6 +1241,8 @@ public sealed class SearchViewModel : IDisposable
         // as one atomic step with respect to a concurrent RefreshDevices/SetTargetSelected call.
         lock (_gate)
         {
+            // A sandbox edits only the live fields; the user's draft in _settings must survive it.
+            if (_sandbox) return;
             SaveSettings(s => s with
             {
                 Patterns = _patterns.Select(p => new PatternDraft(p.Text, p.Position.ToString(), p.IgnoreCase, p.EndsText, p.IsNearStartPair)).ToArray(),
@@ -1097,13 +1274,18 @@ public sealed class SearchViewModel : IDisposable
     /// the in-memory list and the pending batch — and raises no event. Persisting, notifying and
     /// <see cref="Changed"/> happen in <see cref="FlushPendingMatches"/> on the progress tick.
     /// </summary>
-    private void OnMatch(Match match)
+    internal void OnMatch(Match match, bool sandboxSession)
     {
         SessionResult result = new(match.Address, match.Seed, match.Pattern, match.Position.ToString(), DateTimeOffset.Now, ResolveMatchTarget());
         lock (_gate)
         {
+            // The flag belongs to the session that found the match, not to the view model's current
+            // state: a hit still in flight when the sandbox ends must reach neither the store nor
+            // the restored session list.
+            if (sandboxSession && !_sandbox) return;
             _results.Insert(0, result);
             _resultsDirty = true;
+            if (sandboxSession) return;
             _pendingPersist.Add(new StoredResult(result.Address, result.Seed, result.Pattern, result.Position, result.FoundAt, result.Target));
             _unnotifiedMatches++;
             _lastMatch = result;
@@ -1139,7 +1321,7 @@ public sealed class SearchViewModel : IDisposable
     /// one notification for the batch. Called from the progress tick and once more before the
     /// terminal state transition; never throws into its caller.
     /// </summary>
-    private void FlushPendingMatches()
+    internal void FlushPendingMatches()
     {
         StoredResult[] batch;
         int unnotified;
@@ -1223,6 +1405,7 @@ public sealed class SearchViewModel : IDisposable
     {
         FlushPendingMatches();
         SearchSession? finished;
+        bool sandboxSession;
         lock (_gate)
         {
             LastSummary = summary;
@@ -1230,17 +1413,22 @@ public sealed class SearchViewModel : IDisposable
             State = SearchState.Idle;
             finished = _session;
             _session = null;
+            sandboxSession = _sessionIsSandbox;
             if (summary.Outcome == SessionOutcome.AllTargetsFailed)
             {
                 LastFailure = summary.Final.Targets.FirstOrDefault(t => t.Failure is not null)?.Failure ?? "no target could start";
             }
+
+            if (_sandboxEndPending) RestoreSandbox();
         }
 
         // After the state transition, never before it: a settings write that fails would otherwise
         // fault this continuation and leave the view model stuck in Searching with a dead session.
+        // A sandbox search measured real speeds, so its hints are kept; _settings still holds the
+        // user's own values, so this write cannot carry the tutorial's patterns to disk.
         ApplyRateHints(summary.Final.Targets);
 
-        if (_settings.NotificationsEnabled)
+        if (!sandboxSession && _settings.NotificationsEnabled)
         {
             _notifications.Notify("Search finished", $"{summary.Final.Reported} found · {summary.Outcome}");
         }
@@ -1286,6 +1474,7 @@ public sealed class SearchViewModel : IDisposable
             State = SearchState.Idle;
             finished = _session;
             _session = null;
+            if (_sandboxEndPending) RestoreSandbox();
         }
 
         Changed?.Invoke();
