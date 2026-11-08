@@ -31,7 +31,8 @@ async function fixture(pages = { 'index.html': PAGE }) {
   const root = await mkdtemp(join(tmpdir(), 'xrpl-vanity-site-'));
   const siteDir = join(root, 'site');
   await mkdir(join(siteDir, 'src', 'css'), { recursive: true });
-  for (const name of ['css/tokens.css', 'css/base.css', 'css/site.css', 'favicon.svg']) {
+  await mkdir(join(siteDir, 'src', 'js'), { recursive: true });
+  for (const name of ['css/tokens.css', 'css/base.css', 'css/site.css', 'favicon.svg', 'js/lang-redirect.js', 'js/lang.mjs']) {
     await writeFile(join(siteDir, 'src', name), 'p { margin: 0; }\n');
   }
   for (const name of NAV_PAGES) {

@@ -80,6 +80,9 @@ function renderHead(page) {
     `<link rel="canonical" href="${url}">`,
     ...languageAlternates(pagePath, page.langs),
     '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
+    // Classic and blocking on purpose: the redirect must run before anything paints.
+    '<script src="/js/lang-redirect.js"></script>',
+    '<script type="module" src="/js/lang.mjs"></script>',
     '<link rel="stylesheet" href="/css/tokens.css">',
     '<link rel="stylesheet" href="/css/base.css">',
     '<link rel="stylesheet" href="/css/site.css">',
