@@ -147,7 +147,7 @@ public class PatternEditorTests : BunitContext
 
         cut.Find("input.pattern").Input("ab");
 
-        cut.WaitForAssertion(() => Assert.Equal("Press Enter to add \"ab\" — Start adds it too.", cut.Find(".pattern-hint").TextContent.Trim()));
+        cut.WaitForAssertion(() => Assert.Equal("Press Enter to add \"ab\". Start adds it too.", cut.Find(".pattern-hint").TextContent.Trim()));
         Assert.Empty(cut.FindAll(".pattern-problem"));
     }
 
@@ -192,7 +192,7 @@ public class PatternEditorTests : BunitContext
         cut.Find("input.pattern").Input("Il");
 
         cut.WaitForAssertion(() => Assert.Equal(
-            "\"Il\" is searched as \"iL\" — press Enter to add it, or just press Start.",
+            "\"Il\" is searched as \"iL\". Press Enter to add it, or just press Start.",
             cut.Find(".pattern-hint").TextContent.Trim()));
     }
 
@@ -205,7 +205,7 @@ public class PatternEditorTests : BunitContext
         cut.Find("input.pattern").Input("ab");
 
         cut.WaitForAssertion(() => Assert.Equal(
-            "Press Enter to add \"ab\" — Start adds it too.",
+            "Press Enter to add \"ab\". Start adds it too.",
             cut.Find(".pattern-hint").TextContent.Trim()));
     }
 

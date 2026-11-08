@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
@@ -67,8 +68,9 @@ public class NearStartOptionTests : BunitContext
         vm.EntryText = text;
 
         Assert.NotNull(vm.NearStartHint);
-        Assert.Contains("2nd or 3rd character", vm.NearStartHint);
-        Assert.Contains("about 24× sooner", vm.NearStartHint);
+        Assert.Equal(SearchText.NearStartHint, vm.NearStartHint.Id);
+        Assert.Equal(text, vm.NearStartHint.Arg("pattern"));
+        Assert.Equal(24, Math.Round((double)vm.NearStartHint.Arg("speedup")!));
     }
 
     [Theory]
@@ -230,7 +232,7 @@ public class NearStartOptionTests : BunitContext
         vm.EntryText = "XRPL";
         vm.EntryEndsText = "FILE";
 
-        Assert.Contains("about 24× sooner", vm.NearStartHint);
+        Assert.Equal(24, Math.Round((double)vm.NearStartHint!.Arg("speedup")!));
 
         vm.EntryText = "pshn";
         Assert.Null(vm.NearStartHint);

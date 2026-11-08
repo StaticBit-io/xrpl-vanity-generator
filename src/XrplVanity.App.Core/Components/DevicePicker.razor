@@ -26,5 +26,5 @@
       }
     </label>
   }
-  @if (Vm.CalibrationFailure is not null) { <div class="banner-negative">@Vm.CalibrationFailure</div> }
+  @if (Vm.CalibrationFailure is not null) { <div class="banner-negative">@T.Render(Vm.CalibrationFailure)</div> }
 </div>

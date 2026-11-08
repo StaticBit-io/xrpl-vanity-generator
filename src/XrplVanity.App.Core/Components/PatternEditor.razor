@@ -97,14 +97,14 @@
   }
   @if (Vm.PatternProblem is not null)
   {
-    <div class="pattern-problem">@Vm.PatternProblem</div>
+    <div class="pattern-problem">@T.Render(Vm.PatternProblem)</div>
   }
   @if (Vm.PatternHint is not null)
   {
-    <div class="pattern-hint">@Vm.PatternHint</div>
+    <div class="pattern-hint">@T.Render(Vm.PatternHint)</div>
   }
   @if (Vm.NearStartHint is not null)
   {
-    <div class="near-start-hint">@Vm.NearStartHint</div>
+    <div class="near-start-hint">@T.Render(Vm.NearStartHint)</div>
   }
 </div>

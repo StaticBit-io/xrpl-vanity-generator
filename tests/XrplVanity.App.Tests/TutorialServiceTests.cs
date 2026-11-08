@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.Tutorial;
@@ -108,7 +109,7 @@ public class TutorialServiceTests
     private sealed class ThrowingStore : IResultStore
     {
         public bool IsReadOnly => false;
-        public string? ReadOnlyReason => null;
+        public UiText? ReadOnlyReason => null;
         public IReadOnlyList<StoredResult> LoadAll() => throw new IOException("results.dat is unreadable");
         public void Append(StoredResult result) { }
         public void AppendRange(IEnumerable<StoredResult> results) { }
@@ -138,7 +139,7 @@ public class TutorialServiceTests
     [Fact]
     public void ShouldOffer_Is_False_When_The_Store_Is_ReadOnly_Or_Throws()
     {
-        Assert.False(Create(results: new MemoryResultStore { IsReadOnly = true, ReadOnlyReason = "locked" }).Tutorial.ShouldOffer());
+        Assert.False(Create(results: new MemoryResultStore { IsReadOnly = true, ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeRead, ("detail", "locked")) }).Tutorial.ShouldOffer());
         Assert.False(Create(tutorialStore: new ThrowingStore()).Tutorial.ShouldOffer());
     }
 

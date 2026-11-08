@@ -32,7 +32,7 @@ public class EstimateCardTests : BunitContext
         Assert.Equal("4.6 M", Formatting.Candidates(expectedCandidates, En));
         Assert.Equal(Formatting.Candidates(expectedCandidates, En), cut.Find(".candidates").TextContent.Trim());
         Assert.Equal("-", cut.Find(".eta").TextContent.Trim());
-        Assert.Contains("rate unknown — press \"measure speed\" or run a search once", cut.Markup);
+        Assert.Contains("rate unknown: press \"measure speed\" or run a search once", cut.Markup);
     }
 
     [Fact]

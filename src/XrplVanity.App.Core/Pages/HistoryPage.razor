@@ -16,7 +16,7 @@
 <div class="content-scroll" inert="@(_pending is not null || _qrRows is not null)">
   @if (Store.IsReadOnly)
   {
-    <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
+    <Banner Kind="negative" Text="@T.Render(Store.ReadOnlyReason ?? UiText.Of(HistoryText.ReadOnly))" />
   }
   @* A failed write turns the store read-only and throws with that same reason, so the banner
      above already carries it; showing both would stack two identical red lines. *@

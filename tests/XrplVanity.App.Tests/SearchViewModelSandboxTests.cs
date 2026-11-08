@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
@@ -346,7 +347,7 @@ public class SearchViewModelSandboxTests
         vm.MeasureSpeed();
         // The failure is written just after the flag drops.
         WaitUntil(() => !vm.IsCalibrating && vm.CalibrationFailure is not null, "the measurement to report its failure");
-        string? failure = vm.CalibrationFailure;
+        UiText? failure = vm.CalibrationFailure;
         Assert.NotNull(failure);
 
         Assert.True(vm.BeginSandbox());

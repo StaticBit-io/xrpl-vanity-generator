@@ -15,7 +15,7 @@
         <button class="btn-primary-mint start t" disabled="@(!Vm.CanStart)" @onclick="Vm.Start">Start</button>
         @if (Vm.TargetProblem is not null)
         {
-          <div class="start-hint muted">@Vm.TargetProblem</div>
+          <div class="start-hint muted">@T.Render(Vm.TargetProblem)</div>
         }
       }
       else
@@ -28,7 +28,7 @@
 <div class="content-scroll" inert="@(_clearPending || _qrRows is not null)">
   @if (Vm.LastFailure is not null)
   {
-    <Banner Kind="negative" Text="@Vm.LastFailure" />
+    <Banner Kind="negative" Text="@T.Render(Vm.LastFailure)" />
   }
   <div class="search-grid">
     <div class="col">
@@ -55,7 +55,7 @@
          hits, but they are not on disk and are gone on restart. *@
       @if (Vm.HistoryReadOnlyReason is not null)
       {
-        <Banner Kind="negative" Text="@Vm.HistoryReadOnlyReason" />
+        <Banner Kind="negative" Text="@T.Render(Vm.HistoryReadOnlyReason)" />
       }
       <TutorialRegion Name="@TutorialRegions.Results">
         @* IsSandbox is read before Results: a sandbox that ends between the two reads then shows the
