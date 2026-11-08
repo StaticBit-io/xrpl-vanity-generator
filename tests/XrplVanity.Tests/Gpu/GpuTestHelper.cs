@@ -9,6 +9,16 @@ namespace XrplVanity.Tests.Gpu;
 
 internal static class GpuTestHelper
 {
+    /// <summary>The trait name carrying <see cref="RealGpu"/>.</summary>
+    public const string Category = "Category";
+
+    /// <summary>
+    /// Marks a test that measures time or volume only a real GPU makes meaningful. On a CPU OpenCL
+    /// device such as pocl these runs take minutes and prove nothing a fast test does not, so CI
+    /// excludes them with <c>-trait- Category=RealGpu</c> and they run on a developer machine.
+    /// </summary>
+    public const string RealGpu = "RealGpu";
+
     /// <summary>
     /// Returns a live CUDA context, or skips the calling test when CUDA is unavailable or the
     /// device is older than the PTX's compute_75 (Turing) target.

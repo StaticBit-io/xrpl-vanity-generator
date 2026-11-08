@@ -70,7 +70,8 @@ jobs:
           # Scoped to the build for the reason given in linux/Dockerfile: DartSassBuilder ships a
           # net8.0 tool, and the test executables must not be rolled forward with it.
           DOTNET_ROLL_FORWARD: LatestMajor
-      - run: dotnet run --project tests/XrplVanity.Tests -c Release --no-build
+      # RealGpu tests need a real card, which hosted runners lack; they run on a developer machine.
+      - run: dotnet run --project tests/XrplVanity.Tests -c Release --no-build -- -trait- "Category=RealGpu"
       - run: dotnet run --project tests/XrplVanity.App.Tests -c Release --no-build
       - name: Mark the tree as tested
         if: needs.gate.outputs.tree != ''
@@ -88,7 +89,9 @@ jobs:
     needs: gate
     if: ${{ !cancelled() && needs.gate.outputs.linux != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # About 6 minutes for the suite on a 4-CPU container once the RealGpu tests are left out; the
+    # margin covers a slower runner without letting a hang burn the budget.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: bash linux/run-linux-tests.sh --cpu-only

@@ -54,6 +54,7 @@ public sealed class DutyCycleTests
     }
 
     [Theory]
+    [Trait(GpuTestHelper.Category, GpuTestHelper.RealGpu)]
     [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
     public void Half_Duty_Roughly_Doubles_The_Wall_Time_Of_The_Same_Search(string backend)
     {

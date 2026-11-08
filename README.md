@@ -310,11 +310,16 @@ The test suite runs on Linux inside Docker, with two modes:
   (`--gpu-devices all` reports `on 1 device(s)`), plus two additional exit-2
   smokes specific to this mode: `--gpu-devices cuda` and `--backend cuda`
   each fail with a "no matching device" / "no usable device" reason, since
-  there is no CUDA device to select.
+  there is no CUDA device to select. This mode leaves out the tests marked
+  `Category=RealGpu`: the duty-cycle timings, the throughput floor and the
+  million-key cross-check. On pocl they take most of an hour and prove nothing
+  the rest of the suite does not. Run them on a machine with a real card, in GPU
+  mode or with plain `dotnet run --project tests/XrplVanity.Tests -c Release`.
 
 Both modes use the same single kernel source and exercise the same test
 anchors: field arithmetic vs BigInteger, RFC 8032 vectors, hash padding
-boundaries, base58 encoding, the 1,000,000-input cross-check, the 20,000-address
+boundaries, base58 encoding, the input cross-check against the CPU reference
+(1,000,000 inputs on a real card, 65,536 in CPU-only mode), the 20,000-address
 matcher equivalence, and the search engine gate with consistency re-verification.
 
 The "0 skipped" / "0 failed" assertions above are enforced through the
