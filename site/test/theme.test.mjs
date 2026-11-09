@@ -23,7 +23,8 @@ test('the font comes from the site and carries the full width axis', () => {
 
 test('every font face is a shipped file, listed with its hash, and the Cyrillic one exists', () => {
   const faces = css('base.css').match(/@font-face\s*{[^}]*}/g) ?? [];
-  const sources = readFileSync(new URL('SOURCES.txt', FONTS), 'utf8');
+  // A Windows checkout with core.autocrlf turns the file CRLF; the pattern below spans lines.
+  const sources = readFileSync(new URL('SOURCES.txt', FONTS), 'utf8').replaceAll('\r\n', '\n');
   const files = faces.map((face) => /url\("?\/fonts\/([^")]+)/.exec(face)?.[1]);
   for (const [i, file] of files.entries()) {
     assert.ok(file, `face ${i} names a file under /fonts/`);
