@@ -286,6 +286,7 @@ public sealed class MultiDeviceSearchTests
     }
 
     [Theory]
+    [Trait(GpuTestHelper.Category, GpuTestHelper.RealGpu)]
     [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
     public void Lowering_Duty_Mid_Run_Slows_The_Launch_Cadence(string backend)
     {
