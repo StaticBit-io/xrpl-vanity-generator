@@ -38,13 +38,13 @@
 <tr><th scope="row"><code>--starts-ends PREFIX:SUFFIX</code></th><td>nenhum</td><td>Exige um início e um fim no mesmo endereço. Pode repetir.</td></tr>
 <tr><th scope="row"><code>--near-starts-ends PREFIX:SUFFIX</code></th><td>nenhum</td><td>O mesmo, com o início permitido no 2º ou 3º caractere. Pode repetir.</td></tr>
 <tr><th scope="row"><code>--list FILE [minLen]</code></th><td>minLen 4</td><td>Carrega de um arquivo palavras para o início do endereço.</td></tr>
-<tr><th scope="row"><code>--case-sensitive</code></th><td>desligado</td><td>Busca exatamente como digitado. Por padrão qualquer combinação de maiúsculas vale, para palavras de até 12 caracteres.</td></tr>
+<tr><th scope="row"><code>--case-sensitive</code></th><td>desligado</td><td>Busca exatamente como digitado. Por padrão, qualquer combinação de maiúsculas e minúsculas vale para palavras de até 12 caracteres.</td></tr>
 <tr><th scope="row"><code>--threads N</code></th><td>todos os núcleos</td><td>Linhas de execução para buscar no processador. Ignorado com <code>--gpu</code>.</td></tr>
 <tr><th scope="row"><code>--out FILE</code></th><td>nenhum</td><td>Acrescenta os resultados a um arquivo, além de mostrá-los.</td></tr>
 <tr><th scope="row"><code>--count N</code></th><td>nenhum</td><td>Para após N resultados. Sem ele, a busca continua até você pressionar Ctrl+C.</td></tr>
 <tr><th scope="row"><code>--gpu</code></th><td>desligado</td><td>Busca na placa de vídeo: primeiro CUDA, depois OpenCL.</td></tr>
 <tr><th scope="row"><code>--backend NAME</code></th><td>nenhum</td><td>Força <code>cuda</code> ou <code>opencl</code>. Implica <code>--gpu</code>.</td></tr>
-<tr><th scope="row"><code>--device N</code></th><td>nenhum</td><td>Escolhe um dispositivo pelo número. Implica <code>--gpu</code>.</td></tr>
+<tr><th scope="row"><code>--device N</code></th><td>nenhum</td><td>Escolhe um dispositivo pelo índice. Implica <code>--gpu</code>.</td></tr>
 <tr><th scope="row"><code>--list-devices</code></th><td>nenhum</td><td>Lista todos os dispositivos e sai.</td></tr>
 <tr><th scope="row"><code>--gpu-devices SPEC</code></th><td>nenhum</td><td>Usa vários dispositivos ao mesmo tempo: <code>all</code>, <code>cuda</code>, <code>opencl</code> ou uma lista separada por vírgulas. Implica <code>--gpu</code>.</td></tr>
 <tr><th scope="row"><code>--gpu-duty N</code></th><td>100</td><td>Mantém a placa de vídeo ocupada cerca de N% do tempo, de 1 a 100.</td></tr>
@@ -53,7 +53,7 @@
 </div>
 
 <h2 id="words">Quais palavras funcionam</h2>
-<p>Os endereços usam 58 caracteres. <code>0</code>, <code>O</code>, <code>I</code> e <code>l</code> não existem, então sua palavra é ajustada: <code>l</code> vira <code>L</code>, <code>0</code> e <code>O</code> viram <code>o</code>, e <code>I</code> vira <code>i</code>. Se uma palavra ainda tiver um caractere impossível, ela é informada e ignorada.</p>
+<p>Os endereços usam 58 caracteres. <code>0</code>, <code>O</code>, <code>I</code> e <code>l</code> não existem, então sua palavra é ajustada: <code>l</code> vira <code>L</code>, <code>0</code> e <code>O</code> viram <code>o</code>, e <code>I</code> vira <code>i</code>. Se uma palavra ainda tiver um caractere impossível, o programa avisa e a ignora.</p>
 <p>Cada caractere a mais multiplica a espera: por até 58 com <code>--case-sensitive</code> e por menos sem ele, porque mais grafias contam como resultado.</p>
 <p>O primeiro caractere depois do <code>r</code> costuma ser um de <code>pshnaf39wBUDNEGHJKLM4PQ</code>. Uma palavra que começa com outro é cerca de 23 vezes mais rara do que o tamanho sugere. <code>--near-start</code> a deixa começar um caractere depois, o que a encontra cerca de 24 vezes mais rápido.</p>
 

@@ -24,7 +24,7 @@
 <span class="prompt">$</span> xrpl-vanity --ends xyz --contains dao
 <span class="prompt">$</span> xrpl-vanity --starts-ends abc:xyz
 <span class="prompt">$</span> xrpl-vanity --list words.txt 5</pre></div>
-<p><code>--starts-ends</code> exige las dos mitades en la misma dirección, así que cuesta lo mismo que una palabra de su longitud sumada. La última línea carga sus palabras de un archivo y se queda con las de 5 caracteres o más.</p>
+<p><code>--starts-ends</code> exige las dos mitades en la misma dirección, así que tarda lo mismo que una sola palabra con la longitud de ambas partes juntas. La última línea carga sus palabras de un archivo y se queda con las de 5 caracteres o más.</p>
 
 <h2 id="flags">Opciones</h2>
 <div class="reference" role="region" aria-label="Opciones de la línea de comandos" data-table="options" tabindex="0">
@@ -62,7 +62,7 @@
 <span class="prompt">$</span> xrpl-vanity --gpu --contains dao --count 1
 <span class="prompt">$</span> xrpl-vanity --gpu-devices cuda --starts abc
 <span class="prompt">$</span> xrpl-vanity --gpu --gpu-duty 80 --contains dao --count 1 --out dao.tsv</pre></div>
-<p>Cada coincidencia de la tarjeta gráfica se vuelve a derivar en el procesador y solo se muestra si las dos coinciden: un dispositivo defectuoso cuesta velocidad, pero nunca te da una clave errónea. Sin un dispositivo usable, <code>--gpu</code> termina con el código 2 en lugar de pasar al procesador.</p>
+<p>Cada coincidencia de la tarjeta gráfica se vuelve a calcular en el procesador y solo se muestra si ambos cálculos coinciden: un dispositivo defectuoso reduce la velocidad, pero nunca te da una clave errónea. Sin un dispositivo usable, <code>--gpu</code> termina con el código 2 en lugar de pasar al procesador.</p>
 <p>La primera ejecución con OpenCL puede tardar decenas de segundos mientras el controlador compila el programa. Las siguientes son rápidas. <code>--gpu-duty</code> deja sitio a otras aplicaciones, y la velocidad baja más o menos en proporción. <code>--gpu-devices all</code> abre cada tarjeta una vez por backend, así que usa <code>--gpu-devices cuda</code> para usar cada tarjeta NVIDIA una sola vez.</p>
 
 <h2 id="output">Resultados y códigos de salida</h2>
@@ -75,7 +75,7 @@
 <thead><tr><th scope="col">Código</th><th scope="col">Significado</th></tr></thead>
 <tbody>
 <tr><th scope="row"><code>0</code></th><td>Se alcanzó el objetivo de <code>--count</code>.</td></tr>
-<tr><th scope="row"><code>2</code></th><td>Uso incorrecto, ningún patrón alcanzable, ninguna tarjeta gráfica usable o una búsqueda fallida.</td></tr>
+<tr><th scope="row"><code>2</code></th><td>Uso incorrecto, ningún patrón que pueda aparecer en una dirección, ninguna tarjeta gráfica utilizable o una búsqueda fallida.</td></tr>
 <tr><th scope="row"><code>130</code></th><td>Terminada con Ctrl+C antes de alcanzar el objetivo de <code>--count</code>.</td></tr>
 </tbody>
 </table>

@@ -53,16 +53,16 @@
 </div>
 
 <h2 id="words">哪些单词可用</h2>
-<p>地址使用 58 个字符。<code>0</code>、<code>O</code>、<code>I</code> 和 <code>l</code> 不存在，所以你的单词会被调整：<code>l</code> 变为 <code>L</code>，<code>0</code> 和 <code>O</code> 变为 <code>o</code>，<code>I</code> 变为 <code>i</code>。调整后仍含有不可能字符的单词会被报告并跳过。</p>
+<p>地址由 58 种字符组成。<code>0</code>、<code>O</code>、<code>I</code> 和 <code>l</code> 不存在，所以你的单词会被调整：<code>l</code> 变为 <code>L</code>，<code>0</code> 和 <code>O</code> 变为 <code>o</code>，<code>I</code> 变为 <code>i</code>。调整后仍含有不可能字符的单词会被报告并跳过。</p>
 <p>每多一个字符，等待时间都会成倍增加：使用 <code>--case-sensitive</code> 时最多 58 倍，不使用时增幅更小，因为更多写法都算作匹配。</p>
-<p><code>r</code> 之后的第一个字符通常是 <code>pshnaf39wBUDNEGHJKLM4PQ</code> 之一。以其他字符开头的单词比按长度推算的稀有约 23 倍。<code>--near-start</code> 允许它晚一个字符开始，这样找到它的速度约快 24 倍。</p>
+<p><code>r</code> 之后的第一个字符通常是 <code>pshnaf39wBUDNEGHJKLM4PQ</code> 之一。以其他字符开头的单词，出现的概率只有按长度推算值的约 1/23。<code>--near-start</code> 允许它晚一个字符开始，这样找到它所需的时间约为原来的 1/24。</p>
 
 <h2 id="gpu">在显卡上搜索</h2>
 <div class="well" tabindex="0"><pre><span class="prompt">$</span> xrpl-vanity --list-devices
 <span class="prompt">$</span> xrpl-vanity --gpu --contains dao --count 1
 <span class="prompt">$</span> xrpl-vanity --gpu-devices cuda --starts abc
 <span class="prompt">$</span> xrpl-vanity --gpu --gpu-duty 80 --contains dao --count 1 --out dao.tsv</pre></div>
-<p>显卡找到的每个匹配都会在处理器上重新推导，只有两者一致时才会输出：出故障的设备只会拖慢速度，绝不会给你错误的密钥。没有可用设备时，<code>--gpu</code> 会以代码 2 退出，而不是退回处理器。</p>
+<p>显卡找到的每个匹配都会在处理器上重新计算验证，只有两者一致时才会输出：出故障的设备只会拖慢速度，绝不会给你错误的密钥。没有可用设备时，<code>--gpu</code> 会以代码 2 退出，而不是退回处理器。</p>
 <p>首次运行 OpenCL 时，驱动编译程序可能需要几十秒。之后的运行会很快。<code>--gpu-duty</code> 为其他应用留出余量，速度大致按比例下降。<code>--gpu-devices all</code> 会在每个后端各打开一次每张显卡，所以要让每张 NVIDIA 显卡只用一次，请使用 <code>--gpu-devices cuda</code>。</p>
 
 <h2 id="output">结果和退出代码</h2>

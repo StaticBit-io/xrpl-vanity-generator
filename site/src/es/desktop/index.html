@@ -26,7 +26,7 @@
 <h3>Añade tus palabras</h3>
 <p>Escribe una palabra, elige la posición y añádela como regla: <em>empieza por</em>, <em>termina en</em>, <em>en cualquier parte</em> o <em>empieza y termina en</em>, que pide las dos mitades en una misma dirección. Las reglas no distinguen mayúsculas salvo que lo desactives, y una búsqueda puede tener muchas reglas.</p>
 <p>Los caracteres <code>0</code>, <code>O</code>, <code>I</code> y <code>l</code> no existen en una dirección. Se sustituyen por <code>o</code>, <code>i</code> y <code>L</code>, y la regla muestra el resultado junto a lo que escribiste.</p>
-<p>El carácter justo después de la <code>r</code> inicial está limitado, por eso algunas palabras son unas 23 veces más raras de lo que indica su longitud. La casilla <em>desde el 2.º o 3.er carácter</em> deja que la palabra empiece un carácter después. Cuando así se encontraría al menos el doble de rápido, la aplicación lo propone en la regla. Viene desactivada porque cambia cómo se lee la dirección.</p>
+<p>El carácter justo después de la <code>r</code> inicial está limitado, por eso algunas palabras son unas 23 veces más raras de lo que indica su longitud. La casilla <em>en el 2.º o 3.er carácter</em> deja que la palabra empiece un carácter después. Cuando así se encontraría al menos el doble de rápido, la aplicación lo propone en la regla. Viene desactivada porque cambia cómo se lee la dirección.</p>
 <p><strong>Guardar lista</strong> y <strong>Cargar lista</strong> guardan un conjunto de reglas en un archivo de texto. Al cargar, las reglas se suman a las que hay en pantalla y se omiten los duplicados.</p>
 
 <h3>Elige dónde buscar</h3>
@@ -37,7 +37,7 @@
 <p>Antes de empezar, la página muestra cuántas direcciones hacen falta de media para una coincidencia y cuánto tardará en los dispositivos marcados. Usa la última velocidad medida en cada dispositivo. La primera vez aún no hay ninguna, así que pulsa <strong>medir velocidad</strong> o haz una búsqueda.</p>
 
 <h3>Lanza la búsqueda</h3>
-<p>La página muestra la velocidad actual, las direcciones probadas y las coincidencias. Cada coincidencia entra en la lista de resultados con su dirección, regla, dispositivo y hora. <em>Detener tras N coincidencias</em>, en Ajustes, termina la búsqueda por sí sola.</p>
+<p>La página muestra la velocidad actual, las direcciones probadas y las coincidencias. Cada coincidencia entra en la lista de resultados con su dirección, regla, dispositivo y hora. El ajuste <em>Detener tras N coincidencias</em> detiene la búsqueda automáticamente.</p>
 <p>Una búsqueda larga puede seguir desde la bandeja del sistema, donde también está el control de carga. Una notificación te avisa de cada coincidencia y de cuándo termina una búsqueda.</p>
 
 <h2 id="results">Resultados e historial</h2>
@@ -52,7 +52,7 @@
 <p><strong>Al desinstalar la aplicación se elimina <code>results.dat</code>, con todas sus semillas.</strong> Guarda antes las semillas que quieras conservar.</p>
 
 <h2 id="qr">Pasa un monedero a tu teléfono</h2>
-<p>El botón QR de un resultado muestra ese monedero, y <strong>Mostrar QR</strong> muestra todas las filas seleccionadas. Escanea el código con el monedero móvil <a href="https://staticbit.io">StaticBit</a>, que los restaura desde la copia de seguridad que lleva el código. Un código admite hasta 22 monederos, o 21 con contraseña.</p>
+<p>El botón QR de un resultado muestra ese monedero, y <strong>Mostrar QR</strong> muestra todas las filas seleccionadas. Escanea el código con el monedero móvil <a href="https://staticbit.io">StaticBit</a>, que restaura los monederos a partir de la copia de seguridad incluida en el código. Un código admite hasta 22 monederos, o 21 con contraseña.</p>
 <p><strong>Pon una contraseña si alguien puede ver tu pantalla.</strong> Es opcional y cifra el código. Sin ella el código no está cifrado, y el diálogo lo avisa. El código nunca se escribe en el disco y se oculta solo a los 60 segundos.</p>
 <p>Una semilla suelta también se puede mostrar como código de un solo monedero. Ese código nunca está cifrado: no admite contraseña, y el diálogo lo avisa. El monedero <a href="https://staticbit.io">StaticBit</a> también puede escanearlo.</p>
 
@@ -65,7 +65,7 @@
 <tr><th scope="row">Botón de cerrar</th><td>Preguntar, minimizar a la bandeja o salir.</td><td>Preguntar cada vez</td></tr>
 <tr><th scope="row">Notificaciones</th><td>Un aviso en cada coincidencia y al terminar una búsqueda.</td><td>Activadas</td></tr>
 <tr><th scope="row">Carga de la GPU</th><td>Parte del tiempo que trabaja la tarjeta gráfica, del 25 al 100 %.</td><td>100</td></tr>
-<tr><th scope="row">Detener tras N coincidencias</th><td>Termina la búsqueda por sí sola. Vacío o 0: la búsqueda sigue hasta que pulses «Detener».</td><td>Vacío</td></tr>
+<tr><th scope="row">Detener tras N coincidencias</th><td>Detiene la búsqueda automáticamente. Vacío o 0: la búsqueda sigue hasta que pulses «Detener».</td><td>Vacío</td></tr>
 <tr><th scope="row">Borrar el portapapeles tras copiar una semilla</th><td>Segundos hasta que se borra una semilla copiada.</td><td>30</td></tr>
 <tr><th scope="row">Ocultar una semilla mostrada tras</th><td>Segundos hasta que una semilla mostrada se oculta de nuevo.</td><td>15</td></tr>
 <tr><th scope="row">Velocidades guardadas</th><td>La última velocidad medida en cada dispositivo, usada para la estimación. <strong>Olvidar velocidades</strong> las borra.</td><td>Ninguna</td></tr>

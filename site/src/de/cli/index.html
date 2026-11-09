@@ -38,7 +38,7 @@
 <tr><th scope="row"><code>--starts-ends PREFIX:SUFFIX</code></th><td>keiner</td><td>Anfang und Ende in derselben Adresse. Wiederholbar.</td></tr>
 <tr><th scope="row"><code>--near-starts-ends PREFIX:SUFFIX</code></th><td>keiner</td><td>Dasselbe, der Anfang darf am 2. oder 3. Zeichen stehen. Wiederholbar.</td></tr>
 <tr><th scope="row"><code>--list FILE [minLen]</code></th><td>minLen 4</td><td>Wörter für den Adressanfang aus einer Datei laden.</td></tr>
-<tr><th scope="row"><code>--case-sensitive</code></th><td>aus</td><td>Exakt wie eingegeben suchen. Standardmäßig passt jede Schreibweise, bei Wörtern bis 12 Zeichen.</td></tr>
+<tr><th scope="row"><code>--case-sensitive</code></th><td>aus</td><td>Exakt wie eingegeben suchen. Standardmäßig passt bei Wörtern bis 12 Zeichen jede Kombination aus Groß- und Kleinbuchstaben.</td></tr>
 <tr><th scope="row"><code>--threads N</code></th><td>alle Kerne</td><td>Threads für die Suche auf dem Prozessor. Mit <code>--gpu</code> ohne Wirkung.</td></tr>
 <tr><th scope="row"><code>--out FILE</code></th><td>keiner</td><td>Treffer zusätzlich an eine Datei anhängen.</td></tr>
 <tr><th scope="row"><code>--count N</code></th><td>keiner</td><td>Nach N Treffern stoppen. Sonst läuft die Suche, bis Sie Ctrl+C drücken.</td></tr>
@@ -54,7 +54,7 @@
 
 <h2 id="words">Welche Wörter gehen</h2>
 <p>Adressen nutzen 58 Zeichen. <code>0</code>, <code>O</code>, <code>I</code> und <code>l</code> gibt es nicht, daher wird Ihr Wort angepasst: <code>l</code> wird zu <code>L</code>, <code>0</code> und <code>O</code> werden zu <code>o</code>, und <code>I</code> wird zu <code>i</code>. Enthält ein Wort danach noch ein unmögliches Zeichen, wird es gemeldet und übersprungen.</p>
-<p>Jedes weitere Zeichen verlängert die Wartezeit: um bis zum 58-Fachen mit <code>--case-sensitive</code> und um weniger ohne, weil dann mehr Schreibweisen als Treffer zählen.</p>
+<p>Jedes weitere Zeichen vervielfacht die Wartezeit: mit <code>--case-sensitive</code> um bis zu 58, ohne um weniger, weil dann mehr Schreibweisen als Treffer zählen.</p>
 <p>Das erste Zeichen nach dem <code>r</code> ist meist eines von <code>pshnaf39wBUDNEGHJKLM4PQ</code>. Ein Wort, das mit etwas anderem beginnt, ist etwa 23-mal seltener, als seine Länge vermuten lässt. <code>--near-start</code> lässt es ein Zeichen später beginnen und findet es so etwa 24-mal schneller.</p>
 
 <h2 id="gpu">Suche auf der Grafikkarte</h2>
@@ -69,7 +69,7 @@
 <p>Jeder Treffer ist eine Zeile im Terminal:</p>
 <div class="well" tabindex="0"><pre>Address: r...	Seed: sEd...</pre></div>
 <p><code>--out FILE</code> hängt dasselbe Paar an, durch einen Tabulator getrennt und ohne Beschriftung. Warnungen und die Endgeschwindigkeit gehen nach stderr, über stdout kommen also nur Treffer.</p>
-<p><strong>Wer den Seed besitzt, verfügt über das Konto.</strong> Treffer stehen im Klartext im Terminal und in dieser Datei, sonst nirgends. Halten Sie sie privat.</p>
+<p><strong>Wer den Seed besitzt, verfügt über das Konto.</strong> Treffer stehen im Klartext im Terminal und in dieser Datei, sonst nirgends. Halten Sie sie geheim.</p>
 <div class="reference" role="region" aria-label="Exit-Codes" tabindex="0">
 <table>
 <thead><tr><th scope="col">Code</th><th scope="col">Bedeutung</th></tr></thead>
