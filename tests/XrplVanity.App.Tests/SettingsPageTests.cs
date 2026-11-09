@@ -77,6 +77,25 @@ public class SettingsPageTests : BunitContext
     }
 
     [Fact]
+    public void The_Not_Remembered_Note_Goes_Away_After_A_Later_Successful_Save()
+    {
+        MemorySettingsStore settings = new() { FailSaves = true };
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
+        Services.AddSingleton(vm);
+        Services.AddSingleton(new TutorialService(vm, new MemoryResultStore()));
+        Services.AddSingleton<INotificationService>(new FakeNotifications());
+        Services.AddSingleton<IWindowService>(new NullWindowService());
+        IRenderedComponent<SettingsPage> cut = Render<SettingsPage>();
+        cut.Find("select.language").Change("de");
+        Assert.Single(cut.FindAll(".language-not-remembered"));
+
+        settings.FailSaves = false;
+        cut.Find("select.close-behavior").Change(CloseBehavior.Exit.ToString());
+
+        Assert.Empty(cut.FindAll(".language-not-remembered"));
+    }
+
+    [Fact]
     public void Clipboard_And_Reveal_Seconds_Are_Clamped_To_A_Sane_Range()
     {
         MemorySettingsStore settings = new();

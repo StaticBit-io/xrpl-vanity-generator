@@ -1478,12 +1478,14 @@ public sealed class SearchViewModel : IDisposable
         }
     }
 
-    private static TextId OutcomeText(SessionOutcome outcome) => outcome switch
+    // An outcome added later must not fault the completion continuation, which still has the session
+    // to dispose and the UI to refresh; it is shown by its raw name instead.
+    private static object OutcomeText(SessionOutcome outcome) => outcome switch
     {
-        SessionOutcome.CountReached => NotificationText.OutcomeCountReached,
+        SessionOutcome.CountReached => (object)NotificationText.OutcomeCountReached,
         SessionOutcome.Cancelled => NotificationText.OutcomeCancelled,
         SessionOutcome.AllTargetsFailed => NotificationText.OutcomeAllTargetsFailed,
-        _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Unknown session outcome."),
+        _ => UiText.Of(PatternsText.Raw, ("value", outcome.ToString())),
     };
 
     private void OnFailed(UiText message)

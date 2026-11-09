@@ -20,7 +20,7 @@ function memoryStorage(initial = {}) {
   };
 }
 
-// Runs the production script with the active list replaced, as production has only English active.
+// Runs the production script with the active list replaced, so the cases do not depend on which languages ship.
 function run({ path = '/', search = '', hash = '', languages = ['ru'], storage = memoryStorage(), active = ['en', 'ru', 'de'], throwing = false } = {}) {
   const replaced = [];
   const sandbox = {
@@ -115,16 +115,22 @@ test('its page list is every English page that has translations', () => {
 
 test('lang.mjs stores the clicked language', async () => {
   const storage = memoryStorage();
-  let listener = null;
+  const listeners = new Map();
   globalThis.localStorage = storage;
-  globalThis.document = { addEventListener: (type, fn) => { if (type === 'click') listener = fn; } };
+  globalThis.document = { addEventListener: (type, fn) => { listeners.set(type, fn); } };
   await import('../src/js/lang.mjs');
-  assert.equal(typeof listener, 'function');
-  const link = { dataset: { lang: 'en' } };
-  listener({ target: { closest: (selector) => (selector === 'a[data-lang]' ? link : null) } });
-  assert.equal(storage.data.get(LANG_KEY), 'en');
-  listener({ target: { closest: () => null } });
-  assert.equal(storage.data.size, 1);
+  // Middle-click and "open in new tab" raise auxclick and contextmenu, not click; the new tab must
+  // still find the choice stored or the redirect would send it back.
+  for (const type of ['click', 'auxclick', 'contextmenu']) {
+    storage.data.clear();
+    const listener = listeners.get(type);
+    assert.equal(typeof listener, 'function', type);
+    const link = { dataset: { lang: 'en' } };
+    listener({ target: { closest: (selector) => (selector === 'a[data-lang]' ? link : null) } });
+    assert.equal(storage.data.get(LANG_KEY), 'en', type);
+    listener({ target: { closest: () => null } });
+    assert.equal(storage.data.size, 1, type);
+  }
   delete globalThis.document;
   delete globalThis.localStorage;
 });

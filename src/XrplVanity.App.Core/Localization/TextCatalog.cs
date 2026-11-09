@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Net;
 using System.Text;
 using System.Text.Json;
 
@@ -65,32 +64,7 @@ public sealed class TextCatalog
                 : throw new KeyNotFoundException($"No phrase '{text.Id.Key}' in the {Language.Code} catalog.");
         }
 
-        return Fill(phrase.Pick(Language, text), text, html: null);
-    }
-
-    /// <summary>
-    /// A phrase as HTML for a sentence that carries inline markup around some of its values ("Publishing
-    /// <c>&lt;strong&gt;{name}&lt;/strong&gt;</c> from …"): every literal and value is HTML-encoded, and
-    /// the value named in <paramref name="wrap"/> is put inside that element. The element is named by the
-    /// code, never by a catalog, so a translation cannot inject markup.
-    /// </summary>
-    /// <param name="wrap">Value name to element, such as <c>("name", "strong")</c>; one of <c>strong</c>, <c>em</c>, <c>code</c>, <c>kbd</c>.</param>
-    public string RenderHtml(UiText text, params (string Value, string Element)[] wrap)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        foreach ((string _, string element) in wrap)
-        {
-            if (element is not ("strong" or "em" or "code" or "kbd")) throw new ArgumentException($"'{element}' is not an inline element this method writes.", nameof(wrap));
-        }
-
-        if (!_phrases.TryGetValue(text.Id.Key, out Phrase? phrase))
-        {
-            return _fallback is not null
-                ? _fallback.RenderHtml(text, wrap)
-                : throw new KeyNotFoundException($"No phrase '{text.Id.Key}' in the {Language.Code} catalog.");
-        }
-
-        return Fill(phrase.Pick(Language, text), text, wrap.ToDictionary(item => item.Value, item => item.Element, StringComparer.Ordinal));
+        return Fill(phrase.Pick(Language, text), text);
     }
 
     /// <summary>An integer grouped in the language's locale: "12,345", "12 345", "12.345".</summary>
@@ -98,10 +72,10 @@ public sealed class TextCatalog
 
     /// <summary>
     /// A catalog of <paramref name="language"/> whose phrases are the English ones run through
-    /// <paramref name="phrase"/>. Tests use it to tell languages apart while the shipped catalogs still
-    /// hold English text; it is never cached and never reaches a screen.
+    /// <paramref name="phrase"/>. Tests use it to tell languages apart without depending on the wording of
+    /// the shipped translations; it is never cached and never reaches a screen.
     /// </summary>
-    /// <param name="source">The catalog whose phrases are transformed; English when null. Tests pass their own to cover placeholders and plurals before the shipped catalogs have any.</param>
+    /// <param name="source">The catalog whose phrases are transformed; English when null. Tests pass their own to cover placeholders and plurals independently of the shipped catalogs.</param>
     internal static TextCatalog Transformed(UiLanguage language, Func<string, string> phrase, TextCatalog? source = null)
     {
         TextCatalog english = source ?? For(UiLanguage.English);
@@ -150,10 +124,9 @@ public sealed class TextCatalog
         return new TextCatalog(language, Parse(stream), fallback);
     }
 
-    /// <param name="html">Null for plain text; else HTML output, with the values to wrap and their elements.</param>
-    private string Fill(string template, UiText text, Dictionary<string, string>? html)
+    private string Fill(string template, UiText text)
     {
-        if (html is null && template.IndexOf('{') < 0 && template.IndexOf('}') < 0) return template;
+        if (template.IndexOf('{') < 0 && template.IndexOf('}') < 0) return template;
 
         StringBuilder result = new(template.Length + 16);
         int i = 0;
@@ -171,7 +144,7 @@ public sealed class TextCatalog
             {
                 int next = template.IndexOfAny(['{', '}'], i);
                 string literal = template[i..(next < 0 ? template.Length : next)];
-                result.Append(html is null ? literal : WebUtility.HtmlEncode(literal));
+                result.Append(literal);
                 i += literal.Length;
                 continue;
             }
@@ -194,18 +167,7 @@ public sealed class TextCatalog
             object value = text.Arg(name)
                 ?? throw new FormatException($"Phrase '{text.Id.Key}' ({Language.Code}) needs a value for '{name}'.");
             string formatted = Format(value, format);
-            if (html is null)
-            {
-                result.Append(formatted);
-            }
-            else if (html.TryGetValue(name, out string? element))
-            {
-                result.Append('<').Append(element).Append('>').Append(WebUtility.HtmlEncode(formatted)).Append("</").Append(element).Append('>');
-            }
-            else
-            {
-                result.Append(WebUtility.HtmlEncode(formatted));
-            }
+            result.Append(formatted);
 
             i = close + 1;
         }

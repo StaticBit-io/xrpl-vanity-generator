@@ -4,7 +4,7 @@ namespace XrplVanity.App.Core.Localization;
 
 /// <summary>
 /// One of the languages the application speaks: the project site's set, in the site's menu order
-/// (<c>site/src/js/languages.mjs</c>), so the site, the element and the application offer the same choice.
+/// (<c>site/src/js/languages.mjs</c>), so the site and the application offer the same choice.
 /// </summary>
 public sealed class UiLanguage
 {

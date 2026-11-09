@@ -58,11 +58,20 @@
         string tag = Localizer.Language.HtmlTag;
         if (string.Equals(tag, _appliedTag, StringComparison.Ordinal)) return;
 
-        _appliedTag = tag;
         try
         {
-            _languageModule ??= await Js.InvokeAsync<IJSObjectReference>("import", "./_content/XrplVanity.App.Core/js/language.js");
-            await _languageModule.InvokeVoidAsync("setLang", tag);
+            IJSObjectReference module = _languageModule ??= await Js.InvokeAsync<IJSObjectReference>("import", "./_content/XrplVanity.App.Core/js/language.js");
+            if (_disposed)
+            {
+                // The import finished after teardown, when DisposeAsync no longer sees it.
+                await module.DisposeAsync();
+                _languageModule = null;
+                return;
+            }
+
+            await module.InvokeVoidAsync("setLang", tag);
+            // Set only after the call succeeded, so a failed one is retried on the next render.
+            _appliedTag = tag;
         }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException or TaskCanceledException)
         {

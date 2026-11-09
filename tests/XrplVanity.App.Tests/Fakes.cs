@@ -36,7 +36,7 @@ public sealed class MemorySettingsStore : ISettingsStore
     public string? LastError { get; private set; }
 
     /// <summary>When set, every <see cref="Save"/> fails the way a read-only data folder would.</summary>
-    public bool FailSaves { get; init; }
+    public bool FailSaves { get; set; }
 
     /// <summary>When set, <see cref="Save"/> throws — a store that breaks the non-throwing contract.</summary>
     public bool ThrowOnSave { get; init; }

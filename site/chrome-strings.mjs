@@ -4,6 +4,7 @@
 export const CHROME_STRINGS = {
   en: {
     skip: 'Skip to content',
+    navLabel: 'Pages',
     nav: { desktop: 'Desktop app', cli: 'CLI', privacy: 'Privacy', support: 'Support' },
     language: 'Language',
     published: 'Published by {publisher}.',
@@ -13,6 +14,7 @@ export const CHROME_STRINGS = {
   },
   ru: {
     skip: 'Перейти к содержимому',
+    navLabel: 'Разделы',
     nav: { desktop: 'Приложение', cli: 'Командная строка', privacy: 'Конфиденциальность', support: 'Поддержка' },
     language: 'Язык',
     published: 'Издатель: {publisher}.',
@@ -22,6 +24,7 @@ export const CHROME_STRINGS = {
   },
   de: {
     skip: 'Zum Inhalt springen',
+    navLabel: 'Seiten',
     nav: { desktop: 'Desktop-Anwendung', cli: 'Kommandozeile', privacy: 'Datenschutz', support: 'Hilfe' },
     language: 'Sprache',
     published: 'Herausgegeben von {publisher}.',
@@ -31,6 +34,7 @@ export const CHROME_STRINGS = {
   },
   es: {
     skip: 'Saltar al contenido',
+    navLabel: 'Páginas',
     nav: { desktop: 'Aplicación', cli: 'Línea de comandos', privacy: 'Privacidad', support: 'Ayuda' },
     language: 'Idioma',
     published: 'Publicado por {publisher}.',
@@ -40,6 +44,7 @@ export const CHROME_STRINGS = {
   },
   pt: {
     skip: 'Pular para o conteúdo',
+    navLabel: 'Páginas',
     nav: { desktop: 'Aplicativo', cli: 'Linha de comando', privacy: 'Privacidade', support: 'Suporte' },
     language: 'Idioma',
     published: 'Publicado por {publisher}.',
@@ -49,6 +54,7 @@ export const CHROME_STRINGS = {
   },
   zh: {
     skip: '跳到正文',
+    navLabel: '页面',
     nav: { desktop: '桌面应用', cli: '命令行', privacy: '隐私', support: '支持' },
     language: '语言',
     published: '发布者：{publisher}。',

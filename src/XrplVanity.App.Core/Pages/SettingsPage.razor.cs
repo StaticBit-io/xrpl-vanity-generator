@@ -31,7 +31,10 @@ public partial class SettingsPage
     /// </summary>
     private int? ShownCount => Vm.IsSandbox ? Vm.Settings.Count : Vm.Count;
 
-    private bool _notRemembered;
+    // The note shows only while the last save failed, so a later successful save clears it.
+    private bool _languageChosen;
+
+    private bool NotRemembered => _languageChosen && Vm.SettingsSaveError is not null;
 
     protected override void OnInitialized()
     {
@@ -57,7 +60,7 @@ public partial class SettingsPage
 
         Localizer.Choose(language);
         Vm.SaveSettings(s => s with { Language = language.Code });
-        _notRemembered = Vm.SettingsSaveError is not null;
+        _languageChosen = true;
     }
 
     private void StartTutorial() => Tutorial.Begin();

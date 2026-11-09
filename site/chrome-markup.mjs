@@ -133,7 +133,7 @@ function renderHeader(page) {
 <header class="site-header">
 <a class="wordmark" href="${homePath(lang)}">xrpl-vanity</a>
 <div class="site-header__tools">
-<nav aria-label="Pages">
+<nav aria-label="${escapeHtml(strings.navLabel)}">
 ${links.join('\n')}
 </nav>
 ${renderLanguageMenu(page, strings)}

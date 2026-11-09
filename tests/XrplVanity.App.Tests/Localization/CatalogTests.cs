@@ -110,7 +110,7 @@ public sealed partial class CatalogTests
         Assert.Equal(PluralForm.Other, PluralRules.FormOf(UiLanguage.Chinese, 1));
     }
 
-    /// <summary>The languages whose catalogs are written; the others still carry English text.</summary>
+    /// <summary>The languages whose catalogs are translated; English is the reference they are checked against.</summary>
     public static TheoryData<string> Translated() => new("ru", "de", "es", "pt", "zh");
 
     // Words that read the same in every language; a phrase made only of these, placeholders and
