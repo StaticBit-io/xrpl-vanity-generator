@@ -1,5 +1,4 @@
 {
-  "Settings.LanguageTitle": "Язык",
   "Settings.LanguageLabel": "Язык приложения",
   "Settings.LanguageNotRemembered": "Язык сменился, но сохранить выбор не удалось: при следующем запуске будет прежний.",
   "Common.Days": { "one": "{count:0.#} день", "few": "{count:0.#} дня", "many": "{count:0.#} дней", "other": "{count:0.#} дня" },

@@ -68,7 +68,7 @@ public sealed class LocalizerTests
     {
         TextCatalog catalog = TextCatalog.Transformed(UiLanguage.Russian, p => "[ru] " + p);
 
-        Assert.Equal("[ru] Language", catalog[SettingsText.LanguageTitle]);
+        Assert.Equal("[ru] Language of the application", catalog[SettingsText.LanguageLabel]);
     }
 
     [Fact]

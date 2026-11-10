@@ -1,5 +1,4 @@
 {
-  "Settings.LanguageTitle": "Idioma",
   "Settings.LanguageLabel": "Idioma do aplicativo",
   "Settings.LanguageNotRemembered": "O idioma mudou, mas não foi possível salvá-lo: na próxima abertura o aplicativo volta ao anterior.",
   "Common.Days": { "one": "{count:0.#} dia", "other": "{count:0.#} dias" },

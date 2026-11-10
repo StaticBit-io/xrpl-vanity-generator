@@ -1,5 +1,4 @@
 {
-  "Settings.LanguageTitle": "Sprache",
   "Settings.LanguageLabel": "Sprache der Anwendung",
   "Settings.LanguageNotRemembered": "Die Sprache ist umgestellt, konnte aber nicht gespeichert werden. Beim nächsten Start gilt wieder die vorherige.",
   "Common.Days": { "one": "{count:0.#} Tag", "other": "{count:0.#} Tage" },

@@ -1,5 +1,4 @@
 {
-  "Settings.LanguageTitle": "Language",
   "Settings.LanguageLabel": "Language of the application",
   "Settings.LanguageNotRemembered": "The language is changed for now, but it could not be saved, so the next start uses the previous one.",
   "Common.Days": { "one": "{count:0.#} day", "other": "{count:0.#} days" },

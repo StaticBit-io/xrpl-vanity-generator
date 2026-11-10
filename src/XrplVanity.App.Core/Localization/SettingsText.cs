@@ -5,7 +5,6 @@ namespace XrplVanity.App.Core.Localization;
 /// <summary>The Settings screen.</summary>
 public static class SettingsText
 {
-    public static readonly TextId LanguageTitle = Id();
     public static readonly TextId LanguageLabel = Id();
     public static readonly TextId LanguageNotRemembered = Id();
 

@@ -1,5 +1,4 @@
 {
-  "Settings.LanguageTitle": "语言",
   "Settings.LanguageLabel": "应用语言",
   "Settings.LanguageNotRemembered": "语言已切换，但未能保存，下次启动时会恢复为之前的语言。",
   "Common.Days": { "other": "{count:0.#} 天" },
