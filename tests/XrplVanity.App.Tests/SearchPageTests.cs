@@ -1,6 +1,9 @@
 using Bunit;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Pages;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Tutorial;
@@ -22,6 +25,64 @@ public class SearchPageTests : BunitContext
         Services.AddSingleton<IFileDialogService>(new FakeFileDialog());
         Services.AddSingleton<TimeProvider>(TimeProvider.System);
         return vm;
+    }
+
+    [Fact]
+    public void Switching_Language_Keeps_State_And_Translates_Messages()
+    {
+        SearchViewModel vm = Register();
+        TextCatalog english = TextCatalog.For(UiLanguage.English);
+        IRenderedComponent<CatalogHost> host = Render<CatalogHost>(p => p
+            .Add(h => h.Catalog, english)
+            .Add(h => h.ChildContent, (RenderFragment)(b =>
+            {
+                b.OpenComponent<SearchPage>(0);
+                b.CloseComponent();
+            })));
+        vm.AddPattern("ab", XrplVanity.Core.MatchPosition.Starts, false);
+        vm.OnMatch(new XrplVanity.Core.Match("rReal", "sReal", "ab", XrplVanity.Core.MatchPosition.Starts), sandboxSession: false);
+        vm.FlushPendingMatches();
+        // "0" is folded onto "o", so with a chip present the message that shows is the "searched as" hint.
+        vm.EntryText = "0";
+        host.WaitForAssertion(() =>
+        {
+            Assert.Equal("ab", host.Find(".chip .mono").TextContent);
+            Assert.Equal("rReal", host.Find(".result-row .address").TextContent);
+            Assert.Equal("\"0\" is searched as \"o\". Press Enter to add it, or just press Start.", host.Find(".pattern-hint").TextContent);
+        });
+
+        host.InvokeAsync(() => host.Instance.Swap(TextCatalog.Transformed(UiLanguage.Russian, phrase => "[ru] " + phrase)));
+
+        host.WaitForAssertion(() =>
+        {
+            Assert.StartsWith("[ru] ", host.Find(".pattern-hint").TextContent, StringComparison.Ordinal);
+            Assert.Equal("ab", host.Find(".chip .mono").TextContent);
+            Assert.Equal("rReal", host.Find(".result-row .address").TextContent);
+            Assert.Equal("0", host.Find("input.pattern").GetAttribute("value"));
+            Assert.StartsWith("[ru] ", host.Find("button.start").TextContent, StringComparison.Ordinal);
+        });
+    }
+
+    /// <summary>Cascades a catalog that the test can replace, the way the shell does when the language changes.</summary>
+    private sealed class CatalogHost : ComponentBase
+    {
+        [Parameter] public TextCatalog Catalog { get; set; } = TextCatalog.For(UiLanguage.English);
+
+        [Parameter] public RenderFragment? ChildContent { get; set; }
+
+        public void Swap(TextCatalog catalog)
+        {
+            Catalog = catalog;
+            StateHasChanged();
+        }
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenComponent<CascadingValue<TextCatalog>>(0);
+            builder.AddAttribute(1, "Value", Catalog);
+            builder.AddAttribute(2, "ChildContent", ChildContent);
+            builder.CloseComponent();
+        }
     }
 
     [Fact]
@@ -160,7 +221,7 @@ public class SearchPageTests : BunitContext
 
         cut.Find("button.show-qr").Click();
 
-        string body = TutorialScript.Steps.Single(s => s.Step == TutorialStep.QrDialog).Body;
+        string body = TextCatalog.For(UiLanguage.English).Render(TutorialScript.Steps.Single(s => s.Step == TutorialStep.QrDialog).Body);
         Assert.Equal(body, cut.Find(".qr-box .tutorial-note").TextContent);
     }
 

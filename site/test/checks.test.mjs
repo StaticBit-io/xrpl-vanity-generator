@@ -63,3 +63,22 @@ test('an address inside the fence passes, and one after the fence does not', () 
   assert.deepEqual(findUnfencedEmails('a.html', fenced), []);
   assert.equal(findUnfencedEmails('a.html', `${fenced} support@staticbit.io`).length, 1);
 });
+
+test('a language-prefixed link resolves when the page exists and is broken when it does not', () => {
+  const files = new Set(['index.html', 'ru/index.html', 'ru/desktop/index.html']);
+  const ok = new Map([['index.html', '<a href="/ru/">x</a><a href="/ru/desktop/">y</a>']]);
+  assert.deepEqual(findBrokenLinks(files, ok), []);
+  const bad = new Map([['index.html', '<a href="/ru/cli/">x</a>']]);
+  const broken = findBrokenLinks(files, bad);
+  assert.equal(broken.length, 1);
+  assert.match(broken[0], /\/ru\/cli\//);
+});
+
+test('an hreflang alternate to this site is not an external reference', () => {
+  assert.deepEqual(findExternalRefs('a.html', '<link rel="alternate" hreflang="ru" href="https://xrpl-vanity.staticbit.io/ru/">'), []);
+});
+
+test('an alternate or canonical that names another origin is still an external reference', () => {
+  assert.equal(findExternalRefs('a.html', '<link rel="alternate" hreflang="ru" href="https://evil.example/ru/">').length, 1);
+  assert.equal(findExternalRefs('a.html', '<link rel="canonical" href="https://evil.example/">').length, 1);
+});

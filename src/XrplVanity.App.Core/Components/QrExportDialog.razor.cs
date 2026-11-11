@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
 
@@ -9,7 +10,7 @@ namespace XrplVanity.App.Core.Components;
 /// Shows a selection of results as a QR code. The dialog builds nothing until it is asked to: the
 /// format and the password are settled first, and only then does a secret appear on screen.
 /// </summary>
-public partial class QrExportDialog : ComponentBase, IDisposable
+public partial class QrExportDialog : IDisposable
 {
     /// <summary>Long enough to line a phone camera up — the 15 s seed reveal is not.</summary>
     private const int HideSeconds = 60;
@@ -20,11 +21,16 @@ public partial class QrExportDialog : ComponentBase, IDisposable
     /// <summary>The StaticBit mark, drawn over the middle of the code when it is short enough.</summary>
     private const string LogoUri = "_content/XrplVanity.App.Core/images/staticbit-qr-logo.png";
 
+    /// <summary>The wallet the code is for; the dialog links its name, wherever the sentence puts it.</summary>
+    private const string AppName = "StaticBit";
+
+    private const string AppUrl = "https://staticbit.io";
+
     private ElementReference _box;
     private ElementReference _close;
     private ITimer? _hideTimer;
     private string? _code;
-    private string? _error;
+    private UiText? _error;
     private string _password = string.Empty;
     private string _passwordConfirm = string.Empty;
     private string _folder = string.Empty;
@@ -76,7 +82,7 @@ public partial class QrExportDialog : ComponentBase, IDisposable
 
         if (!_seedOnly && _password != _passwordConfirm)
         {
-            _error = "The passwords do not match.";
+            _error = UiText.Of(QrText.PasswordsDoNotMatch);
             return;
         }
 
@@ -101,7 +107,7 @@ public partial class QrExportDialog : ComponentBase, IDisposable
         }
         catch (ArgumentException)
         {
-            _error = "Nothing to encode.";
+            _error = UiText.Of(QrText.NothingToEncode);
         }
         finally
         {
@@ -121,7 +127,7 @@ public partial class QrExportDialog : ComponentBase, IDisposable
     {
         if (!_seedOnly && code.Length > MaxCodeCharacters)
         {
-            _error = $"Too many wallets for one code. Select at most {Fitting()} of them.";
+            _error = UiText.Of(QrText.TooManyWallets, ("count", Fitting()));
             return;
         }
 

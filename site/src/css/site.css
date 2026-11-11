@@ -2,6 +2,9 @@
  * hero: Settled, head and actions left, the glyph field right · nav: edge-aligned (no search on this site, swapped from search-led) · footer: letter close · imagery: none, the keyspace printed in base58 · signature: the letter r printed in the address alphabet, resolving from noise
  * axes: dark/mono/chromatic-green · posture: committed · contrast: pass · fold: pass · copy: writing-site-copy · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V3 · weakest: V, the section order is fixed by the spec; each section takes a different device (a diff, a reference table, rows, a figure table) */
+/* Martian Mono has no Chinese glyphs and none is shipped; name the system Simplified Chinese faces
+   so the browser does not fall back to a generic monospace face with Japanese glyph shapes. */
+:root:lang(zh) { --font-display: "Martian Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif; }
 
 body { font-stretch: var(--stretch-body); font-variant-numeric: tabular-nums; line-height: 1.65; }
 h1, h2, h3 { font-stretch: var(--stretch-display); line-height: 1.12; text-wrap: balance; }
@@ -104,3 +107,16 @@ a:hover { color: var(--color-accent); }
 @media (prefers-reduced-motion: reduce) {
   .btn, a { transition: none; }
 }
+
+.site-header__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; margin-inline-start: auto; gap: var(--space-xs) var(--space-lg); }
+/* The language menu: a native disclosure whose panel is plain links, so it opens with no script. The list hangs from the right edge to stay on a phone screen. */
+.lang { position: relative; font-size: var(--text-sm); }
+.lang summary { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 44px; padding-inline: var(--space-sm); border: var(--rule-hair) solid var(--color-rule-2); color: var(--color-ink-2); cursor: pointer; list-style: none; }
+.lang summary::-webkit-details-marker { display: none; }
+.lang summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.lang[open] summary::after { transform: translateY(1px) rotate(225deg); }
+.lang summary:hover, .lang[open] summary { background: var(--color-paper-3); color: var(--color-ink); }
+.lang__list { position: absolute; top: calc(100% + var(--space-2xs)); right: 0; z-index: var(--z-dropdown); display: grid; min-width: 11rem; max-width: calc(100vw - 2 * var(--gutter)); padding: var(--space-2xs); border: var(--rule-hair) solid var(--color-rule-2); background: var(--color-paper-2); }
+.lang__list a { display: flex; align-items: center; min-height: 44px; padding-inline: var(--space-sm); color: var(--color-ink-2); text-decoration: none; }
+.lang__list a:hover { background: var(--color-paper-3); color: var(--color-ink); }
+.lang__list a[aria-current="true"] { box-shadow: inset 2px 0 0 var(--color-accent); color: var(--color-ink); }

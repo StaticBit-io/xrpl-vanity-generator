@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Globalization;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using XrplVanity.App.Core.Components;
+using Microsoft.AspNetCore.Components;
 using XrplVanity.App.Core.Layout;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Tutorial;
 using XrplVanity.App.Core.ViewModels;
@@ -12,8 +15,11 @@ namespace XrplVanity.App.Tests;
 
 public class MainLayoutTests : BunitContext
 {
+    private readonly Localizer _localizer = new(null, CultureInfo.InvariantCulture);
+
     public MainLayoutTests()
     {
+        Services.AddSingleton(_localizer);
         // The tutorial bubble loads its script module once the offer appears.
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
@@ -42,6 +48,35 @@ public class MainLayoutTests : BunitContext
         window.RaiseCloseRequested();   // must be a no-op now: no exception, no prompt shown, no tray/exit call
         Assert.False(window.HideToTrayCalled);
         Assert.False(window.ExitCalled);
+    }
+
+    [Fact]
+    public void Changing_The_Language_Re_Renders_The_Layout_In_It()
+    {
+        Register();
+        IRenderedComponent<MainLayout> cut = Render<MainLayout>(p => p.Add(
+            l => l.Body,
+            (RenderFragment)(b =>
+            {
+                b.OpenComponent<LanguageProbe>(0);
+                b.CloseComponent();
+            })));
+        Assert.Equal("en", cut.Find(".probe").TextContent);
+
+        _localizer.Choose(UiLanguage.German);
+
+        cut.WaitForAssertion(() => Assert.Equal("de", cut.Find(".probe").TextContent));
+    }
+
+    private sealed class LanguageProbe : LocalizedComponent
+    {
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "probe");
+            builder.AddContent(2, T.Language.Code);
+            builder.CloseElement();
+        }
     }
 
     [Fact]

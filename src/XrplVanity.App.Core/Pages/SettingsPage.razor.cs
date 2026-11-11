@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 
 namespace XrplVanity.App.Core.Pages;
@@ -30,6 +31,11 @@ public partial class SettingsPage
     /// </summary>
     private int? ShownCount => Vm.IsSandbox ? Vm.Settings.Count : Vm.Count;
 
+    // The note shows only while the last save failed, so a later successful save clears it.
+    private bool _languageChosen;
+
+    private bool NotRemembered => _languageChosen && Vm.SettingsSaveError is not null;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
@@ -42,6 +48,19 @@ public partial class SettingsPage
     {
         Tutorial.Changed -= OnViewModelChanged;
         base.Dispose();
+    }
+
+    /// <summary>
+    /// The language applies even when it cannot be saved: the screens switch first, and a failed
+    /// write only costs the choice at the next start, which the page says out loud.
+    /// </summary>
+    private void OnLanguageChanged(ChangeEventArgs e)
+    {
+        if (UiLanguage.FromCode((string?)e.Value) is not { } language) return;
+
+        Localizer.Choose(language);
+        Vm.SaveSettings(s => s with { Language = language.Code });
+        _languageChosen = true;
     }
 
     private void StartTutorial() => Tutorial.Begin();

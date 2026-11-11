@@ -1,3 +1,4 @@
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Storage;
 
 namespace XrplVanity.App.Core.Services;
@@ -5,7 +6,7 @@ namespace XrplVanity.App.Core.Services;
 public interface IResultStore
 {
     bool IsReadOnly { get; }
-    string? ReadOnlyReason { get; }
+    UiText? ReadOnlyReason { get; }
     IReadOnlyList<StoredResult> LoadAll();
     void Append(StoredResult result);
 

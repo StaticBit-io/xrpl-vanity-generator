@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<title>Windows 靓号地址生成器 | XRPL Vanity</title>
+<meta name="description" content="如何用 Windows 版 XRPL Vanity 找到 XRP Ledger 靓号地址：搜索、结果、种子和二维码导出。">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>桌面应用</h1>
+<p class="lead">搜索靓号地址，加密保存结果，并把钱包转到手机上。</p>
+
+<h2 id="get-it">获取方式</h2>
+<p>应用即将上架 Microsoft Store。在此之前，可以<a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">从源代码编译</a>。</p>
+<ul>
+<li>Windows 10 1809（内部版本 17763）或更高版本，x64。</li>
+<li>Microsoft Edge WebView2 运行时。Windows 11 和较新的 Windows 10 更新已自带。</li>
+<li>如需在显卡上搜索，需要 NVIDIA 驱动（CUDA，2018 年推出的 Turing 架构及更新架构的显卡）或任意已安装的 OpenCL 平台。两者都没有时，应用会在处理器上搜索并给出提示。</li>
+</ul>
+
+<h2 id="tutorial">教程</h2>
+<p>首次打开应用时，它会邀请你体验一个简短教程，带你完成一次真实的搜索，从添加单词到查看结果及其二维码。找到的匹配不会保存，结束后你自己的单词和设置都会恢复。这个提示只出现一次：如需再次学习，请在“设置”页面点击<strong>开始教程</strong>。</p>
+
+<h2 id="search">搜索</h2>
+<h3>添加你的单词</h3>
+<p>输入一个单词，选择位置，然后作为规则添加：<em>开头为</em>、<em>结尾为</em>、<em>任意位置</em>，或<em>开头和结尾为</em>，后者要求两部分出现在同一个地址中。规则默认不区分大小写，除非你关闭这一选项；一次搜索可以包含许多规则。</p>
+<p>地址中不存在字符 <code>0</code>、<code>O</code>、<code>I</code> 和 <code>l</code>。它们会被替换为 <code>o</code>、<code>i</code> 和 <code>L</code>，规则会在你输入的内容旁显示替换结果。</p>
+<p>紧跟在开头 <code>r</code> 之后的字符是受限的，所以有些单词出现的概率只有按长度推算值的约 1/23。勾选<em>从第 2 或第 3 个字符开始</em>可以让单词晚一个字符开始。如果这样至少能快一倍找到，应用会在规则上建议你开启。它默认关闭，因为会改变地址的读法。</p>
+<p><strong>保存列表</strong>和<strong>载入列表</strong>把一组规则保存在文本文件中。载入时会追加到屏幕上的规则，并跳过重复项。</p>
+
+<h3>选择搜索设备</h3>
+<p>勾选处理器并设置线程数，再勾选应用找到的 CUDA 和 OpenCL 设备。它们可以同时运行。</p>
+<p><em>显卡负载</em>控件设定显卡工作的时间比例，范围 25% 到 100%。数值越低，显卡留给其他应用的时间越多，更改会立即作用于正在进行的搜索。</p>
+
+<h3>查看估算</h3>
+<p>开始之前，页面会显示平均需要检查多少个地址才能得到一个匹配，以及在所选设备上的预计用时。估算使用每个设备上次测得的速度。第一次使用时还没有测量值，所以请点击<strong>测量速度</strong>或先搜索一次。</p>
+
+<h3>开始搜索</h3>
+<p>页面会显示当前速度、已检查的地址数和匹配。每个匹配都会进入结果列表，附带地址、规则、设备和时间。“设置”中的 <em>N 个匹配后停止</em>会自动结束搜索。</p>
+<p>长时间的搜索可以在托盘中继续运行，负载控件也在托盘菜单里。每次出现匹配或搜索结束时，都会有通知提醒你。</p>
+
+<h2 id="results">结果和历史</h2>
+<p>历史中保存着应用存下的每一个结果。可以用文本框按地址和模式筛选，也可以用模式列表筛选。勾选若干行，或使用<em>全选显示的结果</em>，即可一起导出或删除。</p>
+<p><strong>删除结果无法撤销：</strong>种子会随之消失，除非你在别处另存过，否则账户也随之丢失。</p>
+<p><strong>TSV 导出文件以明文保存种子。</strong>它会保存到你选择的位置，且没有任何保护，请把这个文件当作机密对待。</p>
+
+<h2 id="seeds">种子</h2>
+<p>种子控制着它对应的账户。种子在各处都是隐藏的，直到你点击显示；15 秒后或离开页面时会再次隐藏。复制的种子会在 30 秒后从剪贴板清除，除非你在此之前复制了别的内容。这两个时间都可以在“设置”中修改。</p>
+<p>复制的种子不会进入 Windows 剪贴板历史，也不会参与剪贴板同步。</p>
+<p>结果保存在一个文件 <code>results.dat</code> 中，并用 Windows 数据保护 API（DPAPI）加密。只有写入该文件的 Windows 账户才能读取它，因此结果不能转移到其他账户或其他电脑。种子不会出现在日志、通知或托盘菜单中。</p>
+<p><strong>卸载应用会删除 <code>results.dat</code> 及其中的所有种子。</strong>请先保存你想保留的种子。</p>
+
+<h2 id="qr">把钱包转到手机上</h2>
+<p>结果上的二维码按钮会显示该钱包，<strong>显示二维码</strong>会显示所有选中的行。用 <a href="https://staticbit.io">StaticBit</a> 手机钱包扫描该码，它会根据码中的备份格式恢复钱包。一个码最多容纳 22 个钱包，设置密码时为 21 个。</p>
+<p><strong>如果有人可能看到你的屏幕，请设置密码。</strong>密码是可选的，用于加密二维码。没有密码时二维码不加密，对话框会提示这一点。二维码从不写入磁盘，60 秒后会自动隐藏。</p>
+<p>单独的种子也可以显示为只含一个钱包的二维码。这种码从不加密：它不接受密码，对话框会提示这一点。<a href="https://staticbit.io">StaticBit</a> 钱包同样可以扫描它。</p>
+
+<h2 id="settings">设置</h2>
+<p>每项更改都会立即生效：没有保存按钮。应用的语言也在这里选择。</p>
+<div class="reference" role="region" aria-label="设置" tabindex="0">
+<table>
+<thead><tr><th scope="col">设置</th><th scope="col">作用</th><th scope="col">默认值</th></tr></thead>
+<tbody>
+<tr><th scope="row">关闭按钮</th><td>询问、最小化到托盘或退出。</td><td>每次都询问</td></tr>
+<tr><th scope="row">通知</th><td>每次匹配和搜索结束时发出通知。</td><td>开启</td></tr>
+<tr><th scope="row">显卡负载</th><td>显卡工作的时间比例，25% 到 100%。</td><td>100</td></tr>
+<tr><th scope="row">N 个匹配后停止</th><td>自动结束搜索。留空或填 0：一直搜索，直到你点击“停止”。</td><td>留空</td></tr>
+<tr><th scope="row">复制种子后清空剪贴板</th><td>复制的种子在多少秒后被清除。</td><td>30</td></tr>
+<tr><th scope="row">显示的种子在多久后隐藏</th><td>显示的种子在多少秒后重新隐藏。</td><td>15</td></tr>
+<tr><th scope="row">已保存的速度</th><td>每个设备上次测得的速度，用于估算。<strong>清除已保存的速度</strong>会删除它们。</td><td>无</td></tr>
+<tr><th scope="row">数据文件夹</th><td>设置和结果所在的位置。<strong>打开文件夹</strong>会打开它。</td><td>无</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="more">遇到问题？</h2>
+<p>常见问题请见<a href="/zh/support/">支持</a>页面。编译和打包说明见 <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">GitHub 上的开发者说明</a>（英文）。</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

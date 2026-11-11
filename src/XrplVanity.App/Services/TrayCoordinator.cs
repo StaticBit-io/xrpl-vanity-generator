@@ -1,4 +1,5 @@
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.ViewModels;
 
@@ -15,18 +16,20 @@ public sealed class TrayCoordinator : IDisposable
     private readonly ITrayService _tray;
     private readonly IWindowService _window;
     private readonly WindowsNotificationService _notifications;
+    private readonly Localizer _localizer;
 
     // Written from OnViewModelChanged, which runs on the search's worker threads, and read from
     // the UI thread; volatile keeps the compare-and-publish from working off a stale cached value.
     private volatile TrayMenu _current;
     private volatile bool _disposed;
 
-    public TrayCoordinator(SearchViewModel viewModel, ITrayService tray, IWindowService window, WindowsNotificationService notifications)
+    public TrayCoordinator(SearchViewModel viewModel, ITrayService tray, IWindowService window, WindowsNotificationService notifications, Localizer localizer)
     {
         _viewModel = viewModel;
         _tray = tray;
         _window = window;
         _notifications = notifications;
+        _localizer = localizer;
         _current = Snapshot();
     }
 
@@ -34,6 +37,7 @@ public sealed class TrayCoordinator : IDisposable
     {
         _tray.Activated += OnTrayActivated;
         _viewModel.Changed += OnViewModelChanged;
+        _localizer.Changed += OnViewModelChanged;
         _notifications.Activated += OnNotificationActivated;
         _tray.Show(_current);
     }
@@ -48,16 +52,18 @@ public sealed class TrayCoordinator : IDisposable
         _disposed = true;
         _tray.Activated -= OnTrayActivated;
         _viewModel.Changed -= OnViewModelChanged;
+        _localizer.Changed -= OnViewModelChanged;
         _notifications.Activated -= OnNotificationActivated;
         _tray.Hide();
     }
 
-    private TrayMenu Snapshot() => new(_viewModel.State != SearchState.Idle, _viewModel.DutyPercent);
+    private TrayMenu Snapshot() => new(_viewModel.State != SearchState.Idle, _viewModel.DutyPercent, _localizer.Language.Code);
 
     private void OnViewModelChanged()
     {
-        // Changed fires on worker threads and on every progress tick; only a menu that actually
-        // reads differently is worth rebuilding, and only on the UI thread.
+        // Both the view model and the localizer raise this on arbitrary threads; the view model on
+        // every progress tick. Only a menu that actually reads differently (state, duty or language)
+        // is worth rebuilding, and only on the UI thread.
         TrayMenu next = Snapshot();
         if (next == _current || _disposed)
         {

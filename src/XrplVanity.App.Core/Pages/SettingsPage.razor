@@ -3,87 +3,103 @@
 @inject INotificationService Notifications
 @inject IWindowService Window
 @inject TutorialService Tutorial
+@inject Localizer Localizer
 
 <header class="page-head">
-  <h1>Settings</h1>
-  <div class="muted" style="font-size:12px">changes save immediately</div>
+  <h1>@T[SettingsText.Title]</h1>
+  <div class="muted" style="font-size:12px">@T[SettingsText.AutoSave]</div>
 </header>
 <div class="content-scroll">
   <div class="settings-grid">
     <div class="card-box">
-      <div class="card-title">Window</div>
+      <div class="card-title">@T[SettingsText.WindowTitle]</div>
       <TutorialRegion Name="@TutorialRegions.SettingsOther">
         <div class="srow">
-          <div>Close button<div class="desc">What the &times; in the title bar does</div></div>
+          <label for="language-select">@T[SettingsText.LanguageLabel]</label>
+          <select id="language-select" class="language form-select" @onchange="OnLanguageChanged">
+            @foreach (UiLanguage language in Localizer.Choices)
+            {
+              <option value="@language.Code" selected="@(language == Localizer.Language)">@language.NativeName</option>
+            }
+          </select>
+        </div>
+        @if (NotRemembered)
+        {
+          <div class="desc language-not-remembered" role="status">@T[SettingsText.LanguageNotRemembered]</div>
+        }
+      </TutorialRegion>
+      <TutorialRegion Name="@TutorialRegions.SettingsOther">
+        <div class="srow">
+          <div>@T[SettingsText.CloseButtonLabel]<div class="desc">@T[SettingsText.CloseButtonDesc]</div></div>
           <select class="close-behavior form-select" @onchange="OnCloseBehaviorChanged">
-            <option value="Ask" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.Ask)">Ask every time</option>
-            <option value="MinimizeToTray" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.MinimizeToTray)">Minimise to tray</option>
-            <option value="Exit" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.Exit)">Exit</option>
+            <option value="Ask" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.Ask)">@T[SettingsText.CloseAsk]</option>
+            <option value="MinimizeToTray" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.MinimizeToTray)">@T[ShellText.MinimiseToTray]</option>
+            <option value="Exit" selected="@(Vm.Settings.CloseBehavior == CloseBehavior.Exit)">@T[ShellText.Exit]</option>
           </select>
         </div>
       </TutorialRegion>
       <TutorialRegion Name="@TutorialRegions.SettingNotifications">
         <div class="srow">
-          <div>Notifications<div class="desc">Toast on every match and when a search finishes@(Notifications.IsAvailable ? "" : " · unavailable on this system")</div></div>
+          <div>@T[SettingsText.NotificationsLabel]<div class="desc">@T[Notifications.IsAvailable ? SettingsText.NotificationsDesc : SettingsText.NotificationsDescUnavailable]</div></div>
           <input class="notifications" type="checkbox" checked="@Vm.Settings.NotificationsEnabled" disabled="@(!Notifications.IsAvailable)" @onchange="OnNotificationsChanged" />
         </div>
       </TutorialRegion>
       <TutorialRegion Name="@TutorialRegions.SettingsOther">
         <div class="srow">
-          <div>GPU duty (applies immediately)<div class="desc">The same value the slider on the Search page and the tray menu carry</div></div>
+          <div>@T[SettingsText.GpuDutyLabel]<div class="desc">@T[SettingsText.GpuDutyDesc]</div></div>
           <input class="default-duty" type="number" min="25" max="100" value="@Vm.DutyPercent" @onchange="OnDefaultDutyChanged" />
         </div>
       </TutorialRegion>
       <TutorialRegion Name="@TutorialRegions.SettingStop">
         <div class="srow">
-          <div>Stop after N matches<div class="desc">Empty or 0 searches until you press Stop</div></div>
+          <div>@T[SettingsText.StopAfterLabel]<div class="desc">@T[SettingsText.StopAfterDesc]</div></div>
           <input class="match-count" type="number" min="0" value="@(ShownCount?.ToString() ?? string.Empty)" @onchange="OnCountChanged" />
         </div>
       </TutorialRegion>
     </div>
     <div class="card-box">
-      <div class="card-title">Secrets</div>
+      <div class="card-title">@T[SettingsText.SecretsTitle]</div>
       <TutorialRegion Name="@TutorialRegions.SettingsOther">
         <div class="srow">
-          <div>Clear clipboard after copying a seed<div class="desc">Only if the clipboard still holds the seed</div></div>
+          <div>@T[SettingsText.ClipboardLabel]<div class="desc">@T[SettingsText.ClipboardDesc]</div></div>
           <input class="clipboard-seconds" type="number" min="1" value="@Vm.Settings.ClipboardClearSeconds" @onchange="OnClipboardSecondsChanged" />
         </div>
       </TutorialRegion>
       <TutorialRegion Name="@TutorialRegions.SettingsOther">
         <div class="srow">
-          <div>Hide a revealed seed after<div class="desc">Also hidden when leaving the page</div></div>
+          <div>@T[SettingsText.RevealLabel]<div class="desc">@T[SettingsText.RevealDesc]</div></div>
           <input class="reveal-seconds" type="number" min="1" value="@Vm.Settings.SeedRevealSeconds" @onchange="OnRevealSecondsChanged" />
         </div>
       </TutorialRegion>
       <TutorialRegion Name="@TutorialRegions.SettingsOther">
         <div class="srow">
-          <div>Rate hints<div class="desc">Last measured speed per device, used for the estimate before a run</div></div>
-          <button class="btn-secondary-dark forget-hints t" @onclick="ForgetHints">Forget rate hints</button>
+          <div>@T[SettingsText.RateHintsLabel]<div class="desc">@T[SettingsText.RateHintsDesc]</div></div>
+          <button class="btn-secondary-dark forget-hints t" @onclick="ForgetHints">@T[SettingsText.ForgetRateHints]</button>
         </div>
       </TutorialRegion>
     </div>
     <div class="card-box full">
-      <div class="card-title">Data</div>
+      <div class="card-title">@T[SettingsText.DataTitle]</div>
       <TutorialRegion Name="@TutorialRegions.SettingData">
         <div class="srow">
-          <div>Data folder<div class="desc mono">@Window.DataFolder</div></div>
-          <button class="btn-secondary-dark open-folder t" @onclick="Window.OpenDataFolder">Open folder</button>
+          <div>@T[SettingsText.DataFolderLabel]<div class="desc mono">@Window.DataFolder</div></div>
+          <button class="btn-secondary-dark open-folder t" @onclick="Window.OpenDataFolder">@T[SettingsText.OpenFolder]</button>
         </div>
       </TutorialRegion>
       <TutorialRegion Name="@TutorialRegions.SettingsOther">
         <div class="srow">
-          <div>Tutorial<div class="desc">A short walk through one real search</div></div>
-          <button class="btn-secondary-dark run-tutorial t" disabled="@(!Tutorial.CanStart)" @onclick="StartTutorial">Start tutorial</button>
+          <div>@T[SettingsText.TutorialLabel]<div class="desc">@T[SettingsText.TutorialDesc]</div></div>
+          <button class="btn-secondary-dark run-tutorial t" disabled="@(!Tutorial.CanStart)" @onclick="StartTutorial">@T[SettingsText.StartTutorial]</button>
         </div>
       </TutorialRegion>
       <TutorialRegion Name="@TutorialRegions.SettingsOther">
         <div class="srow about">
           <div>
-            About
-            <div class="desc">XRPL Vanity @AppVersion · CUDA and OpenCL search engines · fonts Inter and Cascadia Code, SIL Open Font License 1.1</div>
+            @T[SettingsText.AboutTitle]
+            <div class="desc">@T.Render(UiText.Of(SettingsText.AboutDescription, ("version", AppVersion)))</div>
             <div class="about-links">
-              <a href="https://github.com/StaticBit-io/xrpl-vanity-generator">Project on GitHub</a>
-              <a href="https://github.com/StaticBit-io">StaticBit on GitHub</a>
+              <a href="https://github.com/StaticBit-io/xrpl-vanity-generator">@T[SettingsText.ProjectOnGitHub]</a>
+              <a href="https://github.com/StaticBit-io">@T[SettingsText.StaticBitOnGitHub]</a>
               <a href="https://x.com/StaticBit_io">X</a>
               <a href="https://staticbit.io/">staticbit.io</a>
             </div>

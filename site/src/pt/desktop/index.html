@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<title>Gerador de endereços personalizados para Windows | XRPL Vanity</title>
+<meta name="description" content="Como encontrar um endereço personalizado do XRP Ledger com o aplicativo XRPL Vanity para Windows: busca, resultados, seeds e exportação por QR.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Aplicativo para Windows</h1>
+<p class="lead">Busque um endereço personalizado, guarde os resultados criptografados e leve uma carteira para o celular.</p>
+
+<h2 id="get-it">Como obter</h2>
+<p>O aplicativo está a caminho da Microsoft Store. Até lá, ele pode ser <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">compilado a partir do código</a>.</p>
+<ul>
+<li>Windows 10 versão 1809 (build 17763) ou mais recente, x64.</li>
+<li>O runtime Microsoft Edge WebView2. O Windows 11 e as atualizações recentes do Windows 10 já o incluem.</li>
+<li>Para buscar na placa de vídeo, um driver da NVIDIA (CUDA, placas Turing de 2018 ou mais recentes) ou qualquer plataforma OpenCL instalada. Sem nenhum dos dois, o aplicativo busca no processador e avisa.</li>
+</ul>
+
+<h2 id="tutorial">Tutorial</h2>
+<p>Na primeira vez que você abre o aplicativo, ele oferece um tutorial rápido que acompanha uma busca de verdade, de adicionar uma palavra até ver um resultado e o código QR dele. O resultado encontrado não é salvo, e suas palavras e configurações voltam no final. A oferta aparece uma vez: para repetir, clique em <strong>Iniciar tutorial</strong> na página “Configurações”.</p>
+
+<h2 id="search">Busca</h2>
+<h3>Adicione suas palavras</h3>
+<p>Digite uma palavra, escolha a posição e adicione como regra: <em>começa com</em>, <em>termina com</em>, <em>em qualquer lugar</em> ou <em>começa e termina com</em>, que pede as duas metades no mesmo endereço. Por padrão, as regras não diferenciam maiúsculas e minúsculas; você pode mudar isso, e uma busca pode ter muitas regras.</p>
+<p>Os caracteres <code>0</code>, <code>O</code>, <code>I</code> e <code>l</code> não existem em um endereço. Eles viram <code>o</code>, <code>i</code> e <code>L</code>, e a regra mostra o resultado ao lado do que você digitou.</p>
+<p>O caractere logo depois do <code>r</code> inicial é limitado, por isso algumas palavras são cerca de 23 vezes mais raras do que o tamanho sugere. A caixa <em>no 2º ou 3º caractere</em> deixa a palavra começar um caractere depois. Quando isso a encontraria pelo menos duas vezes mais rápido, o aplicativo oferece a opção na regra. Ela vem desligada porque muda a leitura do endereço.</p>
+<p><strong>Salvar lista</strong> e <strong>Carregar lista</strong> guardam um conjunto de regras em um arquivo de texto. Ao carregar, as regras se somam às que estão na tela e os duplicados são ignorados.</p>
+
+<h3>Escolha onde buscar</h3>
+<p>Marque o processador, com um número de linhas de execução, e os dispositivos CUDA e OpenCL que o aplicativo encontrou. Todos podem rodar ao mesmo tempo.</p>
+<p>O controle <em>Carga da GPU</em> define a parte do tempo em que a placa de vídeo trabalha, de 25 a 100%. Um valor menor deixa a placa livre para outros aplicativos, e a mudança chega na hora a uma busca em andamento.</p>
+
+<h3>Confira a estimativa</h3>
+<p>Antes de começar, a página mostra quantos endereços devem ser testados, em média, até um resultado e o tempo esperado nos dispositivos marcados. Ela usa a última velocidade medida em cada dispositivo. Na primeira vez ainda não há nenhuma, então clique em <strong>medir velocidade</strong> ou faça uma busca.</p>
+
+<h3>Rode a busca</h3>
+<p>A página mostra a velocidade atual, os endereços testados e os resultados. Cada resultado entra na lista com endereço, regra, dispositivo e horário. <em>Parar após N resultados</em>, em Configurações, encerra a busca automaticamente.</p>
+<p>Uma busca longa pode continuar pela bandeja do sistema, onde também fica o controle de carga. Uma notificação avisa quando chega um resultado ou quando uma busca termina.</p>
+
+<h2 id="results">Resultados e histórico</h2>
+<p>O histórico guarda todos os resultados que o aplicativo salvou. Filtre com a caixa de texto, que busca em endereços e padrões, e com a lista de padrões. Marque linhas, ou use <em>selecionar todos os visíveis</em>, para exportar ou excluir juntas.</p>
+<p><strong>Excluir um resultado não tem volta:</strong> a seed some, e com ela a conta, a menos que você a tenha guardado em outro lugar.</p>
+<p><strong>Uma exportação TSV contém as seeds em texto puro.</strong> Ela vai para onde você escolher e não tem proteção, então trate esse arquivo como o segredo que ele é.</p>
+
+<h2 id="seeds">Seeds</h2>
+<p>Uma seed controla a conta dela. Ela fica oculta em todo lugar até você mostrá-la, e se oculta de novo após 15 segundos ou quando você sai da página. Uma seed copiada é apagada da área de transferência após 30 segundos, a menos que você tenha copiado outra coisa antes. Os dois tempos podem ser mudados em Configurações.</p>
+<p>Uma seed copiada fica fora do histórico da área de transferência do Windows e da sincronização dela.</p>
+<p>Os resultados ficam em um arquivo, <code>results.dat</code>, criptografado com a API de proteção de dados do Windows (DPAPI). Só a conta do Windows que gravou o arquivo consegue lê-lo, então os resultados não passam para outra conta ou outro computador. Nenhuma seed aparece em um log, em uma notificação ou no menu da bandeja.</p>
+<p><strong>Desinstalar o aplicativo apaga o <code>results.dat</code> e todas as seeds dele.</strong> Guarde antes as seeds que quiser manter.</p>
+
+<h2 id="qr">Leve uma carteira para o celular</h2>
+<p>O botão QR de um resultado mostra aquela carteira, e <strong>Mostrar QR</strong> mostra todas as linhas selecionadas. Escaneie o código com a carteira móvel <a href="https://staticbit.io">StaticBit</a>, que as restaura a partir do backup que o código carrega. Um código comporta até 22 carteiras, ou 21 com senha.</p>
+<p><strong>Defina uma senha se alguém puder ver sua tela.</strong> Ela é opcional e criptografa o código. Sem ela o código não é criptografado, e a janela avisa. O código nunca é gravado no disco e se oculta sozinho após 60 segundos.</p>
+<p>Uma seed avulsa também pode ser mostrada como código de uma única carteira. Esse código nunca é criptografado: não aceita senha, e a janela avisa. A carteira <a href="https://staticbit.io">StaticBit</a> também consegue escaneá-lo.</p>
+
+<h2 id="settings">Configurações</h2>
+<p>Toda mudança vale na hora: não existe botão de salvar. É ali também que você escolhe o idioma do aplicativo.</p>
+<div class="reference" role="region" aria-label="Configurações" tabindex="0">
+<table>
+<thead><tr><th scope="col">Configuração</th><th scope="col">O que faz</th><th scope="col">Padrão</th></tr></thead>
+<tbody>
+<tr><th scope="row">Botão de fechar</th><td>Perguntar, minimizar para a bandeja ou sair.</td><td>Perguntar sempre</td></tr>
+<tr><th scope="row">Notificações</th><td>Um aviso a cada resultado e quando uma busca termina.</td><td>Ligadas</td></tr>
+<tr><th scope="row">Carga da GPU</th><td>Parte do tempo em que a placa de vídeo trabalha, de 25 a 100%.</td><td>100</td></tr>
+<tr><th scope="row">Parar após N resultados</th><td>Encerra a busca automaticamente. Vazio ou 0: a busca continua até você clicar em “Parar”.</td><td>Vazio</td></tr>
+<tr><th scope="row">Limpar a área de transferência depois de copiar uma seed</th><td>Segundos até uma seed copiada ser apagada.</td><td>30</td></tr>
+<tr><th scope="row">Ocultar uma seed exibida após</th><td>Segundos até uma seed exibida voltar a ficar oculta.</td><td>15</td></tr>
+<tr><th scope="row">Velocidades salvas</th><td>A última velocidade medida em cada dispositivo, usada na estimativa. <strong>Esquecer velocidades</strong> as apaga.</td><td>Nenhuma</td></tr>
+<tr><th scope="row">Pasta de dados</th><td>Onde ficam as configurações e os resultados. <strong>Abrir pasta</strong> a abre.</td><td>Nenhuma</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="more">Algo não funciona?</h2>
+<p>Veja a página de <a href="/pt/support/">Suporte</a> para problemas comuns. Compilação e empacotamento estão nas <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">notas para desenvolvedores no GitHub</a> (em inglês).</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

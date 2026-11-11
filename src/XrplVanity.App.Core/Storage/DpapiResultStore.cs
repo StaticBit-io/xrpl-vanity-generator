@@ -2,6 +2,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 
 namespace XrplVanity.App.Core.Storage;
@@ -32,7 +33,10 @@ public sealed class DpapiResultStore : IResultStore
     }
 
     public bool IsReadOnly { get; private set; }
-    public string? ReadOnlyReason { get; private set; }
+    public UiText? ReadOnlyReason { get; private set; }
+
+    /// <summary>The English technical text of <see cref="ReadOnlyReason"/> for exceptions, which are not UI.</summary>
+    private string? _readOnlyMessage;
 
     public IReadOnlyList<StoredResult> LoadAll()
     {
@@ -140,7 +144,8 @@ public sealed class DpapiResultStore : IResultStore
         catch (Exception ex) when (ex is CryptographicException or JsonException or IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
             IsReadOnly = true;
-            ReadOnlyReason = $"results.dat could not be read: {ex.Message}";
+            ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeRead, ("detail", ex.Message));
+            _readOnlyMessage = $"results.dat could not be read: {ex.Message}";
             _cache = new List<StoredResult>();
         }
 
@@ -151,7 +156,7 @@ public sealed class DpapiResultStore : IResultStore
     {
         if (IsReadOnly)
         {
-            throw new InvalidOperationException(ReadOnlyReason);
+            throw new InvalidOperationException(_readOnlyMessage);
         }
     }
 
@@ -170,8 +175,9 @@ public sealed class DpapiResultStore : IResultStore
         catch (Exception ex) when (ex is CryptographicException or IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
             IsReadOnly = true;
-            ReadOnlyReason = $"results.dat could not be written: {ex.Message}";
-            throw new InvalidOperationException(ReadOnlyReason, ex);
+            ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeWritten, ("detail", ex.Message));
+            _readOnlyMessage = $"results.dat could not be written: {ex.Message}";
+            throw new InvalidOperationException(_readOnlyMessage, ex);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.Tutorial;
@@ -108,7 +109,7 @@ public class TutorialServiceTests
     private sealed class ThrowingStore : IResultStore
     {
         public bool IsReadOnly => false;
-        public string? ReadOnlyReason => null;
+        public UiText? ReadOnlyReason => null;
         public IReadOnlyList<StoredResult> LoadAll() => throw new IOException("results.dat is unreadable");
         public void Append(StoredResult result) { }
         public void AppendRange(IEnumerable<StoredResult> results) { }
@@ -138,7 +139,7 @@ public class TutorialServiceTests
     [Fact]
     public void ShouldOffer_Is_False_When_The_Store_Is_ReadOnly_Or_Throws()
     {
-        Assert.False(Create(results: new MemoryResultStore { IsReadOnly = true, ReadOnlyReason = "locked" }).Tutorial.ShouldOffer());
+        Assert.False(Create(results: new MemoryResultStore { IsReadOnly = true, ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeRead, ("detail", "locked")) }).Tutorial.ShouldOffer());
         Assert.False(Create(tutorialStore: new ThrowingStore()).Tutorial.ShouldOffer());
     }
 
@@ -361,7 +362,7 @@ public class TutorialServiceTests
         SetEstimate(rig, TimeSpan.FromSeconds(1));
 
         Assert.Equal(TutorialStep.LongWord, StepOf(rig));
-        Assert.Contains("shortest", rig.Tutorial.Hint);
+        Assert.Contains("shortest", TextCatalog.For(UiLanguage.English).Render(rig.Tutorial.Hint));
         Assert.True(changes > 0);
 
         rig.Vm.RemovePattern(rig.Vm.Patterns.Single(p => p.Text == "test"));
@@ -745,12 +746,15 @@ public class TutorialServiceTests
     [Fact]
     public void Copy_Has_No_Long_Dash()
     {
+        TextCatalog english = TextCatalog.For(UiLanguage.English);
         foreach (TutorialStepInfo info in TutorialScript.Steps)
         {
-            Assert.DoesNotContain('—', info.Title + info.Body);
-            Assert.DoesNotContain('–', info.Title + info.Body);
-            Assert.False(string.IsNullOrWhiteSpace(info.Title));
-            Assert.False(string.IsNullOrWhiteSpace(info.Body));
+            string title = english[info.Title];
+            string body = english.Render(info.Body);
+            Assert.DoesNotContain('—', title + body);
+            Assert.DoesNotContain('–', title + body);
+            Assert.False(string.IsNullOrWhiteSpace(title));
+            Assert.False(string.IsNullOrWhiteSpace(body));
         }
     }
 }

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+<head>
+<title>Vanity-Adressen für den XRP Ledger auf der Kommandozeile | XRPL Vanity</title>
+<meta name="description" content="So bauen und starten Sie xrpl-vanity, die Kommandozeilensuche nach XRP-Ledger-Vanity-Adressen unter Windows oder Linux.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Kommandozeile xrpl-vanity</h1>
+<p class="lead">Dieselbe Suche nach Vanity-Adressen wie in der Desktop-Anwendung, aus einem Terminal unter Windows oder Linux.</p>
+
+<h2 id="build">Bauen</h2>
+<p>Fertige Programmdateien gibt es nicht: Starten Sie es aus dem Quellcode mit dem .NET 10 SDK.</p>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> git clone https://github.com/StaticBit-io/xrpl-vanity-generator.git
+<span class="prompt">$</span> cd xrpl-vanity-generator
+<span class="prompt">$</span> dotnet run --project src/XrplVanity.Cli -c Release -- --contains xrp --count 1</pre></div>
+<p>Der erste Aufruf baut das Programm. In den Beispielen unten steht <code>xrpl-vanity</code> für <code>dotnet run --project src/XrplVanity.Cli -c Release --</code>.</p>
+
+<h2 id="search">Wo das Wort stehen soll</h2>
+<p>Ein Wort ohne Option muss am Anfang der Adresse stehen, direkt nach dem führenden <code>r</code>. Ein Aufruf kann Positionen mischen, und eine Adresse passt, wenn irgendein Muster passt.</p>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> xrpl-vanity ripple hodl xrp
+<span class="prompt">$</span> xrpl-vanity --ends xyz --contains dao
+<span class="prompt">$</span> xrpl-vanity --starts-ends abc:xyz
+<span class="prompt">$</span> xrpl-vanity --list words.txt 5</pre></div>
+<p><code>--starts-ends</code> verlangt beide Hälften in derselben Adresse und dauert daher so lange wie ein Wort ihrer gemeinsamen Länge. Die letzte Zeile lädt ihre Wörter aus einer Datei und behält die mit mindestens 5 Zeichen.</p>
+
+<h2 id="flags">Optionen</h2>
+<div class="reference" role="region" aria-label="Kommandozeilenoptionen" data-table="options" tabindex="0">
+<table>
+<thead><tr><th scope="col">Option</th><th scope="col">Standard</th><th scope="col">Wirkung</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>--starts P</code></th><td>keiner</td><td>Treffer am Anfang der Adresse, nach dem <code>r</code>. Wiederholbar. Wörter ohne Option wirken genauso.</td></tr>
+<tr><th scope="row"><code>--near-start P</code></th><td>keiner</td><td>Das Wort darf am 2. oder 3. Zeichen beginnen. Wiederholbar.</td></tr>
+<tr><th scope="row"><code>--ends P</code></th><td>keiner</td><td>Treffer am Ende der Adresse. Wiederholbar.</td></tr>
+<tr><th scope="row"><code>--contains P</code></th><td>keiner</td><td>Treffer an beliebiger Stelle. Wiederholbar.</td></tr>
+<tr><th scope="row"><code>--starts-ends PREFIX:SUFFIX</code></th><td>keiner</td><td>Anfang und Ende in derselben Adresse. Wiederholbar.</td></tr>
+<tr><th scope="row"><code>--near-starts-ends PREFIX:SUFFIX</code></th><td>keiner</td><td>Dasselbe, der Anfang darf am 2. oder 3. Zeichen stehen. Wiederholbar.</td></tr>
+<tr><th scope="row"><code>--list FILE [minLen]</code></th><td>minLen 4</td><td>Wörter für den Adressanfang aus einer Datei laden.</td></tr>
+<tr><th scope="row"><code>--case-sensitive</code></th><td>aus</td><td>Exakt wie eingegeben suchen. Standardmäßig passt bei Wörtern bis 12 Zeichen jede Kombination aus Groß- und Kleinbuchstaben.</td></tr>
+<tr><th scope="row"><code>--threads N</code></th><td>alle Kerne</td><td>Threads für die Suche auf dem Prozessor. Mit <code>--gpu</code> ohne Wirkung.</td></tr>
+<tr><th scope="row"><code>--out FILE</code></th><td>keiner</td><td>Treffer zusätzlich an eine Datei anhängen.</td></tr>
+<tr><th scope="row"><code>--count N</code></th><td>keiner</td><td>Nach N Treffern stoppen. Sonst läuft die Suche, bis Sie Ctrl+C drücken.</td></tr>
+<tr><th scope="row"><code>--gpu</code></th><td>aus</td><td>Auf der Grafikkarte suchen: zuerst CUDA, dann OpenCL.</td></tr>
+<tr><th scope="row"><code>--backend NAME</code></th><td>keiner</td><td><code>cuda</code> oder <code>opencl</code> erzwingen. Schließt <code>--gpu</code> ein.</td></tr>
+<tr><th scope="row"><code>--device N</code></th><td>keiner</td><td>Ein Gerät per Nummer wählen. Schließt <code>--gpu</code> ein.</td></tr>
+<tr><th scope="row"><code>--list-devices</code></th><td>keiner</td><td>Alle Geräte auflisten und beenden.</td></tr>
+<tr><th scope="row"><code>--gpu-devices SPEC</code></th><td>keiner</td><td>Mehrere Geräte gleichzeitig: <code>all</code>, <code>cuda</code>, <code>opencl</code> oder eine kommagetrennte Liste. Schließt <code>--gpu</code> ein.</td></tr>
+<tr><th scope="row"><code>--gpu-duty N</code></th><td>100</td><td>Die Grafikkarte etwa N % der Zeit beschäftigen, von 1 bis 100.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="words">Welche Wörter gehen</h2>
+<p>Adressen nutzen 58 Zeichen. <code>0</code>, <code>O</code>, <code>I</code> und <code>l</code> gibt es nicht, daher wird Ihr Wort angepasst: <code>l</code> wird zu <code>L</code>, <code>0</code> und <code>O</code> werden zu <code>o</code>, und <code>I</code> wird zu <code>i</code>. Enthält ein Wort danach noch ein unmögliches Zeichen, wird es gemeldet und übersprungen.</p>
+<p>Jedes weitere Zeichen vervielfacht die Wartezeit: mit <code>--case-sensitive</code> um bis zu 58, ohne um weniger, weil dann mehr Schreibweisen als Treffer zählen.</p>
+<p>Das erste Zeichen nach dem <code>r</code> ist meist eines von <code>pshnaf39wBUDNEGHJKLM4PQ</code>. Ein Wort, das mit etwas anderem beginnt, ist etwa 23-mal seltener, als seine Länge vermuten lässt. <code>--near-start</code> lässt es ein Zeichen später beginnen und findet es so etwa 24-mal schneller.</p>
+
+<h2 id="gpu">Suche auf der Grafikkarte</h2>
+<div class="well" tabindex="0"><pre><span class="prompt">$</span> xrpl-vanity --list-devices
+<span class="prompt">$</span> xrpl-vanity --gpu --contains dao --count 1
+<span class="prompt">$</span> xrpl-vanity --gpu-devices cuda --starts abc
+<span class="prompt">$</span> xrpl-vanity --gpu --gpu-duty 80 --contains dao --count 1 --out dao.tsv</pre></div>
+<p>Jeder Treffer der Grafikkarte wird auf dem Prozessor neu abgeleitet und nur ausgegeben, wenn beide übereinstimmen: Ein fehlerhaftes Gerät kostet Geschwindigkeit, liefert aber nie einen falschen Schlüssel. Ohne nutzbares Gerät beendet sich <code>--gpu</code> mit Code 2, statt auf den Prozessor auszuweichen.</p>
+<p>Der erste OpenCL-Lauf kann einige Dutzend Sekunden dauern, während der Treiber das Programm kompiliert. Spätere Läufe sind schnell. <code>--gpu-duty</code> lässt anderen Programmen Platz, und die Geschwindigkeit sinkt etwa im gleichen Maß. <code>--gpu-devices all</code> öffnet jede Karte einmal pro Backend, nutzen Sie also <code>--gpu-devices cuda</code>, um jede NVIDIA-Karte genau einmal einzusetzen.</p>
+
+<h2 id="output">Ergebnisse und Exit-Codes</h2>
+<p>Jeder Treffer ist eine Zeile im Terminal:</p>
+<div class="well" tabindex="0"><pre>Address: r...	Seed: sEd...</pre></div>
+<p><code>--out FILE</code> hängt dasselbe Paar an, durch einen Tabulator getrennt und ohne Beschriftung. Warnungen und die Endgeschwindigkeit gehen nach stderr, über stdout kommen also nur Treffer.</p>
+<p><strong>Wer den Seed besitzt, verfügt über das Konto.</strong> Treffer stehen im Klartext im Terminal und in dieser Datei, sonst nirgends. Halten Sie sie geheim.</p>
+<div class="reference" role="region" aria-label="Exit-Codes" tabindex="0">
+<table>
+<thead><tr><th scope="col">Code</th><th scope="col">Bedeutung</th></tr></thead>
+<tbody>
+<tr><th scope="row"><code>0</code></th><td>Das Ziel von <code>--count</code> ist erreicht.</td></tr>
+<tr><th scope="row"><code>2</code></th><td>Falscher Aufruf, kein erreichbares Muster, keine nutzbare Grafikkarte oder eine fehlgeschlagene Suche.</td></tr>
+<tr><th scope="row"><code>130</code></th><td>Mit Ctrl+C beendet, bevor das Ziel von <code>--count</code> erreicht war.</td></tr>
+</tbody>
+</table>
+</div>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

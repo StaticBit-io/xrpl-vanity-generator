@@ -121,6 +121,7 @@ Settings page, which is disabled while a search or a speed measurement is runnin
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
+| Language | The language of every screen, the tutorial, the tray menu and notifications. It changes at once and is remembered in `settings.json`. | The system language if the application has it, else English |
 | Close button | What the × in the title bar does: ask every time, minimise to tray, or exit. | Ask every time |
 | Notifications | A toast on a match and when a search finishes. Disabled, with a note, when the platform refuses registration (an unpackaged build has no package identity). | On |
 | GPU duty (applies immediately) | Share of the time the GPU runs, 25–100 %. The same value as the Search page's slider and the tray menu; a change reaches a running search at once. | 100 |
@@ -136,6 +137,18 @@ Seeds are masked everywhere by default. A row reveals its seed only on request a
 it again after the configured timeout or when the page is left. Copying a seed puts it on
 the clipboard and clears it after the configured delay, but only if the clipboard still
 holds that same seed. The copy stays out of Windows clipboard history and clipboard sync, which the delayed clear could not reach.
+
+### Languages
+
+The application speaks English, Русский, Deutsch, Español, Português and 中文. The first start
+follows the Windows display language when it is one of these, by its primary subtag (`zh-TW` is
+Chinese, `pt-PT` Portuguese), and falls back to English; the choice on the Settings page wins from then
+on. Numbers and durations follow the chosen language. File formats do not: the TSV export, the pattern
+list, `settings.json` and `results.dat` read the same in every language. English is written by hand;
+Russian is translated from English and awaits the owner's read; German, Spanish, Portuguese and Chinese
+are translated from English and await a native speaker's review. The strings live in
+`src/XrplVanity.App.Core/Localization/Text/<code>.json`, and the catalog tests hold every language to
+English's keys, placeholders and plural forms.
 
 ### Where the data is
 

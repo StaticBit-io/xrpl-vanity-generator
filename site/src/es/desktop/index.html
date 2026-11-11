@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<title>Generador de direcciones personalizadas para Windows | XRPL Vanity</title>
+<meta name="description" content="Cómo encontrar una dirección personalizada de XRP Ledger con la aplicación XRPL Vanity para Windows: búsqueda, resultados, semillas y exportación por QR.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Aplicación de escritorio</h1>
+<p class="lead">Busca una dirección personalizada, guarda los resultados cifrados y pasa un monedero a tu teléfono.</p>
+
+<h2 id="get-it">Cómo conseguirla</h2>
+<p>La aplicación llegará pronto a Microsoft Store. Mientras tanto, se puede <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">compilar desde el código</a>.</p>
+<ul>
+<li>Windows 10 versión 1809 (compilación 17763) o posterior, x64.</li>
+<li>El entorno de ejecución Microsoft Edge WebView2. Windows 11 y las actualizaciones recientes de Windows 10 ya lo incluyen.</li>
+<li>Para buscar en la tarjeta gráfica, un controlador de NVIDIA (CUDA, tarjetas Turing de 2018 o posteriores) o cualquier plataforma OpenCL instalada. Sin ninguno de los dos, la aplicación busca en el procesador y lo indica.</li>
+</ul>
+
+<h2 id="tutorial">Tutorial</h2>
+<p>La primera vez que abres la aplicación, te ofrece un recorrido breve por una búsqueda real, desde añadir una palabra hasta ver un resultado y su código QR. La coincidencia que encuentra no se guarda, y tus palabras y ajustes vuelven al terminar. Solo se ofrece una vez: para repetirlo, pulsa <strong>Empezar tutorial</strong> en la página «Ajustes».</p>
+
+<h2 id="search">Búsqueda</h2>
+<h3>Añade tus palabras</h3>
+<p>Escribe una palabra, elige la posición y añádela como regla: <em>empieza por</em>, <em>termina en</em>, <em>en cualquier parte</em> o <em>empieza y termina en</em>, que pide las dos mitades en una misma dirección. Las reglas no distinguen mayúsculas salvo que lo desactives, y una búsqueda puede tener muchas reglas.</p>
+<p>Los caracteres <code>0</code>, <code>O</code>, <code>I</code> y <code>l</code> no existen en una dirección. Se sustituyen por <code>o</code>, <code>i</code> y <code>L</code>, y la regla muestra el resultado junto a lo que escribiste.</p>
+<p>El carácter justo después de la <code>r</code> inicial está limitado, por eso algunas palabras son unas 23 veces más raras de lo que indica su longitud. La casilla <em>en el 2.º o 3.er carácter</em> deja que la palabra empiece un carácter después. Cuando así se encontraría al menos el doble de rápido, la aplicación lo propone en la regla. Viene desactivada porque cambia cómo se lee la dirección.</p>
+<p><strong>Guardar lista</strong> y <strong>Cargar lista</strong> guardan un conjunto de reglas en un archivo de texto. Al cargar, las reglas se suman a las que hay en pantalla y se omiten los duplicados.</p>
+
+<h3>Elige dónde buscar</h3>
+<p>Marca el procesador, con un número de hilos, y los dispositivos CUDA y OpenCL que haya encontrado la aplicación. Pueden funcionar todos a la vez.</p>
+<p>El control <em>Carga de la GPU</em> fija qué parte del tiempo trabaja la tarjeta gráfica, del 25 al 100 %. Un valor más bajo deja la tarjeta libre para otras aplicaciones, y el cambio llega al momento a una búsqueda en curso.</p>
+
+<h3>Mira la estimación</h3>
+<p>Antes de empezar, la página muestra cuántas direcciones hacen falta de media para una coincidencia y cuánto tardará en los dispositivos marcados. Usa la última velocidad medida en cada dispositivo. La primera vez aún no hay ninguna, así que pulsa <strong>medir velocidad</strong> o haz una búsqueda.</p>
+
+<h3>Lanza la búsqueda</h3>
+<p>La página muestra la velocidad actual, las direcciones probadas y las coincidencias. Cada coincidencia entra en la lista de resultados con su dirección, regla, dispositivo y hora. El ajuste <em>Detener tras N coincidencias</em> detiene la búsqueda automáticamente.</p>
+<p>Una búsqueda larga puede seguir desde la bandeja del sistema, donde también está el control de carga. Una notificación te avisa de cada coincidencia y de cuándo termina una búsqueda.</p>
+
+<h2 id="results">Resultados e historial</h2>
+<p>El historial contiene todos los resultados que la aplicación ha guardado. Acótalo con el cuadro de texto, que busca en direcciones y patrones, y con la lista de patrones. Marca filas, o usa <em>seleccionar todo lo visible</em>, para exportarlas o eliminarlas juntas.</p>
+<p><strong>Eliminar un resultado no se puede deshacer:</strong> la semilla desaparece, y con ella la cuenta, salvo que la hayas guardado en otro sitio.</p>
+<p><strong>Una exportación TSV contiene las semillas en texto plano.</strong> Se guarda donde elijas y no está protegida, así que trata ese archivo como el secreto que es.</p>
+
+<h2 id="seeds">Semillas</h2>
+<p>Una semilla controla su cuenta. Está oculta en todas partes hasta que la muestras, y se vuelve a ocultar a los 15 segundos o al salir de la página. Una semilla copiada se borra del portapapeles a los 30 segundos, salvo que hayas copiado otra cosa antes. Puedes cambiar los dos tiempos en Ajustes.</p>
+<p>Una semilla copiada no entra en el historial del portapapeles de Windows ni en su sincronización.</p>
+<p>Los resultados se guardan en un archivo, <code>results.dat</code>, cifrado con la API de protección de datos de Windows (DPAPI). Solo la cuenta de Windows que escribió el archivo puede leerlo, así que los resultados no pasan a otra cuenta ni a otro ordenador. Ninguna semilla aparece en un registro, una notificación o el menú de la bandeja.</p>
+<p><strong>Al desinstalar la aplicación se elimina <code>results.dat</code>, con todas sus semillas.</strong> Guarda antes las semillas que quieras conservar.</p>
+
+<h2 id="qr">Pasa un monedero a tu teléfono</h2>
+<p>El botón QR de un resultado muestra ese monedero, y <strong>Mostrar QR</strong> muestra todas las filas seleccionadas. Escanea el código con el monedero móvil <a href="https://staticbit.io">StaticBit</a>, que restaura los monederos a partir de la copia de seguridad incluida en el código. Un código admite hasta 22 monederos, o 21 con contraseña.</p>
+<p><strong>Pon una contraseña si alguien puede ver tu pantalla.</strong> Es opcional y cifra el código. Sin ella el código no está cifrado, y el diálogo lo avisa. El código nunca se escribe en el disco y se oculta solo a los 60 segundos.</p>
+<p>Una semilla suelta también se puede mostrar como código de un solo monedero. Ese código nunca está cifrado: no admite contraseña, y el diálogo lo avisa. El monedero <a href="https://staticbit.io">StaticBit</a> también puede escanearlo.</p>
+
+<h2 id="settings">Ajustes</h2>
+<p>Cada cambio se aplica al momento: no hay botón de guardar. Ahí también eliges el idioma de la aplicación.</p>
+<div class="reference" role="region" aria-label="Ajustes" tabindex="0">
+<table>
+<thead><tr><th scope="col">Ajuste</th><th scope="col">Qué hace</th><th scope="col">Por defecto</th></tr></thead>
+<tbody>
+<tr><th scope="row">Botón de cerrar</th><td>Preguntar, minimizar a la bandeja o salir.</td><td>Preguntar cada vez</td></tr>
+<tr><th scope="row">Notificaciones</th><td>Un aviso en cada coincidencia y al terminar una búsqueda.</td><td>Activadas</td></tr>
+<tr><th scope="row">Carga de la GPU</th><td>Parte del tiempo que trabaja la tarjeta gráfica, del 25 al 100 %.</td><td>100</td></tr>
+<tr><th scope="row">Detener tras N coincidencias</th><td>Detiene la búsqueda automáticamente. Vacío o 0: la búsqueda sigue hasta que pulses «Detener».</td><td>Vacío</td></tr>
+<tr><th scope="row">Borrar el portapapeles tras copiar una semilla</th><td>Segundos hasta que se borra una semilla copiada.</td><td>30</td></tr>
+<tr><th scope="row">Ocultar una semilla mostrada tras</th><td>Segundos hasta que una semilla mostrada se oculta de nuevo.</td><td>15</td></tr>
+<tr><th scope="row">Velocidades guardadas</th><td>La última velocidad medida en cada dispositivo, usada para la estimación. <strong>Olvidar velocidades</strong> las borra.</td><td>Ninguna</td></tr>
+<tr><th scope="row">Carpeta de datos</th><td>Dónde están los ajustes y los resultados. <strong>Abrir carpeta</strong> la abre.</td><td>Ninguna</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="more">¿Algo no funciona?</h2>
+<p>Consulta la página de <a href="/es/support/">Ayuda</a> para los problemas habituales. La compilación y el empaquetado se explican en las <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">notas para desarrolladores en GitHub</a> (en inglés).</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

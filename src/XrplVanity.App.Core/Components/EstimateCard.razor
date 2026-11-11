@@ -1,9 +1,9 @@
 @inherits ViewModelComponent
 <div class="card-box estimate">
-  <div class="card-title">Estimate</div>
+  <div class="card-title">@T[SearchText.EstimateTitle]</div>
   <div class="row-2">
-    <div><div class="label">candidates per match</div><div class="num candidates">@(Vm.ExpectedCandidates is double c ? Formatting.Candidates(c) : "—")</div></div>
-    <div><div class="label">expected time to a match</div><div class="num eta">@Formatting.Duration(Vm.EstimatedTime)</div></div>
+    <div><div class="label">@T[SearchText.CandidatesPerMatch]</div><div class="num candidates">@(Vm.ExpectedCandidates is double c ? Formatting.Candidates(c, T) : T[CommonText.NoValue])</div></div>
+    <div><div class="label">@T[SearchText.ExpectedTime]</div><div class="num eta">@Formatting.Duration(Vm.EstimatedTime, T)</div></div>
   </div>
-  <div class="note">@Vm.EstimateNote · assumes a 34-character address; case-insensitive letters count every variant · <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/benchmarks.md">reference rates</a></div>
+  <div class="note">@T.Render(Vm.EstimateNote) · @T[SearchText.EstimateAssumptions] · <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/benchmarks.md">@T[SearchText.ReferenceRates]</a></div>
 </div>

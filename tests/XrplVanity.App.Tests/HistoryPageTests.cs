@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Pages;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
@@ -71,8 +72,29 @@ public class HistoryPageTests : BunitContext
         string[] options = cut.FindAll("select.pattern-filter option").Select(o => o.TextContent.Trim()).ToArray();
 
         Assert.Equal(
-            new[] { "All patterns — 5", "abc:xyz (pair) — 1", "fast (ends) — 1", "fast (starts) — 2", "slow (starts) — 1" },
+            new[] { "All patterns: 5", "abc:xyz (pair): 1", "fast (ends): 1", "fast (starts): 2", "slow (starts): 1" },
             options);
+    }
+
+    [Fact]
+    public void Filter_Labels_Are_Built_From_The_Catalog_With_The_Translated_Position()
+    {
+        MemoryResultStore store = new();
+        SeedMixed(store);
+        Services.AddSingleton<IResultStore>(store);
+        Services.AddSingleton(new SearchViewModel(new MemorySettingsStore(), store, new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>()));
+        Services.AddSingleton<IClipboardService>(new FakeClipboard());
+        Services.AddSingleton<IFileDialogService>(new FakeFileDialog());
+        Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        TextCatalog german = TextCatalog.Transformed(UiLanguage.German, phrase => "[de] " + phrase);
+
+        IRenderedComponent<HistoryPage> cut = Render<HistoryPage>(p => p.AddCascadingValue(german));
+
+        string[] options = cut.FindAll("select.pattern-filter option").Select(o => o.TextContent.Trim()).ToArray();
+        Assert.Equal("[de] [de] abc:xyz ([de] pair): 1", options[1]);
+        Assert.StartsWith("[de] ", cut.Find("button.clear").TextContent, StringComparison.Ordinal);
+        Assert.StartsWith("[de] ", cut.Find(".storage-note").TextContent, StringComparison.Ordinal);
+        Assert.Equal("results.dat", cut.Find(".storage-note .mono").TextContent);
     }
 
     [Fact]
@@ -279,7 +301,7 @@ public class HistoryPageTests : BunitContext
     [Fact]
     public void A_Store_That_Throws_On_Delete_Or_Clear_Shows_A_Banner_Instead_Of_Crashing()
     {
-        MemoryResultStore store = new() { ReadOnlyReason = "results.dat could not be written" };
+        MemoryResultStore store = new() { ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeWritten, ("detail", "disk full")) };
         SeedTwo(store);
         IRenderedComponent<HistoryPage> cut = RenderPage(store);
 
@@ -299,7 +321,7 @@ public class HistoryPageTests : BunitContext
     [Fact]
     public void A_Failing_Bulk_Delete_Shows_The_Reason_Instead_Of_Crashing()
     {
-        MemoryResultStore store = new() { ReadOnlyReason = "results.dat is read-only" };
+        MemoryResultStore store = new() { ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeWritten, ("detail", "access denied")) };
         SeedTwo(store);
         IRenderedComponent<HistoryPage> cut = RenderPage(store);
 
@@ -309,18 +331,18 @@ public class HistoryPageTests : BunitContext
         cut.Find("button.delete-selected").Click();
         cut.Find("button.confirm").Click();
 
-        Assert.Contains("read-only", cut.Find(".banner-negative").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("could not be written", cut.Find(".banner-negative").TextContent);
         Assert.Equal(2, store.LoadAll().Count);
     }
 
     [Fact]
     public void A_Read_Only_Store_Shows_The_Reason_And_Hides_Destructive_Buttons()
     {
-        MemoryResultStore store = new() { IsReadOnly = true, ReadOnlyReason = "results.dat could not be read" };
+        MemoryResultStore store = new() { IsReadOnly = true, ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeRead, ("detail", "corrupt")) };
         SeedTwo(store);
         IRenderedComponent<HistoryPage> cut = RenderPage(store);
 
-        Assert.Contains("results.dat could not be read", cut.Find(".banner-negative").TextContent);
+        Assert.Contains("results.dat could not be read: corrupt", cut.Find(".banner-negative").TextContent);
         Assert.Empty(cut.FindAll("button.clear"));
         Assert.Empty(cut.FindAll("button.delete"));
 

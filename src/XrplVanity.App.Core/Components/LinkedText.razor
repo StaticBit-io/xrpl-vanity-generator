@@ -1,0 +1,19 @@
+@* A sentence in which one run of text, the product's name, is a link. The catalog holds the whole
+   sentence, so word order stays the translator's; the name is found in the finished text. *@
+@{
+  int at = string.IsNullOrEmpty(Link) ? -1 : Text.IndexOf(Link, StringComparison.Ordinal);
+}
+@if (at < 0)
+{
+  @Text
+}
+else
+{
+  @Text[..at]<a href="@Href">@Link</a>@Text[(at + Link.Length)..]
+}
+
+@code {
+  [Parameter, EditorRequired] public string Text { get; set; } = "";
+  [Parameter, EditorRequired] public string Link { get; set; } = "";
+  [Parameter, EditorRequired] public string Href { get; set; } = "";
+}

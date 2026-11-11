@@ -1,4 +1,5 @@
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.ViewModels;
 
@@ -19,9 +20,6 @@ public sealed class TutorialService : IDisposable
     /// <summary>The length the first step asks for: shorter words are found too quickly to show a long wait.</summary>
     private const int LongWordLength = 10;
 
-    private const string ShortestWordHint =
-        "An address needs only one of your words, so the shortest one sets the time. Remove the short words.";
-
     private readonly SearchViewModel _vm;
     private readonly IResultStore _results;
     private readonly object _lock = new();
@@ -29,7 +27,7 @@ public sealed class TutorialService : IDisposable
     private int _dutyAtEntry;
     private bool _calibrationSeen;
     private bool _lastCanGoNext;
-    private string? _lastHint;
+    private UiText? _lastHint;
     private bool _lastLeaving;
     private bool _beginning;
     private bool _pageDialogOpen;
@@ -70,7 +68,7 @@ public sealed class TutorialService : IDisposable
     /// A line shown under the step's text when the user's own state needs it, or null. Adding a long
     /// word next to a short one changes nothing, because any one word is enough for a match.
     /// </summary>
-    public string? Hint { get { lock (_lock) return ComputeHint(); } }
+    public UiText? Hint { get { lock (_lock) return ComputeHint(); } }
 
     /// <summary>1-based position among the numbered steps, which exclude the offer; 0 on the offer or when inactive.</summary>
     public int StepNumber
@@ -351,8 +349,8 @@ public sealed class TutorialService : IDisposable
         bool canGoNext = ComputeCanGoNext();
         bool flipped = canGoNext != _lastCanGoNext;
         _lastCanGoNext = canGoNext;
-        string? hint = ComputeHint();
-        bool hintChanged = !string.Equals(hint, _lastHint, StringComparison.Ordinal);
+        UiText? hint = ComputeHint();
+        bool hintChanged = !Equals(hint, _lastHint);
         _lastHint = hint;
         return moved || flipped || hintChanged;
     }
@@ -445,10 +443,10 @@ public sealed class TutorialService : IDisposable
         }
     }
 
-    private string? ComputeHint()
+    private UiText? ComputeHint()
     {
         if (_current?.Step != TutorialStep.LongWord || _vm.Patterns.Count < 2) return null;
-        return _vm.EstimatedTime is TimeSpan wait && wait <= TooLong ? ShortestWordHint : null;
+        return _vm.EstimatedTime is TimeSpan wait && wait <= TooLong ? TutorialText.ShortestWordHint : null;
     }
 
     private bool HasLongWord() =>

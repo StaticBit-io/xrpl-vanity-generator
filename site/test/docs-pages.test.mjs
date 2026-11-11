@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { ACTIVE_LANGS, pathPrefix } from '../src/js/languages.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const textOf = (markup) => markup.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
@@ -20,10 +21,19 @@ function sourceFlags() {
   return [...read('../../src/XrplVanity.Cli/CliOptions.cs').matchAll(/case "(--[a-z-]+)":/g)].map((match) => match[1]).sort();
 }
 
-/** The flags of the Options table on the page: the first token of each row head. */
+/** The Options table region of a CLI page: its aria-label is translated, so it is found by data-table. */
+function optionsTable(html) {
+  const region = /<div\b[^>]*data-table="options"[^>]*>[\s\S]*?<\/table>/.exec(html);
+  return region === null ? '' : region[0];
+}
+
+/** The flags of the Options table on a page: the first token of each row head. */
+function flagsOf(html) {
+  return [...optionsTable(html).matchAll(/<th scope="row"><code>(--[a-z-]+)/g)].map((match) => match[1]).sort();
+}
+
 function pageFlags() {
-  const table = /aria-label="Command-line options"[\s\S]*?<\/table>/.exec(cli)[0];
-  return [...table.matchAll(/<th scope="row"><code>(--[a-z-]+)/g)].map((match) => match[1]).sort();
+  return flagsOf(cli);
 }
 
 test('the README table is found', () => {
@@ -34,6 +44,19 @@ test('the README table is found', () => {
 test('the page, the README and the parser list exactly the same flags', () => {
   assert.deepEqual(pageFlags(), sourceFlags());
   assert.deepEqual(readmeFlags(), sourceFlags());
+});
+
+for (const lang of ACTIVE_LANGS) {
+  test(`${lang}: the Options table of the CLI page lists exactly the parser's flags`, () => {
+    const html = read(`../src${pathPrefix(lang)}/cli/index.html`);
+    assert.deepEqual(flagsOf(html), sourceFlags());
+  });
+}
+
+test('the options table is found by data-table even when its label is translated', () => {
+  const translated = '<div class="reference" data-table="options" aria-label="Optionen"><table><tr><th scope="row"><code>--gpu-duty N</code></th></tr></table></div>';
+  assert.deepEqual(flagsOf(translated), ['--gpu-duty']);
+  assert.deepEqual(flagsOf('<div aria-label="Options"><table></table></div>'), []);
 });
 
 test('a flag that takes one value is not shown as taking several', () => {

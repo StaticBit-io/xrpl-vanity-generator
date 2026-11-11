@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using XrplVanity.App.Core.Localization;
 
 namespace XrplVanity.App.Core.Tutorial;
 
@@ -22,7 +23,7 @@ public partial class TutorialOverlay
     private int _stepNumber;
     private int _stepCount;
     private bool _canGoNext;
-    private string? _hint;
+    private UiText? _hint;
     private bool _confirming;
     private bool _pageDialog;
     private bool _leaving;

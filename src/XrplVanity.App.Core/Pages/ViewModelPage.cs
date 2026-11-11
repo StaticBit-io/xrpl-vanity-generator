@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.ViewModels;
 
 namespace XrplVanity.App.Core.Pages;
@@ -14,6 +15,11 @@ namespace XrplVanity.App.Core.Pages;
 public abstract class ViewModelPage : ComponentBase, IDisposable
 {
     private volatile bool _disposed;
+
+    [CascadingParameter] public TextCatalog? Catalog { get; set; }
+
+    /// <summary>The catalog the shell cascades; English when the component is rendered without a shell.</summary>
+    protected TextCatalog T => Catalog ?? TextCatalog.For(UiLanguage.English);
 
     [Inject] protected SearchViewModel Vm { get; set; } = null!;
 

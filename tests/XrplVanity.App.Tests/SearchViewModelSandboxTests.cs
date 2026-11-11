@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
@@ -34,6 +35,20 @@ public class SearchViewModelSandboxTests
     {
         vm.Start();
         WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
+    }
+
+    [Fact]
+    public void A_Language_Chosen_During_The_Tutorial_Survives_Its_End()
+    {
+        (SearchViewModel vm, _, _, MemorySettingsStore settings) = Create();
+        Assert.True(vm.BeginSandbox());
+
+        vm.SaveSettings(s => s with { Language = "ru" });
+        vm.EndSandbox();
+
+        Assert.False(vm.IsSandbox);
+        Assert.Equal("ru", vm.Settings.Language);
+        Assert.Equal("ru", settings.Current.Language);
     }
 
     [Fact]
@@ -332,7 +347,7 @@ public class SearchViewModelSandboxTests
         vm.MeasureSpeed();
         // The failure is written just after the flag drops.
         WaitUntil(() => !vm.IsCalibrating && vm.CalibrationFailure is not null, "the measurement to report its failure");
-        string? failure = vm.CalibrationFailure;
+        UiText? failure = vm.CalibrationFailure;
         Assert.NotNull(failure);
 
         Assert.True(vm.BeginSandbox());

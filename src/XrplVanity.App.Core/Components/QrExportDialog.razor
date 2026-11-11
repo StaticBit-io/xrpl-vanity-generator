@@ -1,11 +1,12 @@
 @using XrplVanity.Core
+@inherits LocalizedComponent
 @inject TimeProvider Clock
 
 @if (Rows is { Count: > 0 })
 {
   <div class="modal-backdrop"></div>
-  <div class="modal-box card-box qr-box" role="dialog" aria-modal="true" aria-label="Show as QR code" aria-describedby="@(Note is null ? null : "qr-note")" tabindex="-1" @onkeydown="OnKeyDown" @ref="_box">
-    <h3>Show as QR code</h3>
+  <div class="modal-box card-box qr-box" role="dialog" aria-modal="true" aria-label="@T[QrText.Title]" aria-describedby="@(Note is null ? null : "qr-note")" tabindex="-1" @onkeydown="OnKeyDown" @ref="_box">
+    <h3>@T[QrText.Title]</h3>
     @if (Note is not null)
     {
       <p id="qr-note" class="tutorial-note">@Note</p>
@@ -13,22 +14,22 @@
 
     @* Buttons rather than radios: this application has no other radio group, and a button says
        plainly that choosing a format throws away whatever code is on screen. *@
-    <div class="formats" role="group" aria-label="Code format">
-      <button class="format-backup t @(_seedOnly ? null : "active")" @onclick="() => SetFormat(false)">StaticBit backup — @Rows.Count @(Rows.Count == 1 ? "wallet" : "wallets")</button>
-      <button class="format-seed t @(_seedOnly ? "active" : null)" disabled="@(Rows.Count != 1)" @onclick="() => SetFormat(true)">Seed only</button>
+    <div class="formats" role="group" aria-label="@T[QrText.FormatGroup]">
+      <button class="format-backup t @(_seedOnly ? null : "active")" @onclick="() => SetFormat(false)">@T.Render(UiText.Of(QrText.FormatBackup, ("app", AppName), ("count", Rows.Count)))</button>
+      <button class="format-seed t @(_seedOnly ? "active" : null)" disabled="@(Rows.Count != 1)" @onclick="() => SetFormat(true)">@T[QrText.FormatSeed]</button>
     </div>
     <div class="format-note">
       @if (Rows.Count != 1)
       {
-        <text>A bare seed carries one wallet, so that format needs a selection of exactly one wallet.</text>
+        <text>@T[QrText.SeedNeedsOneWallet]</text>
       }
       else if (_seedOnly)
       {
-        <text>Scanned by <a href="https://staticbit.io">StaticBit</a> or any wallet that takes a family seed.</text>
+        <LinkedText Text="@T.Render(UiText.Of(QrText.ScannedBySeed, ("app", AppName)))" Link="@AppName" Href="@AppUrl" />
       }
       else
       {
-        <text>Scanned by <a href="https://staticbit.io">StaticBit</a>'s restore screen.</text>
+        <LinkedText Text="@T.Render(UiText.Of(QrText.ScannedByBackup, ("app", AppName)))" Link="@AppName" Href="@AppUrl" />
       }
     </div>
 
@@ -37,10 +38,10 @@
        nowhere. Change puts them back. *@
     <div class="backup-fields @(_seedOnly || _code is not null ? "hidden" : null)">
       <div class="password-row">
-        <input class="password form-control" type="password" placeholder="password (optional)" @bind="_password" @bind:event="oninput" />
-        <input class="password-confirm form-control" type="password" placeholder="repeat it" @bind="_passwordConfirm" @bind:event="oninput" />
+        <input class="password form-control" type="password" placeholder="@T[QrText.PasswordPlaceholder]" @bind="_password" @bind:event="oninput" />
+        <input class="password-confirm form-control" type="password" placeholder="@T[QrText.RepeatPlaceholder]" @bind="_passwordConfirm" @bind:event="oninput" />
       </div>
-      <input class="folder form-control" maxlength="@StaticBitBackup.MaxFolderNameLength" placeholder="folder on the phone (optional)" @bind="_folder" @bind:event="oninput" />
+      <input class="folder form-control" maxlength="@StaticBitBackup.MaxFolderNameLength" placeholder="@T[QrText.FolderPlaceholder]" @bind="_folder" @bind:event="oninput" />
     </div>
 
     @* The button stands where the code will: showing, hiding and showing again all happen inside
@@ -48,7 +49,7 @@
     <div class="code-slot">
       @if (_code is null)
       {
-        <button class="btn-primary-mint show-code t" disabled="@_building" @onclick="ShowCode">@(_building ? "Building…" : "Show code")</button>
+        <button class="btn-primary-mint show-code t" disabled="@_building" @onclick="ShowCode">@T[_building ? QrText.Building : QrText.ShowCode]</button>
       }
       else
       {
@@ -56,9 +57,9 @@
       }
     </div>
 
-    <div class="qr-warning @(ShowsWarning ? null : "hidden")">This code is not encrypted. Anyone who photographs it owns @(Rows.Count == 1 ? "this wallet" : "these wallets").</div>
-    <div class="qr-caption @(_code is null ? "hidden" : null)">Scan with <a href="https://staticbit.io">StaticBit</a> on your phone.</div>
-    <div class="qr-error @(_error is null ? "hidden" : null)">@_error</div>
+    <div class="qr-warning @(ShowsWarning ? null : "hidden")">@T.Render(UiText.Of(QrText.NotEncrypted, ("count", Rows.Count)))</div>
+    <div class="qr-caption @(_code is null ? "hidden" : null)"><LinkedText Text="@T.Render(UiText.Of(QrText.ScanCaption, ("app", AppName)))" Link="@AppName" Href="@AppUrl" /></div>
+    <div class="qr-error @(_error is null ? "hidden" : null)">@T.Render(_error)</div>
 
     <div class="stores">
       <a class="store-ios" href="https://apps.apple.com/us/app/staticbit/id6745529426">App Store</a>
@@ -68,9 +69,9 @@
     <div class="buttons">
       @if (_code is not null && !_seedOnly)
       {
-        <button class="btn-secondary-dark change-code t" @onclick="ChangeCode">Change</button>
+        <button class="btn-secondary-dark change-code t" @onclick="ChangeCode">@T[QrText.Change]</button>
       }
-      <button class="btn-secondary-dark close t" @ref="_close" @onclick="() => OnClose.InvokeAsync()">Close</button>
+      <button class="btn-secondary-dark close t" @ref="_close" @onclick="() => OnClose.InvokeAsync()">@T[CommonText.Close]</button>
     </div>
   </div>
 }

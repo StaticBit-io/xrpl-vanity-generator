@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from '../build.mjs';
 import { SITE_ORIGIN } from '../src/js/config.mjs';
+import { ACTIVE_LANGS, ENGLISH_ONLY, pathPrefix } from '../src/js/languages.mjs';
 
 const SITE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PAGES = ['index.html', 'desktop/index.html', 'cli/index.html', 'privacy/index.html', 'support/index.html'];
@@ -49,7 +50,10 @@ test('the sitemap lists every page and leaves out the 404', async (t) => {
   const read = await built(t);
   const sitemap = await read('sitemap.xml');
   const urls = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
-  assert.deepEqual(urls, ['/', '/cli/', '/desktop/', '/privacy/', '/support/'].map((path) => `${SITE_ORIGIN}${path}`));
+  const english = ['/', '/cli/', '/desktop/', '/privacy/', '/support/'];
+  const translated = ACTIVE_LANGS.filter((lang) => lang !== 'en')
+    .flatMap((lang) => english.filter((path) => !ENGLISH_ONLY.includes(path)).map((path) => `${pathPrefix(lang)}${path}`));
+  assert.deepEqual([...urls].sort(), [...english, ...translated].map((path) => `${SITE_ORIGIN}${path}`).sort());
   assert.match(sitemap, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
   assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
 });

@@ -1,5 +1,7 @@
+using System.Globalization;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Pages;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Tutorial;
@@ -10,6 +12,10 @@ namespace XrplVanity.App.Tests;
 
 public class SettingsPageTests : BunitContext
 {
+    private readonly Localizer _localizer = new(null, CultureInfo.InvariantCulture);
+
+    public SettingsPageTests() => Services.AddSingleton(_localizer);
+
     [Fact]
     public void Changing_A_Setting_Saves_It_Immediately()
     {
@@ -29,6 +35,64 @@ public class SettingsPageTests : BunitContext
 
         cut.Find("button.forget-hints").Click();
         Assert.Empty(settings.Current.RateHints);
+    }
+
+    [Fact]
+    public void Choosing_A_Language_Switches_And_Saves_It()
+    {
+        MemorySettingsStore settings = new();
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
+        Services.AddSingleton(vm);
+        Services.AddSingleton(new TutorialService(vm, new MemoryResultStore()));
+        Services.AddSingleton<INotificationService>(new FakeNotifications());
+        Services.AddSingleton<IWindowService>(new NullWindowService());
+        IRenderedComponent<SettingsPage> cut = Render<SettingsPage>();
+
+        Assert.Equal(
+            UiLanguage.All.Select(l => (l.Code, l.NativeName)),
+            cut.FindAll("select.language option").Select(o => (o.GetAttribute("value")!, o.TextContent)));
+
+        cut.Find("select.language").Change("ru");
+
+        Assert.Same(UiLanguage.Russian, _localizer.Language);
+        Assert.Equal("ru", settings.Current.Language);
+        Assert.Empty(cut.FindAll(".language-not-remembered"));
+    }
+
+    [Fact]
+    public void A_Failed_Save_Says_The_Language_Is_Not_Remembered()
+    {
+        MemorySettingsStore settings = new() { FailSaves = true };
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
+        Services.AddSingleton(vm);
+        Services.AddSingleton(new TutorialService(vm, new MemoryResultStore()));
+        Services.AddSingleton<INotificationService>(new FakeNotifications());
+        Services.AddSingleton<IWindowService>(new NullWindowService());
+        IRenderedComponent<SettingsPage> cut = Render<SettingsPage>();
+
+        cut.Find("select.language").Change("de");
+
+        Assert.Same(UiLanguage.German, _localizer.Language);
+        Assert.Single(cut.FindAll(".language-not-remembered"));
+    }
+
+    [Fact]
+    public void The_Not_Remembered_Note_Goes_Away_After_A_Later_Successful_Save()
+    {
+        MemorySettingsStore settings = new() { FailSaves = true };
+        SearchViewModel vm = new(settings, new MemoryResultStore(), new FakeNotifications(), () => Array.Empty<XrplVanity.Search.DeviceCatalogEntry>());
+        Services.AddSingleton(vm);
+        Services.AddSingleton(new TutorialService(vm, new MemoryResultStore()));
+        Services.AddSingleton<INotificationService>(new FakeNotifications());
+        Services.AddSingleton<IWindowService>(new NullWindowService());
+        IRenderedComponent<SettingsPage> cut = Render<SettingsPage>();
+        cut.Find("select.language").Change("de");
+        Assert.Single(cut.FindAll(".language-not-remembered"));
+
+        settings.FailSaves = false;
+        cut.Find("select.close-behavior").Change(CloseBehavior.Exit.ToString());
+
+        Assert.Empty(cut.FindAll(".language-not-remembered"));
     }
 
     [Fact]
