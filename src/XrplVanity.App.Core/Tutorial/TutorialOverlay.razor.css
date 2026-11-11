@@ -1,0 +1,53 @@
+/* Above the dialogs (z-index 40 and 41 in wwwroot/scss/components/_modal.scss), though it is not
+   shown while the QR dialog is open: that step is explained inside the dialog. While the leave
+   confirmation is open it drops below that dialog's backdrop, so the two never overlap. */
+.tutorial-bubble {
+  position: fixed;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  z-index: 60;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: 14px 16px;
+  background: var(--box-bg);
+  color: var(--text);
+  border: 1px solid var(--mint);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+
+/* Once placed, left and top come from the measurement. */
+.tutorial-bubble.positioned { transform: none; transition: left var(--ease), top var(--ease); }
+.tutorial-bubble.unplaced { visibility: hidden; }
+.tutorial-bubble.behind { z-index: 39; }
+.tutorial-bubble:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
+
+/* The wind-down after a leave: small, out of the way, and above the dialogs like the bubble. */
+.tutorial-status {
+  position: fixed;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 8px 14px;
+  background: var(--box-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--mint);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+
+/* --text-secondary on --box-bg is about 7:1 and --mint about 9:1, both over the 4.5:1 AA asks. */
+.tutorial-step { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 4px; }
+.tutorial-bubble h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+.tutorial-bubble p { margin: 0; color: var(--text-secondary); line-height: 1.5; }
+.tutorial-bubble p.tutorial-note { margin-top: 8px; color: var(--yellow); }
+.tutorial-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
+.tutorial-buttons button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.tutorial-buttons .tutorial-next, .tutorial-buttons .tutorial-start { margin-left: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-bubble.positioned { transition: none; }
+}

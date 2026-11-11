@@ -1,3 +1,4 @@
+@inherits LocalizedComponent
 @if (Visible)
 {
   <div class="modal-backdrop"></div>
@@ -13,13 +14,13 @@
         }
         @if (Addresses.Count > MaxListedAddresses)
         {
-          <div class="more">…and @(Addresses.Count - MaxListedAddresses) more</div>
+          <div class="more">@T.Render(UiText.Of(DialogText.AndMore, ("count", Addresses.Count - MaxListedAddresses)))</div>
         }
       </div>
     }
     <div class="buttons">
-      <button class="btn-danger confirm t" @onclick="() => OnConfirm.InvokeAsync()">@ConfirmLabel</button>
-      <button class="btn-secondary-dark cancel t" @ref="_cancel" @onclick="() => OnCancel.InvokeAsync()">Cancel</button>
+      <button class="btn-danger confirm t" @onclick="() => OnConfirm.InvokeAsync()">@(ConfirmLabel ?? T[DialogText.Delete])</button>
+      <button class="btn-secondary-dark cancel t" @ref="_cancel" @onclick="() => OnCancel.InvokeAsync()">@T[DialogText.Cancel]</button>
     </div>
   </div>
 }

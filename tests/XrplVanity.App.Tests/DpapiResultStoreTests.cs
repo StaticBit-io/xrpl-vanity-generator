@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Storage;
 using Xunit;
 
@@ -132,7 +133,7 @@ public class DpapiResultStoreTests
 
         Assert.Throws<InvalidOperationException>(() => store.Append(new("rSecond", "sEdFakeSeedTwo", "b", "Starts", DateTimeOffset.UtcNow, "cpu")));
         Assert.True(store.IsReadOnly);
-        Assert.Contains("could not be written", store.ReadOnlyReason);
+        Assert.Equal(HistoryText.ResultsCouldNotBeWritten, store.ReadOnlyReason!.Id);
         Assert.Equal(new[] { first }, store.LoadAll());
         Assert.Equal(new[] { first }, new DpapiResultStore(folder).LoadAll());
     }

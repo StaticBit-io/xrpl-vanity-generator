@@ -41,6 +41,38 @@ node --test "site/test/*.test.mjs"
 Markers: `<!--@chrome:head-->`, `<!--@chrome:header-->`, `<!--@chrome:footer-->`, `<!--@support-email-->`
 and `<!--@glyph-field-->`.
 
+## Languages
+
+The site is built in six languages. Adding one is a data change: its words, its pages and its entry in two lists.
+
+| Code | Home | `<html lang>` and hreflang | Number locale | Status |
+|---|---|---|---|---|
+| `en` | `/` | `en` | `en-GB` | written by hand |
+| `ru` | `/ru/` | `ru` | `ru-RU` | translated from English, awaiting the owner's read |
+| `de` | `/de/` | `de` | `de-DE` | translated from English, awaiting a native speaker's review |
+| `es` | `/es/` | `es` | `es-ES` | translated from English, awaiting a native speaker's review |
+| `pt` | `/pt/` | `pt` | `pt-BR` | translated from English, awaiting a native speaker's review |
+| `zh` | `/zh/` | `zh-Hans` | `zh-Hans-CN` | translated from English, awaiting a native speaker's review |
+
+The same table, with the same tags and locales, is `UiLanguage` in the desktop application; a test keeps
+the two equal. `/privacy/` exists in English only: it carries a canonical and no alternates, and the
+language menu sends every other language to its home instead.
+
+- `src/js/languages.mjs` holds `LANGS` (menu order) and `ACTIVE_LANGS` (what ships). Only an active
+  language gets pages, a menu entry and `hreflang` alternates; the build refuses a folder for any other.
+- `chrome-strings.mjs` holds the header, footer and head words per language, with English's keys.
+- `src/<lang>/` holds the language's `index.html`, `desktop/`, `cli/`, `support/` and `404.html`. They keep
+  the English pages' ids, internal links, images, scripts and every `<code>` and `<pre>` exactly;
+  `test/translations.test.mjs` checks that, and `test/home.test.mjs` checks the speeds against
+  `docs/benchmarks.md` in each language's number format.
+- `src/js/lang-redirect.js` sends a first visit from an English page to the browser's language. It runs
+  before the stylesheets, only when `localStorage` can be read and written and holds no choice, and
+  stores nothing; a click in the language menu stores the choice first (`src/js/lang.mjs`), so a reader
+  who picks English is never sent away again. It carries its own copy of `ACTIVE_LANGS` and of the
+  unprefixed page list, and tests pin both.
+- Cyrillic is drawn by `fonts/martian-mono-5.3.0-cyrillic.woff2`; Chinese pages use the system's
+  Simplified Chinese faces, since Martian Mono has no Chinese glyphs.
+
 ## E-mail addresses
 
 Cloudflare's Email Address Obfuscation is on for the `staticbit.io` zone. It serves a bare address as

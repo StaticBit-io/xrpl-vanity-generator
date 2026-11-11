@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
 
@@ -11,10 +12,13 @@ public partial class HistoryPage
     private List<PatternOption> _options = new();
     private string _filter = string.Empty;
     private string _patternKey = string.Empty;
-    private string? _storeError;
+    private UiText? _storeError;
     private int _lastSessionResultCount = -1;
     private PendingAction? _pending;
     private IReadOnlyList<SessionResult>? _qrRows;
+
+    /// <summary>The file the storage note names; it is a name on disk, not copy.</summary>
+    private const string StorageFileName = "results.dat";
 
     protected override void OnInitialized()
     {
@@ -84,9 +88,9 @@ public partial class HistoryPage
         // Only the address is captured: a pending action must not hold a seed alive.
         string address = item.Address;
         _pending = new PendingAction(
-            "Delete this result?",
-            () => "Its seed is deleted with it. results.dat is the only place the seed exists, so this cannot be undone.",
-            "Delete",
+            UiText.Of(HistoryText.DeleteOneTitle),
+            () => UiText.Of(HistoryText.DeleteOneMessage),
+            UiText.Of(DialogText.Delete),
             new[] { address },
             () => Write(() => Store.Delete(address)));
     }
@@ -100,18 +104,18 @@ public partial class HistoryPage
 
         string[] addresses = items.Select(i => i.Address).ToArray();
         _pending = new PendingAction(
-            $"Delete {addresses.Length} result{(addresses.Length == 1 ? string.Empty : "s")}?",
-            () => "Their seeds are deleted with them. results.dat is the only place those seeds exist, so this cannot be undone.",
-            $"Delete {addresses.Length}",
+            UiText.Of(HistoryText.DeleteManyTitle, ("count", addresses.Length)),
+            () => UiText.Of(HistoryText.DeleteManyMessage),
+            UiText.Of(HistoryText.DeleteManyConfirm, ("count", addresses.Length)),
             addresses,
             () => Write(() => Store.DeleteMany(addresses)));
     }
 
     private void AskClear()
         => _pending = new PendingAction(
-            "Clear the whole history?",
-            () => $"All {_all.Count} results and their seeds are removed from results.dat. This cannot be undone, and the filters do not narrow it — everything goes.",
-            "Clear history",
+            UiText.Of(HistoryText.ClearTitle),
+            () => UiText.Of(HistoryText.ClearMessage, ("count", _all.Count)),
+            UiText.Of(HistoryText.ClearHistory),
             null,
             () => Write(Store.Clear));
 
@@ -136,7 +140,7 @@ public partial class HistoryPage
         }
         catch (InvalidOperationException ex)
         {
-            _storeError = ex.Message;
+            _storeError = UiText.Of(HistoryText.ActionFailed, ("detail", ex.Message));
         }
 
         Reload();
@@ -154,9 +158,11 @@ public partial class HistoryPage
             .GroupBy(r => (r.Pattern, r.Position))
             .Select(g => new PatternOption(
                 OptionKey(g.Key.Pattern, g.Key.Position),
-                $"{g.Key.Pattern} ({g.Key.Position.ToLowerInvariant()})",
+                g.Key.Pattern,
+                g.Key.Position,
                 g.Count()))
-            .OrderBy(o => o.Display, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(o => o.Pattern, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(o => o.Position, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         // Deleting the last row of the chosen pattern takes its option with it. A select still
@@ -175,13 +181,17 @@ public partial class HistoryPage
     /// rather than a string because a search running behind the page keeps adding results: the
     /// clear dialog's count must be read at render time, not at the moment it opened.
     /// </summary>
-    private sealed record PendingAction(string Title, Func<string> Message, string ConfirmLabel,
+    private sealed record PendingAction(UiText Title, Func<UiText> Message, UiText ConfirmLabel,
         IReadOnlyList<string>? Addresses, Action Execute);
 
     /// <summary>
-    /// One choice in the pattern filter: <paramref name="Display"/> reads exactly like the cell in
-    /// the pattern column ("fast (starts)"), and <paramref name="Count"/> is how many stored rows
-    /// carry it.
+    /// One choice in the pattern filter. Its label is built at render time (<see cref="OptionLabel"/>)
+    /// so it follows the language; it reads exactly like the cell in the pattern column
+    /// ("fast (starts)"). <paramref name="Position"/> is the stored name, and <paramref name="Count"/>
+    /// is how many stored rows carry the pair.
     /// </summary>
-    private sealed record PatternOption(string Key, string Display, int Count);
+    private sealed record PatternOption(string Key, string Pattern, string Position, int Count);
+
+    private static UiText OptionLabel(PatternOption option)
+        => UiText.Of(HistoryText.PatternOption, ("pattern", option.Pattern), ("position", PatternsText.Position(option.Position)));
 }

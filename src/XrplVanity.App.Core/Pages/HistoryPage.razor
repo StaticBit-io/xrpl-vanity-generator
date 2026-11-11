@@ -5,36 +5,36 @@
 @* While a dialog is open the page behind it is inert: the destructive controls it covers —
    "Clear history" above all — must not stay reachable by keyboard or mouse. *@
 <header class="page-head" inert="@(_pending is not null || _qrRows is not null)">
-  <h1>History <span class="pill">@_all.Count stored</span></h1>
+  <h1>@T[HistoryText.Title] <span class="pill">@T.Render(UiText.Of(HistoryText.Stored, ("count", _all.Count)))</span></h1>
   <div class="actions">
     @if (!Store.IsReadOnly && _all.Count > 0)
     {
-      <button class="btn-secondary-dark clear t" @onclick="AskClear">Clear history</button>
+      <button class="btn-secondary-dark clear t" @onclick="AskClear">@T[HistoryText.ClearHistory]</button>
     }
   </div>
 </header>
 <div class="content-scroll" inert="@(_pending is not null || _qrRows is not null)">
   @if (Store.IsReadOnly)
   {
-    <Banner Kind="negative" Text="@(Store.ReadOnlyReason ?? "history is read-only")" />
+    <Banner Kind="negative" Text="@T.Render(Store.ReadOnlyReason ?? UiText.Of(HistoryText.ReadOnly))" />
   }
   @* A failed write turns the store read-only and throws with that same reason, so the banner
      above already carries it; showing both would stack two identical red lines. *@
   @if (_storeError is not null && !Store.IsReadOnly)
   {
-    <Banner Kind="negative" Text="@_storeError" />
+    <Banner Kind="negative" Text="@T.Render(_storeError)" />
   }
   @* Two filters over one list, narrowing together: the text box searches free-form, the select
      picks one cell of the pattern column so a whole pattern can be selected and acted on at once. *@
   <div class="filter-row">
-    <input class="filter form-control mono" placeholder="filter by address or pattern" @bind="_filter" @bind:event="oninput" />
+    <input class="filter form-control mono" placeholder="@T[HistoryText.FilterPlaceholder]" @bind="_filter" @bind:event="oninput" />
     @if (_options.Count > 0)
     {
-      <select class="pattern-filter form-select" aria-label="Filter by pattern" @bind="_patternKey">
-        <option value="">All patterns — @_all.Count</option>
+      <select class="pattern-filter form-select" aria-label="@T[HistoryText.FilterByPattern]" @bind="_patternKey">
+        <option value="">@T.Render(UiText.Of(HistoryText.AllPatterns, ("count", _all.Count)))</option>
         @foreach (PatternOption option in _options)
         {
-          <option value="@option.Key">@option.Display — @option.Count</option>
+          <option value="@option.Key">@T.Render(UiText.Of(HistoryText.OptionCount, ("label", OptionLabel(option)), ("count", option.Count)))</option>
         }
       </select>
     }
@@ -46,13 +46,25 @@
   @* The mockup replaces this footer with the red banner when results.dat cannot be read. *@
   @if (!Store.IsReadOnly && _storeError is null)
   {
-    <div class="storage-note muted">Stored in <span class="mono">results.dat</span>, encrypted with Windows DPAPI for this user account. Nothing else on disk contains a seed.</div>
+    @* The file name is not translated and stays in the sentence, so it is found in the finished text and set in the monospace face. *@
+    string note = T[HistoryText.StorageNote];
+    int fileAt = note.IndexOf(StorageFileName, StringComparison.Ordinal);
+    <div class="storage-note muted">
+      @if (fileAt < 0)
+      {
+        @note
+      }
+      else
+      {
+        @note[..fileAt]<span class="mono">@StorageFileName</span>@note[(fileAt + StorageFileName.Length)..]
+      }
+    </div>
   }
 </div>
 
 <QrExportDialog Rows="_qrRows" OnClose="() => _qrRows = null" />
 
-<ConfirmDialog Visible="@(_pending is not null)" Title="@(_pending?.Title ?? string.Empty)"
-               Message="@(_pending is null ? string.Empty : _pending.Message())" Addresses="_pending?.Addresses"
-               ConfirmLabel="@(_pending?.ConfirmLabel ?? "Delete")"
+<ConfirmDialog Visible="@(_pending is not null)" Title="@(_pending is null ? string.Empty : T.Render(_pending.Title))"
+               Message="@(_pending is null ? string.Empty : T.Render(_pending.Message()))" Addresses="_pending?.Addresses"
+               ConfirmLabel="@(_pending is null ? null : T.Render(_pending.ConfirmLabel))"
                OnConfirm="Confirm" OnCancel="Cancel" />

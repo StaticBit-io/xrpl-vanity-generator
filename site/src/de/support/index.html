@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de">
+<head>
+<title>Hilfe | XRPL Vanity</title>
+<meta name="description" content="Hilfe zu XRPL Vanity und Lösungen für häufige Probleme mit der Desktop-Anwendung.">
+<!--@chrome:head-->
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main" class="prose">
+<h1>Hilfe</h1>
+<p class="lead">Schreiben Sie an <!--@support-email-->.</p>
+<p>Einen Fehler gefunden? <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/issues">Melden Sie ihn auf GitHub</a>, mit Ihrer Windows-Version und der Grafikkarte, auf der Sie suchen.</p>
+<p><strong>Schicken Sie niemandem einen Seed, weder per E-Mail noch in einem Issue oder auf einem Screenshot.</strong> Für Hilfe braucht ihn niemand, und wer ihn besitzt, verfügt über das Konto.</p>
+
+<h2 id="problems">Häufige Probleme</h2>
+
+<h3>Das Fenster bleibt leer oder meldet, dass die Seite nicht erreichbar ist</h3>
+<p>Die WebView2-Laufzeit fehlt. Installieren Sie die <a href="https://developer.microsoft.com/microsoft-edge/webview2/">Evergreen-WebView2-Laufzeit</a> und öffnen Sie die Anwendung erneut.</p>
+
+<h3>Außer dem Prozessor erscheinen keine Geräte</h3>
+<p>Die Anwendung findet CUDA über den NVIDIA-Treiber und OpenCL über die installierten Treiber. Installieren oder aktualisieren Sie den Grafiktreiber und klicken Sie dann auf der Karte „Geräte“ auf „Geräte neu suchen“. Ein Neustart ist nicht nötig.</p>
+
+<h3>Eine Gerätezeile wird während der Suche rot</h3>
+<p>Dieses Gerät ist ausgefallen, zum Beispiel nach einem Treiber-Reset, und die Meldung steht in der Zeile. Die anderen Geräte laufen weiter. Die Suche endet nur, wenn alle ausfallen.</p>
+
+<h3>Der Verlauf ist schreibgeschützt</h3>
+<p>Die Anwendung konnte ihre Ergebnisdatei nicht lesen oder schreiben, den Grund nennt das Banner auf der Seite „Verlauf“. Meist wurde die Datei von einem anderen Windows-Konto geschrieben oder von einem anderen Computer kopiert: Ergebnisse lassen sich nur mit dem Konto öffnen, das sie geschrieben hat. Verschieben Sie die Datei, um mit einem neuen Verlauf zu beginnen.</p>
+
+<h3>Benachrichtigungen erscheinen nie</h3>
+<p>Die Seite „Einstellungen“ zeigt, ob Windows sie angenommen hat. Falls ja, prüfen Sie in den Windows-Einstellungen unter „System“ und „Benachrichtigungen“, dass Benachrichtigungen für XRPL Vanity an sind und „Nicht stören“ aus ist. Eine lange Suche mit einem kurzen Wort kann Hunderte Benachrichtigungen einreihen, und Windows zeigt sie nacheinander.</p>
+
+<h3>Ein Wort dauert viel länger als geschätzt</h3>
+<p>Die Schätzung ist ein Durchschnitt, und eine Suche kann deutlich länger laufen. Ein Wort, dessen erster Buchstabe selten auf das <code>r</code> folgt, ist etwa 23-mal seltener, als seine Länge vermuten lässt, probieren Sie also die Option <em>am 2. oder 3. Zeichen</em>. Mehr dazu in der <a href="/de/desktop/#search">Anleitung zur Anwendung</a>.</p>
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 
 namespace XrplVanity.App.Core.Pages;
@@ -23,6 +24,46 @@ public partial class SettingsPage
             ?.InformationalVersion.Split('+')[0]
         ?? typeof(SettingsPage).Assembly.GetName().Version?.ToString(3)
         ?? "unknown";
+
+    /// <summary>
+    /// The tutorial forces a stop count of 1 on the live view model so its search ends at the first
+    /// match; the field must show the user's own value, which is what the saved settings still hold.
+    /// </summary>
+    private int? ShownCount => Vm.IsSandbox ? Vm.Settings.Count : Vm.Count;
+
+    // The note shows only while the last save failed, so a later successful save clears it.
+    private bool _languageChosen;
+
+    private bool NotRemembered => _languageChosen && Vm.SettingsSaveError is not null;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        // CanStart also turns false while the offer card is open and true again when it is answered,
+        // which the view model does not announce.
+        Tutorial.Changed += OnViewModelChanged;
+    }
+
+    public override void Dispose()
+    {
+        Tutorial.Changed -= OnViewModelChanged;
+        base.Dispose();
+    }
+
+    /// <summary>
+    /// The language applies even when it cannot be saved: the screens switch first, and a failed
+    /// write only costs the choice at the next start, which the page says out loud.
+    /// </summary>
+    private void OnLanguageChanged(ChangeEventArgs e)
+    {
+        if (UiLanguage.FromCode((string?)e.Value) is not { } language) return;
+
+        Localizer.Choose(language);
+        Vm.SaveSettings(s => s with { Language = language.Code });
+        _languageChosen = true;
+    }
+
+    private void StartTutorial() => Tutorial.Begin();
 
     private void OnCloseBehaviorChanged(ChangeEventArgs e)
     {

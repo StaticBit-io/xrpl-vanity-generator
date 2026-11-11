@@ -1,14 +1,15 @@
+@inherits LocalizedComponent
 @inject IClipboardService Clipboard
 @inject IFileDialogService Dialog
 @inject TimeProvider Clock
 
 <div class="card-box results">
   <div class="head">
-    <div class="card-title">Results <span class="count">@Items.Count</span></div>
+    <div class="card-title">@T[ResultsText.Title] <span class="count">@Items.Count</span></div>
     @* Greyed out while a selection exists: the bar below is then the place to export from, so this button never changes meaning mid-click. *@
-    <button class="btn-secondary-dark export t" disabled="@(Items.Count == 0 || (Selectable && _selected.Count > 0))" @onclick="() => Export(_items)">Export TSV…</button>
+    <button class="btn-secondary-dark export t" disabled="@(SecretsLocked || Items.Count == 0 || (Selectable && _selected.Count > 0))" @onclick="() => Export(_items)">@T[ResultsText.ExportTsv]</button>
   </div>
-  @if (_exportError is not null) { <div class="export-error">@_exportError</div> }
+  @if (_exportError is not null) { <div class="export-error">@T.Render(_exportError)</div> }
   @* The host owns its filter row, so the "all shown" checkbox lives with the list it selects.
      The row is reserved whenever there is anything to select, and the selection's actions appear
      inside it rather than as a strip of their own: ticking the first box or clearing the last one
@@ -16,30 +17,30 @@
   @if (Selectable && Items.Count > 0)
   {
     <div class="sel-row">
-      <label class="pick-all-label @(SomePicked ? "partial" : "")"><input class="pick-all" type="checkbox" checked="@AllPicked" aria-label="@PickAllLabel" @onchange="e => PickAllShown((bool)e.Value!)" /> select all shown</label>
+      <label class="pick-all-label @(SomePicked ? "partial" : "")"><input class="pick-all" type="checkbox" checked="@AllPicked" aria-label="@PickAllLabel" @onchange="e => PickAllShown((bool)e.Value!)" /> @T[ResultsText.SelectAllShown]</label>
       @* Rendered even when nothing is selected, hidden rather than absent: the row then reserves
          exactly the space the actions will occupy, so no arithmetic can drift out of step with
          the buttons' real height and let the list move under the pointer. *@
       <div class="sel-bar @(_selected.Count == 0 ? "idle" : "")" aria-hidden="@(_selected.Count == 0)">
-        <b>@_selected.Count selected</b>
+        <b>@T.Render(UiText.Of(ResultsText.SelectedCount, ("count", _selected.Count)))</b>
         <span class="acts">
-          <button class="btn-secondary-dark export-selected t" @onclick="() => Export(SelectedItems())">Export selected…</button>
+          <button class="btn-secondary-dark export-selected t" disabled="@SecretsLocked" @onclick="() => Export(SelectedItems())">@T[ResultsText.ExportSelected]</button>
           @if (OnShowQr.HasDelegate)
           {
-            <button class="btn-secondary-dark show-qr-selected t" @onclick="() => OnShowQr.InvokeAsync(SelectedItems())">Show QR…</button>
+            <button class="btn-secondary-dark show-qr-selected t" @onclick="() => OnShowQr.InvokeAsync(SelectedItems())">@T[ResultsText.ShowQr]</button>
           }
           @if (OnDeleteSelected.HasDelegate)
           {
-            <button class="btn-secondary-dark danger delete-selected t" @onclick="() => OnDeleteSelected.InvokeAsync(SelectedItems())">Delete selected</button>
+            <button class="btn-secondary-dark danger delete-selected t" @onclick="() => OnDeleteSelected.InvokeAsync(SelectedItems())">@T[ResultsText.DeleteSelected]</button>
           }
-          <button class="btn-secondary-dark clear-selection t" @onclick="ClearSelection">Clear selection</button>
+          <button class="btn-secondary-dark clear-selection t" @onclick="ClearSelection">@T[ResultsText.ClearSelection]</button>
         </span>
       </div>
     </div>
   }
   @if (Items.Count == 0)
   {
-    <div class="empty-note">No matches yet — start a search and hits appear here as they are verified.</div>
+    <div class="empty-note">@T[ResultsText.Empty]</div>
   }
   else
   {
@@ -47,17 +48,17 @@
       <Virtualize TItem="SessionResult" Items="_items" Context="item" ItemSize="44" OverscanCount="8">
         @* _animated.Add returns true only the first time a row is seen, so a re-render (e.g. a seed reveal) does not replay the slide-in. *@
         <div class="result-row @(ShowTarget ? "has-target" : "") @(OnDelete.HasDelegate ? "has-delete" : "") @(Selectable ? "has-select" : "") @(_selected.ContainsKey(item.Address) ? "picked" : "") @(_animated.Add(item.Address) ? "slide-in" : "")" @key="item.Address">
-          @if (Selectable) { <input class="pick" type="checkbox" aria-label="@($"Select {item.Address}")" checked="@_selected.ContainsKey(item.Address)" @onchange="e => Pick(item, (bool)e.Value!)" /> }
+          @if (Selectable) { <input class="pick" type="checkbox" aria-label="@T.Render(UiText.Of(ResultsText.SelectRow, ("address", item.Address)))" checked="@_selected.ContainsKey(item.Address)" @onchange="e => Pick(item, (bool)e.Value!)" /> }
           <span class="mono address">@item.Address</span>
-          <button class="btn-icon copy-address" title="Copy address" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
-          <span class="pattern">@item.Pattern <span class="muted">(@item.Position.ToLowerInvariant())</span></span>
+          <button class="btn-icon copy-address" title="@T[ResultsText.CopyAddress]" disabled="@SecretsLocked" @onclick="() => Clipboard.CopyAsync(item.Address)">⧉</button>
+          <span class="pattern">@item.Pattern <span class="muted">(@T.Render(PatternsText.Position(item.Position)))</span></span>
           @if (ShowTarget) { <span class="target muted">@item.Target</span> }
           <span class="time muted">@item.FoundAt.ToLocalTime().ToString("HH:mm:ss")</span>
           <span class="mono seed">@(_revealed.Contains(item.Address) ? item.Seed : "••••••••")</span>
-          <button class="btn-icon reveal" title="@(_revealed.Contains(item.Address) ? "Hide seed" : "Reveal seed")" @onclick="() => ToggleReveal(item.Address)">👁</button>
-          <button class="btn-icon copy-seed" title="Copy seed (clipboard clears after @ClipboardClearSeconds s)" @onclick="() => Clipboard.CopySecretAsync(item.Seed, TimeSpan.FromSeconds(ClipboardClearSeconds))">⧉</button>
-          @if (OnShowQr.HasDelegate) { <button class="btn-icon show-qr" title="Show as QR code" @onclick="() => OnShowQr.InvokeAsync(new[] { item })">▣</button> }
-          @if (OnDelete.HasDelegate) { <button class="btn-icon delete" title="Delete" @onclick="() => OnDelete.InvokeAsync(item)">🗑</button> }
+          <button class="btn-icon reveal" title="@T[_revealed.Contains(item.Address) ? ResultsText.HideSeed : ResultsText.RevealSeed]" disabled="@SecretsLocked" @onclick="() => ToggleReveal(item.Address)">👁</button>
+          <button class="btn-icon copy-seed" title="@T.Render(UiText.Of(ResultsText.CopySeed, ("seconds", ClipboardClearSeconds)))" disabled="@SecretsLocked" @onclick="() => Clipboard.CopySecretAsync(item.Seed, TimeSpan.FromSeconds(ClipboardClearSeconds))">⧉</button>
+          @if (OnShowQr.HasDelegate) { <button class="btn-icon show-qr" title="@T[ResultsText.ShowAsQr]" @onclick="() => OnShowQr.InvokeAsync(new[] { item })">▣</button> }
+          @if (OnDelete.HasDelegate) { <button class="btn-icon delete" title="@T[ResultsText.Delete]" @onclick="() => OnDelete.InvokeAsync(item)">🗑</button> }
         </div>
       </Virtualize>
     </div>

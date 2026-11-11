@@ -1,5 +1,6 @@
 using System.Drawing;
 using H.NotifyIcon;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 
 namespace XrplVanity.App.Services;
@@ -14,11 +15,18 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
     private const string IconAssetName = "tray.ico";
     private static readonly int[] DutySteps = { 25, 50, 80, 100 };
 
+    private readonly Localizer _localizer;
+
     private TaskbarIcon? _icon;
     private Icon? _iconImage;
     private bool _disposed;
     private bool _searchRunning;
     private Command? _stopCommand;
+
+    public WindowsTrayService(Localizer localizer)
+    {
+        _localizer = localizer;
+    }
 
     public event Action<TrayAction>? Activated;
 
@@ -88,17 +96,19 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
             _stopCommand?.ChangeCanExecute();
         }
 
+        // Read at rebuild time: the coordinator pushes a new menu when the language changes.
+        TextCatalog text = _localizer.Text;
         MenuFlyout flyout = new();
 
         // Every item is wired through Command, not Clicked: H.NotifyIcon renders the flyout as a
         // native popup outside the page tree, where the MAUI item never gets a handler, so Clicked
         // is not raised and the menu silently does nothing. Command is invoked directly.
-        flyout.Add(Item("Show", TrayAction.Show));
+        flyout.Add(Item(text[TrayText.Show], TrayAction.Show));
 
-        MenuFlyoutSubItem duty = new() { Text = "Duty" };
+        MenuFlyoutSubItem duty = new() { Text = text[TrayText.Duty] };
         foreach (int step in DutySteps)
         {
-            duty.Add(Item($"{(menu.DutyPercent == step ? "✓ " : "    ")}{step} %", DutyAction(step)));
+            duty.Add(Item($"{(menu.DutyPercent == step ? "✓ " : "    ")}{text.Render(UiText.Of(TrayText.DutyStep, ("percent", step)))}", DutyAction(step)));
         }
 
         flyout.Add(duty);
@@ -109,12 +119,12 @@ public sealed class WindowsTrayService : ITrayService, IDisposable
         // IsEnabled. _stopCommand is created once and reused so ChangeCanExecute above can
         // notify a menu instance the popup already has open.
         _stopCommand ??= new Command(() => Raise(TrayAction.StopSearch), () => _searchRunning);
-        MenuFlyoutItem stop = new() { Text = "Stop search", Command = _stopCommand };
+        MenuFlyoutItem stop = new() { Text = text[TrayText.StopSearch], Command = _stopCommand };
         stop.IsEnabled = _searchRunning;
         flyout.Add(stop);
 
         flyout.Add(new MenuFlyoutSeparator());
-        flyout.Add(Item("Exit", TrayAction.Exit));
+        flyout.Add(Item(text[ShellText.Exit], TrayAction.Exit));
 
         FlyoutBase.SetContextFlyout(_icon, flyout);
     }

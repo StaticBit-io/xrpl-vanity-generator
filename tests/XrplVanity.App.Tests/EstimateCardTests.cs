@@ -1,5 +1,6 @@
 using Bunit;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
 using Xunit;
@@ -8,6 +9,8 @@ namespace XrplVanity.App.Tests;
 
 public class EstimateCardTests : BunitContext
 {
+    private static readonly TextCatalog En = TextCatalog.For(UiLanguage.English);
+
     [Fact]
     public void Without_Patterns_It_Invites_To_Add_One()
     {
@@ -26,10 +29,10 @@ public class EstimateCardTests : BunitContext
         // Base58 leading-digit model (SearchEstimator), not a naive 58^-n count: "Starts abcd" is
         // about 4.55 M candidates, which Formatting.Candidates renders as "4.6 M".
         double expectedCandidates = ExpectedCandidatesFor(MatchPosition.Starts, "abcd");
-        Assert.Equal("4.6 M", Formatting.Candidates(expectedCandidates));
-        Assert.Equal(Formatting.Candidates(expectedCandidates), cut.Find(".candidates").TextContent.Trim());
-        Assert.Equal("—", cut.Find(".eta").TextContent.Trim());
-        Assert.Contains("rate unknown — press \"measure speed\" or run a search once", cut.Markup);
+        Assert.Equal("4.6 M", Formatting.Candidates(expectedCandidates, En));
+        Assert.Equal(Formatting.Candidates(expectedCandidates, En), cut.Find(".candidates").TextContent.Trim());
+        Assert.Equal("-", cut.Find(".eta").TextContent.Trim());
+        Assert.Contains("rate unknown: press \"measure speed\" or run a search once", cut.Markup);
     }
 
     [Fact]
@@ -43,8 +46,8 @@ public class EstimateCardTests : BunitContext
 
         double expectedCandidates = ExpectedCandidatesFor(MatchPosition.Starts, "ab");
         TimeSpan? expectedEta = SearchEstimator.ExpectedTimeToMatch(expectedCandidates, 1000);
-        Assert.Equal("1 s", Formatting.Duration(expectedEta));
-        Assert.Equal(Formatting.Duration(expectedEta), cut.Find(".eta").TextContent.Trim());
+        Assert.Equal("1 s", Formatting.Duration(expectedEta, En));
+        Assert.Equal(Formatting.Duration(expectedEta, En), cut.Find(".eta").TextContent.Trim());
     }
 
     [Theory]
@@ -56,19 +59,19 @@ public class EstimateCardTests : BunitContext
     [InlineData(1e15, "1 P")]
     [InlineData(1.5e18, "1.5 E")]
     [InlineData(2e21, "2e21")]
-    public void Formats_Candidates(double value, string expected) => Assert.Equal(expected, Formatting.Candidates(value));
+    public void Formats_Candidates(double value, string expected) => Assert.Equal(expected, Formatting.Candidates(value, En));
 
     [Fact]
     public void Formats_Durations()
     {
-        Assert.Equal("—", Formatting.Duration(null));
-        Assert.Equal("12 s", Formatting.Duration(TimeSpan.FromSeconds(12.4)));
-        Assert.Equal("4 min", Formatting.Duration(TimeSpan.FromMinutes(4.2)));
-        Assert.Equal("3 h 20 min", Formatting.Duration(TimeSpan.FromMinutes(200)));
-        Assert.Equal("2.5 days", Formatting.Duration(TimeSpan.FromHours(60)));
-        Assert.Equal("> 1 year", Formatting.Duration(TimeSpan.FromDays(400)));
-        Assert.Equal("0 s", Formatting.Duration(TimeSpan.Zero));
-        Assert.Equal("< 1 s", Formatting.Duration(TimeSpan.FromMilliseconds(235)));
+        Assert.Equal("-", Formatting.Duration(null, En));
+        Assert.Equal("12 s", Formatting.Duration(TimeSpan.FromSeconds(12.4), En));
+        Assert.Equal("4 min", Formatting.Duration(TimeSpan.FromMinutes(4.2), En));
+        Assert.Equal("3 h 20 min", Formatting.Duration(TimeSpan.FromMinutes(200), En));
+        Assert.Equal("2.5 days", Formatting.Duration(TimeSpan.FromHours(60), En));
+        Assert.Equal("> 1 year", Formatting.Duration(TimeSpan.FromDays(400), En));
+        Assert.Equal("0 s", Formatting.Duration(TimeSpan.Zero, En));
+        Assert.Equal("< 1 s", Formatting.Duration(TimeSpan.FromMilliseconds(235), En));
     }
 
     private static double ExpectedCandidatesFor(MatchPosition position, string pattern)

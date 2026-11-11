@@ -1,7 +1,10 @@
+using System.Globalization;
 using H.NotifyIcon;
 using Microsoft.Extensions.Logging;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
+using XrplVanity.App.Core.Tutorial;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.App.Services;
 using XrplVanity.Search;
@@ -31,11 +34,15 @@ public static class MauiProgram
         builder.Services.AddSingleton<IWindowService>(sp => sp.GetRequiredService<WindowsWindowService>());
         builder.Services.AddSingleton<ITrayService, WindowsTrayService>();
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        builder.Services.AddSingleton(sp => new Localizer(
+            sp.GetRequiredService<ISettingsStore>().Load().Language,
+            CultureInfo.CurrentUICulture));
         builder.Services.AddSingleton(sp => new SearchViewModel(
             sp.GetRequiredService<ISettingsStore>(),
             sp.GetRequiredService<IResultStore>(),
             sp.GetRequiredService<INotificationService>(),
             DeviceCatalog.Enumerate));
+        builder.Services.AddSingleton(sp => new TutorialService(sp.GetRequiredService<SearchViewModel>(), sp.GetRequiredService<IResultStore>()));
         builder.Services.AddSingleton<TrayCoordinator>();
 
         MauiApp app = builder.Build();

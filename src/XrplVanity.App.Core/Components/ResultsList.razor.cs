@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.ViewModels;
 
 namespace XrplVanity.App.Core.Components;
@@ -13,7 +14,7 @@ public partial class ResultsList : IDisposable
     // hides is no longer in Items, and the bar promises to export and delete it all the same.
     private readonly Dictionary<string, SessionResult> _selected = new(StringComparer.Ordinal);
     private List<SessionResult> _items = new();
-    private string? _exportError;
+    private UiText? _exportError;
     private volatile bool _disposed;
 
     [Parameter, EditorRequired] public IReadOnlyList<SessionResult> Items { get; set; } = Array.Empty<SessionResult>();
@@ -22,6 +23,12 @@ public partial class ResultsList : IDisposable
     [Parameter] public int RevealSeconds { get; set; } = 15;
     [Parameter] public int ClipboardClearSeconds { get; set; } = 30;
     [Parameter] public bool Selectable { get; set; }
+
+    /// <summary>
+    /// Disables seed reveal, seed copy and file export, leaving the QR button usable. The tutorial's
+    /// practice result is shown this way so its seed cannot leave the application by those routes.
+    /// </summary>
+    [Parameter] public bool SecretsLocked { get; set; }
 
     /// <summary>
     /// Every address the host holds, filter or no filter. Supplied by a host that filters what it
@@ -119,8 +126,8 @@ public partial class ResultsList : IDisposable
     private bool SomePicked => !AllPicked && _items.Any(i => _selected.ContainsKey(i.Address));
 
     private string PickAllLabel => SomePicked
-        ? $"Select all shown; {_items.Count(i => _selected.ContainsKey(i.Address))} of {_items.Count} are selected"
-        : "Select all shown";
+        ? T.Render(UiText.Of(ResultsText.SelectAllShownPartialLabel, ("selected", _items.Count(i => _selected.ContainsKey(i.Address))), ("total", _items.Count)))
+        : T[ResultsText.SelectAllShownLabel];
 
     private void Pick(SessionResult item, bool picked)
     {
@@ -221,7 +228,7 @@ public partial class ResultsList : IDisposable
         {
             // The picker itself can fail (no owner window yet, a shell extension refusing the
             // dialog), so it belongs inside the same guard as the write.
-            string? path = await Dialog.PickSaveAsync("xrpl-vanity.tsv", "Tab-separated values", ".tsv");
+            string? path = await Dialog.PickSaveAsync("xrpl-vanity.tsv", T[ResultsText.TsvFileType], ".tsv");
             if (path is null) return;
 
             // Items is newest-first in the app; export chronologically (oldest-first), matching
@@ -230,7 +237,7 @@ public partial class ResultsList : IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            _exportError = $"Export failed: {ex.Message}";
+            _exportError = UiText.Of(ResultsText.ExportFailed, ("detail", ex.Message));
         }
     }
 

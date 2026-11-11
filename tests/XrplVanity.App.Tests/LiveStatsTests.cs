@@ -32,7 +32,7 @@ public class LiveStatsTests : BunitContext
     public void Without_Progress_The_Tiles_Show_Dashes_And_Keep_Their_Height()
     {
         IRenderedComponent<LiveStats> cut = Render<LiveStats>(p => p.Add(x => x.Progress, (SearchProgress?)null));
-        Assert.Equal("—", cut.Find(".total-rate").TextContent.Trim());
+        Assert.Equal("-", cut.Find(".total-rate").TextContent.Trim());
         Assert.Equal(4, cut.FindAll(".tile").Count);
     }
 }

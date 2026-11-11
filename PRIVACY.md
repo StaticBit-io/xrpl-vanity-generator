@@ -2,7 +2,7 @@
 
 **XRPL Vanity** — desktop application for Windows, published by StaticBit.
 
-Last updated: 2026-11-04.
+Last updated: 2026-11-05.
 
 ## Summary
 
@@ -18,7 +18,7 @@ resolved path and opens the folder on request.
 
 | File | Contents | Protection |
 | --- | --- | --- |
-| `settings.json` | Interface preferences: pattern and target drafts, thread count, GPU duty, match limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, and the last measured search rate per device. | Plain JSON. It holds no keys and no personal data. |
+| `settings.json` | Interface preferences: pattern and target drafts, thread count, GPU duty, match limit, window size, close behaviour, notification flag, clipboard and reveal timeouts, whether the first-run tutorial has been offered, and the last measured search rate per device. | Plain JSON. It holds no keys and no personal data. |
 | `results.dat` | The generated addresses and their seeds. | Encrypted with the Windows Data Protection API (DPAPI) under `CurrentUser` scope, so only the Windows account that wrote the file can decrypt it. |
 
 A seed is the secret that controls an XRP Ledger account. `results.dat` is the only file

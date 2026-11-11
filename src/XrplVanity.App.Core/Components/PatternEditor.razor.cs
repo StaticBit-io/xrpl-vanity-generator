@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
 
@@ -14,8 +15,8 @@ public partial class PatternEditor : ViewModelComponent
     /// <summary>How much of a cut-down set stays on screen — about two rows at the card's width.</summary>
     private const int CollapsedChips = 10;
 
-    private string? _listError;
-    private string? _listNote;
+    private UiText? _listError;
+    private UiText? _listNote;
     private bool _expanded;
 
     /// <summary>
@@ -37,7 +38,7 @@ public partial class PatternEditor : ViewModelComponent
 
         if (!Vm.AddPatternFromEntry() && hadEntry)
         {
-            _listNote = "That pattern is already in the list.";
+            _listNote = UiText.Of(PatternsText.AlreadyInList);
         }
     }
 
@@ -53,7 +54,7 @@ public partial class PatternEditor : ViewModelComponent
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            _listError = $"Could not read the list: {ex.Message}";
+            _listError = UiText.Of(PatternsText.ListReadFailed, ("detail", ex.Message));
             return;
         }
 
@@ -62,24 +63,21 @@ public partial class PatternEditor : ViewModelComponent
     }
 
     /// <summary>What the load skipped, or null when it took every line the file held.</summary>
-    private static string? Describe(ListLoadResult result)
+    private static UiText? Describe(ListLoadResult result)
     {
-        List<string> parts = new(2);
-        if (result.Duplicates > 0)
+        UiText? duplicates = result.Duplicates > 0
+            ? UiText.Of(PatternsText.DuplicatesSkipped, ("count", result.Duplicates))
+            : null;
+        UiText? lines = result.Rejected > 0
+            ? UiText.Of(PatternsText.LinesSkipped, ("count", result.Rejected))
+            : null;
+
+        if (duplicates is not null && lines is not null)
         {
-            parts.Add(result.Duplicates == 1
-                ? "1 duplicate skipped."
-                : $"{result.Duplicates} duplicates skipped.");
+            return UiText.Of(PatternsText.DuplicatesAndLinesSkipped, ("duplicates", duplicates), ("lines", lines));
         }
 
-        if (result.Rejected > 0)
-        {
-            parts.Add(result.Rejected == 1
-                ? "1 line could not be read and was skipped."
-                : $"{result.Rejected} lines could not be read and were skipped.");
-        }
-
-        return parts.Count == 0 ? null : string.Join(" ", parts);
+        return duplicates ?? lines;
     }
 
     private async Task OnSaveList()
@@ -93,14 +91,14 @@ public partial class PatternEditor : ViewModelComponent
         {
             // The picker itself can fail (no owner window yet, a shell extension refusing the
             // dialog), so it belongs inside the same guard as the write.
-            string? path = await Dialog.PickSaveAsync("xrpl-vanity-patterns.txt", "Pattern list", ".txt");
+            string? path = await Dialog.PickSaveAsync("xrpl-vanity-patterns.txt", T[PatternsText.ListFileType], ".txt");
             if (path is null) return;
 
             PatternListFile.Write(path, chips);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            _listError = $"Could not save the list: {ex.Message}";
+            _listError = UiText.Of(PatternsText.ListSaveFailed, ("detail", ex.Message));
         }
     }
 }

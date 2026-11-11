@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+<title>XRPL Vanity: Generator für XRP-Ledger-Vanity-Adressen</title>
+<meta name="description" content="Erzeugen Sie eine XRP-Ledger-Adresse mit dem Wort Ihrer Wahl. Läuft komplett offline auf Ihrem Prozessor und Ihrer Grafikkarte.">
+<!--@chrome:head-->
+<script type="module" src="/js/home.mjs"></script>
+</head>
+<body>
+<!--@chrome:header-->
+<main id="main">
+
+<section class="hero">
+<div class="container stage">
+<div class="intro">
+<h1>Ihr Wort in einer XRP-Ledger-Adresse</h1>
+<p class="lead">Ein Generator für Vanity-Adressen, der offline auf Prozessor und Grafikkarte läuft.</p>
+<div class="actions">
+<button class="btn btn--primary" type="button" data-store disabled><span data-label>Im Microsoft Store holen</span> <span class="tag">bald</span></button>
+<a class="btn" href="https://github.com/StaticBit-io/xrpl-vanity-generator">Quellcode auf GitHub</a>
+</div>
+</div>
+<div class="art"><!--@glyph-field--></div>
+</div>
+</section>
+
+<section id="get" class="section">
+<div class="container">
+<div class="head-block">
+<h2>Eine Adresse, die man lesen kann</h2>
+<p class="lead">Eine Vanity-Adresse funktioniert wie jede andere XRP-Ledger-Adresse. Sie erhalten sie zusammen mit dem Seed, der Zugriff auf sie gibt.</p>
+</div>
+<figure class="well diff">
+<div class="diff-head">--- a/address<br>+++ b/address</div>
+<p class="del"><code class="addr" data-example-address>rGx8uTnF5VqKj3dYpWm2bZsL7cRhN4eAaQ</code></p>
+<p class="add"><code class="addr" data-example-address>r<mark>DiAMond</mark>Hgs4kQe7tWvNpYcX3bLm9fZuT2</code></p>
+<figcaption>Nur Beispiele: Keine Wallet nimmt diese Adressen an.</figcaption>
+</figure>
+</div>
+</section>
+
+<section id="modes" class="section">
+<div class="container">
+<div class="head-block">
+<h2>Das Wort steht, wo Sie es wollen</h2>
+<p class="lead">Mit exakter Groß- und Kleinschreibung oder ohne. Eine Suche kann mehrere Wörter enthalten.</p>
+</div>
+<div class="reference" role="region" aria-label="Suchmodi" tabindex="0">
+<table>
+<thead><tr><th scope="col">Modus</th><th scope="col">Findet</th></tr></thead>
+<tbody>
+<tr><th scope="row">Beginnt mit</th><td><code>r<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">Beginnt am 2. oder 3. Zeichen</th><td><code>r9<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">Endet mit</th><td><code>r...<mark>DiAMond</mark></code></td></tr>
+<tr><th scope="row">Irgendwo</th><td><code>r...<mark>DiAMond</mark>...</code></td></tr>
+<tr><th scope="row">Beginnt und endet mit</th><td><code>r<mark>DiA</mark>...<mark>Mond</mark></code></td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">Jedes weitere Zeichen erhöht die Wartezeit auf bis zu das 58-Fache. Die Anwendung zeigt die erwartete Zeit, bevor Sie starten.</p>
+</div>
+</section>
+
+<section id="safe" class="section">
+<div class="container split-rows">
+<div class="head-block">
+<h2>Ihr Seed bleibt auf Ihrem Computer</h2>
+<p class="lead">Wer einen Seed besitzt, verfügt über das Konto.</p>
+</div>
+<dl class="rows">
+<div><dt>Kein Netzwerkcode</dt><dd>Kein Konto, kein Server, keine Telemetrie, keine Updateprüfung.</dd></div>
+<div><dt>Sicherer Zufall</dt><dd>Die Schlüssel stammen aus dem kryptografischen Zufallsgenerator des Systems.</dd></div>
+<div><dt>Sicherer in der Anwendung</dt><dd>Ergebnisse sind für Ihr Windows-Konto verschlüsselt, Seeds verdeckt. Die Kommandozeile gibt Seeds im Klartext aus.</dd></div>
+<div><dt>QR statt Datei</dt><dd>Übertragen Sie eine Wallet per Scan in die <a href="https://staticbit.io">StaticBit</a>-App, auf Wunsch mit Passwort.</dd></div>
+<div><dt>Lesbarer Quellcode</dt><dd>Bauen Sie das Programm selbst, bevor Sie echtes Guthaben auf eine damit erzeugte Adresse schicken.</dd></div>
+</dl>
+</div>
+</section>
+
+<section id="runs-on" class="section">
+<div class="container">
+<div class="head-block">
+<h2>Worauf es läuft</h2>
+<p class="lead">Kurze Wörter schafft der Prozessor. Mit einer Grafikkarte werden auch längere machbar.</p>
+</div>
+<div class="reference" role="region" aria-label="Hardware für die Suche und gemessene Geschwindigkeiten" tabindex="0">
+<table>
+<thead><tr><th scope="col">Suche auf</th><th scope="col">Unterstützung</th><th scope="col" class="num">Adressen pro Sekunde</th></tr></thead>
+<tbody>
+<tr><th scope="row">CPU</th><td>Alle Kerne oder eine feste Zahl an Threads</td><td class="num"><span data-source="docs/benchmarks.md" data-value="118,885">118.885</span><small>Core i5-11400F</small></td></tr>
+<tr><th scope="row">CUDA</th><td>NVIDIA, Turing (2018) oder neuer</td><td class="num"><span data-source="docs/benchmarks.md" data-value="32,375,668">32.375.668</span><small>RTX 5070 Ti</small></td></tr>
+<tr><th scope="row">OpenCL</th><td>Auf NVIDIA geprüft.</td><td class="num"><span data-source="docs/benchmarks.md" data-value="32,211,960">32.211.960</span><small>RTX 5070 Ti</small></td></tr>
+</tbody>
+</table>
+</div>
+<div class="needs">
+<div><h3>Desktop-Anwendung</h3><p>Windows 10 Version 1809 oder neuer, x64, mit der WebView2-Laufzeit.</p></div>
+<div><h3>Kommandozeile</h3><p>Wird aus dem Quellcode mit dem .NET 10 SDK gebaut. Geprüft unter Windows und Linux.</p></div>
+<div><h3>GPU-Auslastung</h3><p>Nutzen Sie mehrere Geräte gleichzeitig oder begrenzen Sie die Last und arbeiten Sie weiter.</p></div>
+</div>
+<p class="note">Nur Ed25519-Schlüssel. secp256k1-Adressen werden nicht unterstützt.</p>
+</div>
+</section>
+
+<section class="band">
+<div class="container band-grid">
+<h2>Beginnen Sie mit einem Wort</h2>
+<div class="actions">
+<button class="btn btn--primary" type="button" data-store disabled><span data-label>Im Microsoft Store holen</span> <span class="tag">bald</span></button>
+<a class="btn" href="/de/cli/">Zur Kommandozeile</a>
+</div>
+</div>
+</section>
+
+</main>
+<!--@chrome:footer-->
+</body>
+</html>

@@ -58,11 +58,28 @@ public class GpuPipelineTests
         Assert.Equal("rDiskmQdynWqgxoNv4CHsqFHdgsnpJMHGK", AddressAt(output, 0));
     }
 
+    /// <summary>
+    /// The sample CI runs: one batch, enough to catch a kernel that is wrong for a whole class of
+    /// inputs on an independent OpenCL implementation, in seconds rather than minutes on pocl.
+    /// </summary>
     [Theory]
+    [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
+    public void Random_Entropies_Match_The_Cpu_Reference(string backend)
+    {
+        AssertMatchesCpuReference(backend, BatchSize);
+    }
+
+    /// <summary>A million keys, for the rare carry or reduction case a small sample can miss.</summary>
+    [Theory]
+    [Trait(GpuTestHelper.Category, GpuTestHelper.RealGpu)]
     [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
     public void One_Million_Random_Entropies_Match_The_Cpu_Reference(string backend)
     {
-        const int n = 1_000_000;
+        AssertMatchesCpuReference(backend, 1_000_000);
+    }
+
+    private static void AssertMatchesCpuReference(string backend, int n)
+    {
         byte[] entropies = new byte[n * 16];
         new Random(20260903).NextBytes(entropies);
 

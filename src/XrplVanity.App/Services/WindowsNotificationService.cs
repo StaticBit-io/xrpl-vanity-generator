@@ -1,5 +1,6 @@
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 
 namespace XrplVanity.App.Services;
@@ -11,8 +12,11 @@ namespace XrplVanity.App.Services;
 /// </summary>
 public sealed class WindowsNotificationService : INotificationService
 {
-    public WindowsNotificationService()
+    private readonly Localizer _localizer;
+
+    public WindowsNotificationService(Localizer localizer)
     {
+        _localizer = localizer;
         try
         {
             AppNotificationManager.Default.NotificationInvoked += (_, _) => Activated?.Invoke();
@@ -54,16 +58,18 @@ public sealed class WindowsNotificationService : INotificationService
         }
     }
 
-    public void Notify(string title, string body)
+    public void Notify(UiText title, UiText body)
     {
         if (!IsAvailable)
         {
             return;
         }
 
+        // Rendered at call time so a toast raised after a language change speaks the new language.
+        TextCatalog text = _localizer.Text;
         try
         {
-            AppNotification notification = new AppNotificationBuilder().AddText(title).AddText(body).BuildNotification();
+            AppNotification notification = new AppNotificationBuilder().AddText(text.Render(title)).AddText(text.Render(body)).BuildNotification();
             AppNotificationManager.Default.Show(notification);
         }
         catch (Exception)

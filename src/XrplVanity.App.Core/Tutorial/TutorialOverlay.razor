@@ -1,0 +1,61 @@
+@using Microsoft.JSInterop
+@using XrplVanity.App.Core.Localization
+@inherits LocalizedComponent
+@implements IDisposable
+@implements IAsyncDisposable
+@inject TutorialService Tutorial
+@inject IJSRuntime Js
+@inject NavigationManager Nav
+
+@* The QR dialog step has no bubble: it would sit over the dialog, so SearchPage hands the text to
+   the dialog instead. *@
+@if (_step is { } step && step.Step != TutorialStep.QrDialog)
+{
+  <div class="tutorial-bubble @(_position is null ? null : "positioned") @(_placed ? null : "unplaced") @(BehindDialog ? "behind" : null)"
+       data-tutorial-bubble role="dialog" aria-labelledby="tutorial-title" aria-describedby="tutorial-body"
+       tabindex="-1" style="@BubbleStyle" inert="@BehindDialog" @ref="_bubble">
+    @if (_stepNumber > 0)
+    {
+      <div class="tutorial-step">@T.Render(UiText.Of(TutorialText.StepCounter, ("number", _stepNumber), ("count", _stepCount)))</div>
+    }
+    <h3 id="tutorial-title">@T[step.Title]</h3>
+    <p id="tutorial-body">@T[step.Body]</p>
+    @if (_hint is not null)
+    {
+      <p class="tutorial-note tutorial-hint" role="status">@T[_hint]</p>
+    }
+    @if (_busy)
+    {
+      <p class="tutorial-note" role="status">@T[TutorialText.SearchRunning]</p>
+    }
+    <div class="tutorial-buttons">
+      @if (step.Step == TutorialStep.Offer)
+      {
+        <button class="btn-secondary-dark tutorial-decline t" @onclick="Leave">@T[TutorialText.NotNow]</button>
+        <button class="btn-primary-mint tutorial-start t" @onclick="Start">@T[TutorialText.StartTutorial]</button>
+      }
+      else
+      {
+        @if (step.Step != TutorialStep.Done)
+        {
+          <button class="btn-secondary-dark tutorial-skip t" @onclick="Leave">@T[TutorialText.Skip]</button>
+        }
+        @if (_canGoNext)
+        {
+          <button class="btn-primary-mint tutorial-next t" @onclick="Advance">@T[step.Step == TutorialStep.Done ? TutorialText.Finish : TutorialText.Next]</button>
+        }
+      }
+    </div>
+  </div>
+}
+
+@* A leave that had to stop a run first: the page stays locked until the run has ended and the
+   user's words are back, and this says why. *@
+@if (_leaving)
+{
+  <div class="tutorial-status" role="status">@T[TutorialText.Leaving]</div>
+}
+
+<ConfirmDialog Visible="_confirming && _step is not null" Title="@T[TutorialText.LeaveTitle]"
+               Message="@T[TutorialText.LeaveMessage]"
+               ConfirmLabel="@T[TutorialText.LeaveConfirm]" OnConfirm="ConfirmLeave" OnCancel="CancelLeave" />

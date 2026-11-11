@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using XrplVanity.App.Core.Components;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Storage;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
@@ -36,7 +37,7 @@ public class SearchViewModelTests
         Assert.Equal(SearchState.Idle, vm.State);
         Assert.Empty(vm.Patterns);
         Assert.False(vm.CanStart);
-        Assert.Equal("Add at least one reachable pattern.", vm.StartBlockedReason);
+        Assert.Equal(UiText.Of(SearchText.AddAtLeastOnePattern), vm.StartBlockedReason);
         TargetChoice cpu = Assert.Single(vm.Targets);
         Assert.Equal("cpu", cpu.Id);
         Assert.True(cpu.Selected);
@@ -58,7 +59,7 @@ public class SearchViewModelTests
         Assert.Equal(expected, vm.ExpectedCandidates);
         Assert.InRange(vm.ExpectedCandidates!.Value, 1300, 1400);
         Assert.Null(vm.EstimatedTime);   // no rate yet
-        Assert.Equal("rate unknown — press \"measure speed\" or run a search once", vm.EstimateNote);
+        Assert.Equal(UiText.Of(SearchText.RateUnknown), vm.EstimateNote);
     }
 
     [Fact]
@@ -68,7 +69,7 @@ public class SearchViewModelTests
         vm.AddPattern("@", MatchPosition.Starts, ignoreCase: false);
 
         PatternChip chip = Assert.Single(vm.Patterns);
-        Assert.Equal("cannot occur in an XRPL address", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningUnreachable), chip.Warning);
         Assert.False(vm.CanStart);
     }
 
@@ -96,7 +97,7 @@ public class SearchViewModelTests
     {
         (SearchViewModel vm, _, _, _) = Create();
         vm.EntryText = "Il";
-        Assert.Equal("\"Il\" is searched as \"iL\" — press Enter to add it, or just press Start.", vm.PatternHint);
+        Assert.Equal(UiText.Of(SearchText.PatternSearchedAs, ("typed", "Il"), ("normalized", "iL")), vm.PatternHint);
     }
 
     [Fact]
@@ -106,7 +107,7 @@ public class SearchViewModelTests
         vm.AddPattern("a", MatchPosition.Starts, false);
         vm.SetTargetSelected("cpu", false);
         Assert.False(vm.CanStart);
-        Assert.Equal("Select the CPU or at least one device.", vm.StartBlockedReason);
+        Assert.Equal(UiText.Of(SearchText.SelectTarget), vm.StartBlockedReason);
     }
 
     [Fact]
@@ -142,14 +143,14 @@ public class SearchViewModelTests
 
         WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
         // OnCompleted goes Idle first and notifies last, so this is the end of the completion work.
-        WaitUntil(() => { lock (notes.Sent) return notes.Sent.Any(n => n.Title == "Search finished"); }, "the finish notification");
+        WaitUntil(() => { lock (notes.Sent) return notes.Sent.Any(n => n.Title.Id == NotificationText.SearchFinishedTitle); }, "the finish notification");
         Assert.Equal(SessionOutcome.CountReached, vm.LastSummary!.Outcome);
         Assert.Equal(3, vm.Results.Count);
         Assert.All(vm.Results, r => Assert.StartsWith("ra", r.Address));
         Assert.Equal(3, results.LoadAll().Count);
         Assert.Equal(0, results.Appends);   // batched through AppendRange; never one write per hit
-        Assert.Contains(notes.Sent, n => n.Title is "Match found" or "Matches found" && !n.Body.Contains(vm.Results[0].Seed));
-        Assert.Contains(notes.Sent, n => n.Title == "Search finished" && n.Body.Contains("3"));
+        Assert.Contains(notes.Sent, n => (n.Title.Id == NotificationText.MatchFoundTitle || n.Title.Id == NotificationText.MatchesFoundTitle) && !n.Body.ToString().Contains(vm.Results[0].Seed));
+        Assert.Contains(notes.Sent, n => n.Title.Id == NotificationText.SearchFinishedTitle && Equals(n.Body.Arg("count"), 3L) && Equals(n.Body.Arg("outcome"), NotificationText.OutcomeCountReached));
         Assert.True(settings.Current.RateHints.ContainsKey("cpu"), "rate hint stored");
         Assert.True(stateChanges > 0);
         Assert.NotNull(vm.EstimatedTime);   // now computed from the hint
@@ -172,7 +173,7 @@ public class SearchViewModelTests
         Assert.Equal(0, results.Appends);            // OnMatch itself writes nothing
         Assert.True(results.AppendRanges <= 50, "one batch write per flush, not per hit");
 
-        int matchNotifications = notes.Sent.Count(n => n.Title is "Match found" or "Matches found");
+        int matchNotifications = notes.Sent.Count(n => n.Title.Id == NotificationText.MatchFoundTitle || n.Title.Id == NotificationText.MatchesFoundTitle);
         Assert.True(matchNotifications < 50, $"expected fewer notifications than matches, got {matchNotifications}");
     }
 
@@ -180,7 +181,7 @@ public class SearchViewModelTests
     public void A_Failing_Result_Store_Surfaces_A_History_Banner_Without_Breaking_The_Search()
     {
         FakeNotifications notes = new();
-        MemoryResultStore results = new() { ThrowOnWrite = true, ReadOnlyReason = "results.dat could not be written" };
+        MemoryResultStore results = new() { ThrowOnWrite = true, ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeWritten, ("detail", "disk full")) };
         SearchViewModel vm = new(new MemorySettingsStore(), results, notes, () => Array.Empty<DeviceCatalogEntry>());
         vm.AddPattern("a", MatchPosition.Starts, false);
         vm.Count = 1;
@@ -189,7 +190,7 @@ public class SearchViewModelTests
 
         WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
         Assert.Single(vm.Results);
-        Assert.Equal("results.dat could not be written", vm.HistoryReadOnlyReason);
+        Assert.Equal(UiText.Of(HistoryText.ResultsCouldNotBeWritten, ("detail", "disk full")), vm.HistoryReadOnlyReason);
     }
 
     [Fact]
@@ -236,14 +237,14 @@ public class SearchViewModelTests
     public void Read_Only_Store_Does_Not_Break_A_Search()
     {
         FakeNotifications notes = new();
-        MemoryResultStore results = new() { IsReadOnly = true, ReadOnlyReason = "corrupt" };
+        MemoryResultStore results = new() { IsReadOnly = true, ReadOnlyReason = UiText.Of(HistoryText.ResultsCouldNotBeRead, ("detail", "corrupt")) };
         SearchViewModel vm = new(new MemorySettingsStore(), results, notes, () => Array.Empty<DeviceCatalogEntry>());
         vm.AddPattern("a", MatchPosition.Starts, false);
         vm.Count = 1;
         vm.Start();
         WaitUntil(() => vm.State == SearchState.Idle && vm.LastSummary is not null, "completion");
         Assert.Single(vm.Results);
-        Assert.Equal("corrupt", vm.HistoryReadOnlyReason);
+        Assert.Equal(UiText.Of(HistoryText.ResultsCouldNotBeRead, ("detail", "corrupt")), vm.HistoryReadOnlyReason);
     }
 
     [Fact]
@@ -296,9 +297,48 @@ public class SearchViewModelTests
         vm.OnSessionCompleted(Task.FromException<SearchSummary>(new InvalidOperationException("boom")));
 
         Assert.Equal(SearchState.Idle, vm.State);
-        Assert.Contains("boom", vm.LastFailure);
+        Assert.Equal(UiText.Of(SearchText.SearchFailed, ("detail", "boom")), vm.LastFailure);
 
         vm.Dispose();   // in case the real (stopped) session had not settled yet
+    }
+
+    [Fact]
+    public void A_Gpu_Failure_Keeps_The_Driver_Text_Inside_A_Translated_Sentence()
+    {
+        // An OpenCL device that exists on no machine, so the measurement reports a driver failure.
+        DeviceCatalogEntry ghost = new(new DeviceSelector("opencl", 99), "Ghost", "none", false);
+        (SearchViewModel vm, _, _, _) = Create(ghost);
+        vm.SetTargetSelected("opencl:99", true);
+        vm.SetTargetSelected("cpu", false);
+
+        vm.MeasureSpeed();
+
+        WaitUntil(() => !vm.IsCalibrating && vm.CalibrationFailure is not null, "the measurement to report its failure");
+        UiText failure = vm.CalibrationFailure!;
+        Assert.Equal(SearchText.CalibrationFailed, failure.Id);
+        string detail = Assert.IsType<string>(failure.Arg("detail"));
+        Assert.NotEmpty(detail);
+        string english = TextCatalog.For(UiLanguage.English).Render(failure);
+        Assert.EndsWith(detail, english, StringComparison.Ordinal);
+        Assert.NotEqual(detail, english);
+    }
+
+    [Fact]
+    public void A_Match_Notification_Carries_Address_Pattern_And_Position_As_Values()
+    {
+        (SearchViewModel vm, FakeNotifications notes, _, _) = Create();
+        vm.AddPattern("a", MatchPosition.Starts, false);
+        vm.Count = 1;
+
+        vm.Start();
+
+        WaitUntil(() => { lock (notes.Sent) return notes.Sent.Any(n => n.Title.Id == NotificationText.SearchFinishedTitle); }, "the finish notification");
+        (UiText Title, UiText Body) match;
+        lock (notes.Sent) match = notes.Sent.First(n => n.Title.Id == NotificationText.MatchFoundTitle);
+        SessionResult found = Assert.Single(vm.Results);
+        Assert.Equal(
+            UiText.Of(NotificationText.MatchFoundBody, ("address", found.Address), ("pattern", found.Pattern), ("position", PatternsText.Position(found.Position))),
+            match.Body);
     }
 
     [Fact]
@@ -314,7 +354,7 @@ public class SearchViewModelTests
         vm.OnSessionCompleted(tcs.Task);
 
         Assert.Equal(SearchState.Idle, vm.State);
-        Assert.Equal("search cancelled", vm.LastFailure);
+        Assert.Equal(UiText.Of(SearchText.SearchCancelled), vm.LastFailure);
 
         vm.Dispose();
     }
@@ -493,7 +533,7 @@ public class SearchViewModelTests
 
         Assert.Empty(vm.Patterns);
         Assert.False(vm.CanStart);
-        Assert.Equal("Add at least one reachable pattern.", vm.StartBlockedReason);
+        Assert.Equal(UiText.Of(SearchText.AddAtLeastOnePattern), vm.StartBlockedReason);
         Assert.Empty(settings.Current.Patterns);
     }
 
@@ -582,7 +622,7 @@ public class SearchViewModelTests
         vm.AddPair("abc", "@", ignoreCase: false);
 
         PatternChip chip = Assert.Single(vm.Patterns);
-        Assert.Equal("cannot occur in an XRPL address", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningUnreachable), chip.Warning);
         Assert.False(vm.CanStart);
     }
 
@@ -595,7 +635,7 @@ public class SearchViewModelTests
         vm.AddPair("ab", "cdefghijkmnpqr", ignoreCase: true);
 
         PatternChip chip = Assert.Single(vm.Patterns);
-        Assert.Equal($"longer than {PatternSet.MaxIgnoreCaseLength} characters: searched case-sensitively", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningCaseFoldCap, ("count", PatternSet.MaxIgnoreCaseLength)), chip.Warning);
     }
 
     [Fact]
@@ -618,7 +658,7 @@ public class SearchViewModelTests
 
         vm.UpdatePattern(chip, MatchPosition.Pair, ignoreCase: false);
 
-        Assert.Equal("empty pattern", chip.Warning);
+        Assert.Equal(UiText.Of(PatternsText.WarningEmpty), chip.Warning);
         Assert.False(vm.CanStart);
     }
 
@@ -643,17 +683,17 @@ public class SearchViewModelTests
         vm.EntryPosition = MatchPosition.Pair;
         vm.EntryText = "abc";
 
-        Assert.Equal("Add at least one reachable pattern.", vm.PatternProblem);
+        Assert.Equal(UiText.Of(SearchText.AddAtLeastOnePattern), vm.PatternProblem);
         Assert.Null(vm.PatternHint);
         Assert.False(vm.CanStart);
 
         vm.EntryEndsText = "@";
-        Assert.Equal("\"@\" cannot occur in an XRPL address.", vm.PatternProblem);
+        Assert.Equal(UiText.Of(SearchText.PatternUnreachable, ("pattern", "@")), vm.PatternProblem);
         Assert.Null(vm.PatternHint);
 
         vm.EntryEndsText = "xyz";
         Assert.Null(vm.PatternProblem);
-        Assert.Equal("Press Enter to add \"abc..xyz\" — Start adds it too.", vm.PatternHint);
+        Assert.Equal(UiText.Of(SearchText.PatternPressEnter, ("typed", "abc..xyz")), vm.PatternHint);
         Assert.True(vm.CanStart);
     }
 
@@ -665,7 +705,7 @@ public class SearchViewModelTests
         vm.EntryText = "Il";
         vm.EntryEndsText = "ab";
 
-        Assert.Equal("\"Il..ab\" is searched as \"iL..ab\" — press Enter to add it, or just press Start.", vm.PatternHint);
+        Assert.Equal(UiText.Of(SearchText.PatternSearchedAs, ("typed", "Il..ab"), ("normalized", "iL..ab")), vm.PatternHint);
     }
 
     [Fact]
@@ -772,7 +812,7 @@ public class SearchViewModelTests
     public void PatternProblem_Is_The_Generic_Message_For_A_Blank_Entry_And_No_Chips()
     {
         (SearchViewModel vm, _, _, _) = Create();
-        Assert.Equal("Add at least one reachable pattern.", vm.PatternProblem);
+        Assert.Equal(UiText.Of(SearchText.AddAtLeastOnePattern), vm.PatternProblem);
     }
 
     [Fact]
@@ -782,7 +822,7 @@ public class SearchViewModelTests
         // "@" is not in the XRPL base58 alphabet and stays unreachable after normalization
         // (unlike "0", which the normalizer folds onto "o" and which would then be reachable).
         vm.EntryText = "@";
-        Assert.Equal("\"@\" cannot occur in an XRPL address.", vm.PatternProblem);
+        Assert.Equal(UiText.Of(SearchText.PatternUnreachable, ("pattern", "@")), vm.PatternProblem);
     }
 
     [Fact]
@@ -798,7 +838,7 @@ public class SearchViewModelTests
     {
         (SearchViewModel vm, _, _, _) = Create();
         vm.EntryText = "ab";
-        Assert.Equal("Press Enter to add \"ab\" — Start adds it too.", vm.PatternHint);
+        Assert.Equal(UiText.Of(SearchText.PatternPressEnter, ("typed", "ab")), vm.PatternHint);
     }
 
     [Fact]

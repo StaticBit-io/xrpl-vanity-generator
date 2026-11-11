@@ -43,8 +43,13 @@ step "tests (required backends: $XRPL_VANITY_REQUIRE_BACKENDS)"
 # `tee` (even to /dev/stderr) changes fd/buffering characteristics enough to trip a pocl race
 # (pocl_release_dlhandle_cache assertion, observed reproducibly in --cpu-only mode) that a plain
 # redirect does not.
+# Without a GPU, OpenCL runs on pocl on the CPU, where the RealGpu tests (timing, throughput, a
+# million-key sample) take most of an hour and prove nothing the rest of the suite does not. They
+# run in gpu mode, on a machine with a real card.
+SUITE_ARGS=()
+if [ "$MODE" = cpu ]; then SUITE_ARGS=(-- -trait- "Category=RealGpu"); fi
 SUITE_LOG="$(mktemp)"
-set +e; dotnet run --project tests/XrplVanity.Tests -c Release --no-build > "$SUITE_LOG" 2>&1; RC=$?; set -e
+set +e; dotnet run --project tests/XrplVanity.Tests -c Release --no-build "${SUITE_ARGS[@]}" > "$SUITE_LOG" 2>&1; RC=$?; set -e
 SUITE="$(cat "$SUITE_LOG")"
 cat "$SUITE_LOG"
 rm -f "$SUITE_LOG"

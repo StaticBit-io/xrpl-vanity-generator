@@ -17,7 +17,8 @@
 .entry { display: grid; grid-template-columns: 140px 1fr auto; gap: 8px; align-items: center; }
 /* The Pair mode adds a second box: one more equal-width column, the rest of the row unchanged. */
 .pattern-entry.paired { grid-template-columns: 140px 1fr 1fr auto; }
-.entry-tools { display: flex; gap: 8px; align-items: center; }
+/* Wraps: translated button labels ("сохранить список…", "Liste speichern…") outgrow the card in one row. */
+.entry-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .entry-tools .btn-secondary-dark { white-space: nowrap; }
 /* The two option boxes share one slot, stacked. */
 .entry-flags { display: flex; flex-direction: column; gap: 4px; }

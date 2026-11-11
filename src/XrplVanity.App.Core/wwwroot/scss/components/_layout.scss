@@ -1,4 +1,5 @@
-.shell { display: grid; grid-template-columns: 64px 1fr; height: 100vh; }
+// The rail sizes to its labels: "Einstellungen" and "Настройки" are wider than the English ones.
+.shell { display: grid; grid-template-columns: auto 1fr; height: 100vh; }
 .content { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px 20px; min-height: 0; }
 .page-head { flex: none; display: grid; grid-template-columns: 1fr auto; align-items: center; }
 .page-head h1 { font-size: 20px; margin: 0; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 12px; }
@@ -45,8 +46,9 @@
 .settings-grid > .card-box { height: 100%; margin-top: 0; }
 .settings-grid .full { grid-column: 1 / -1; }
 .srow { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--dark-gray); font-size: 13px; }
-.srow:first-of-type { border-top: 0; }
 .srow .desc { color: var(--text-secondary); font-size: 12px; margin-top: 2px; }
+// A row title written as a <label> reads like the plain-text titles beside it, not like the muted global label.
+.srow > label { color: var(--text); }
 // Plain <a href> (no target="_blank"): BlazorWebView routes external navigation through its own
 // UrlLoading handler to the system browser, where a target="_blank" would be inert.
 .about-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; }

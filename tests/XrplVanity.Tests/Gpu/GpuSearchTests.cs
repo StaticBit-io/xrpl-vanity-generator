@@ -198,6 +198,7 @@ public class GpuSearchTests
     }
 
     [Theory]
+    [Trait(GpuTestHelper.Category, GpuTestHelper.RealGpu)]
     [MemberData(nameof(GpuTestHelper.Backends), MemberType = typeof(GpuTestHelper))]
     public void Throughput_Meets_The_Floor_For_The_Device_Class(string backend)
     {

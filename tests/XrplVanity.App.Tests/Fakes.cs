@@ -1,3 +1,4 @@
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.Services;
 using XrplVanity.App.Core.Storage;
 
@@ -5,9 +6,9 @@ namespace XrplVanity.App.Tests;
 
 public sealed class FakeNotifications : INotificationService
 {
-    public List<(string Title, string Body)> Sent { get; } = new();
+    public List<(UiText Title, UiText Body)> Sent { get; } = new();
     public bool IsAvailable => true;
-    public void Notify(string title, string body) { lock (Sent) Sent.Add((title, body)); }
+    public void Notify(UiText title, UiText body) { lock (Sent) Sent.Add((title, body)); }
 }
 
 public sealed class FakeClipboard : IClipboardService
@@ -35,7 +36,7 @@ public sealed class MemorySettingsStore : ISettingsStore
     public string? LastError { get; private set; }
 
     /// <summary>When set, every <see cref="Save"/> fails the way a read-only data folder would.</summary>
-    public bool FailSaves { get; init; }
+    public bool FailSaves { get; set; }
 
     /// <summary>When set, <see cref="Save"/> throws — a store that breaks the non-throwing contract.</summary>
     public bool ThrowOnSave { get; init; }
@@ -69,7 +70,7 @@ public sealed class MemoryResultStore : IResultStore
     private int _deleteManyCalls;
 
     public bool IsReadOnly { get; init; }
-    public string? ReadOnlyReason { get; init; }
+    public UiText? ReadOnlyReason { get; init; }
 
     /// <summary>When set, every write fails the way a read-only <c>results.dat</c> would. Settable so a test can seed rows first.</summary>
     public bool ThrowOnWrite { get; set; }
@@ -123,7 +124,7 @@ public sealed class MemoryResultStore : IResultStore
     {
         if (ThrowOnWrite)
         {
-            throw new InvalidOperationException(ReadOnlyReason ?? "results.dat could not be written");
+            throw new InvalidOperationException("results.dat could not be written");
         }
     }
 }

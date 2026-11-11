@@ -1,0 +1,57 @@
+@implements IDisposable
+@inject TutorialService Tutorial
+
+@* Outside a tutorial the wrapper carries data-tutorial and nothing else, so it styles and behaves
+   like its content. Lit wins over inert for the class: a lit region on an explaining step is
+   outlined but still ignores input. *@
+@{
+  bool lit = Tutorial.IsLit(Name);
+  bool inert = Tutorial.IsInert(Name);
+}
+<div data-tutorial="@Name" class="@(lit ? "tutorial-lit" : inert ? "tutorial-dimmed" : null)" inert="@inert">@ChildContent</div>
+
+@code {
+    private volatile bool _disposed;
+
+    /// <summary>One of the <see cref="TutorialRegions"/> names.</summary>
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => Tutorial.Changed += OnTutorialChanged;
+
+    // Changed is raised on worker threads (view-model events), so the render is marshalled, and a
+    // notification already in flight when the region is torn down is dropped.
+    private void OnTutorialChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = InvokeAsync(() =>
+            {
+                if (!_disposed)
+                {
+                    StateHasChanged();
+                }
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // The renderer is gone; nothing to refresh.
+        }
+        catch (InvalidOperationException)
+        {
+            // The component is no longer attached to a renderer.
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Tutorial.Changed -= OnTutorialChanged;
+    }
+}

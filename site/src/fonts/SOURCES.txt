@@ -1,5 +1,5 @@
 Self-hosted web font: Martian Mono, licensed under the SIL Open Font License 1.1 (see MartianMono-OFL.txt).
-No other font file ships with the site.
+No other font files ship with the site.
 
 Source: the npm package @fontsource-variable/martian-mono@5.3.0, upstream
 https://github.com/evilmartians/mono by Evil Martians.
@@ -7,10 +7,13 @@ https://github.com/evilmartians/mono by Evil Martians.
   files/martian-mono-latin-standard-normal.woff2 -> martian-mono-5.3.0-latin.woff2  (unchanged, 38,492 bytes)
     Both variable axes: wght 100-800 and wdth 75-112.5.
     sha256 f9c1655c2c9d1ed5bb8b301a57d1169a1123ffef1a588dc50a7a487810f7d732
+  files/martian-mono-cyrillic-standard-normal.woff2 -> martian-mono-5.3.0-cyrillic.woff2  (unchanged, 17,200 bytes)
+    Both variable axes, for the Russian pages: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116.
+    sha256 827d9868a49cc5c27acf71f9467a3c5b060bdc1120ff2194452d3966a077103b
   LICENSE -> MartianMono-OFL.txt  (unchanged)
     sha256 bd7d799f6a67b704f9546422ee83d69b4dc5e4ae289d5eabc22581251dd7150a
 
-The file covers the Latin range only: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+The Latin file covers this range only: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD.
 A character outside it, such as an arrow to the right or an approximately-equal sign, would fall back
 to another face, so the pages do not use one. The theme rules out box-drawing glyphs for the same reason.

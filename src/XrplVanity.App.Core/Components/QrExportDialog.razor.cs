@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using XrplVanity.App.Core.Localization;
 using XrplVanity.App.Core.ViewModels;
 using XrplVanity.Core;
 
@@ -9,7 +10,7 @@ namespace XrplVanity.App.Core.Components;
 /// Shows a selection of results as a QR code. The dialog builds nothing until it is asked to: the
 /// format and the password are settled first, and only then does a secret appear on screen.
 /// </summary>
-public partial class QrExportDialog : ComponentBase, IDisposable
+public partial class QrExportDialog : IDisposable
 {
     /// <summary>Long enough to line a phone camera up — the 15 s seed reveal is not.</summary>
     private const int HideSeconds = 60;
@@ -20,23 +21,35 @@ public partial class QrExportDialog : ComponentBase, IDisposable
     /// <summary>The StaticBit mark, drawn over the middle of the code when it is short enough.</summary>
     private const string LogoUri = "_content/XrplVanity.App.Core/images/staticbit-qr-logo.png";
 
+    /// <summary>The wallet the code is for; the dialog links its name, wherever the sentence puts it.</summary>
+    private const string AppName = "StaticBit";
+
+    private const string AppUrl = "https://staticbit.io";
+
     private ElementReference _box;
     private ElementReference _close;
     private ITimer? _hideTimer;
     private string? _code;
-    private string? _error;
+    private UiText? _error;
     private string _password = string.Empty;
     private string _passwordConfirm = string.Empty;
     private string _folder = string.Empty;
     private bool _seedOnly;
     private bool _building;
     private bool _wasVisible;
+    private bool _refocusClose;
     private volatile bool _disposed;
 
     /// <summary>The rows to encode. Null or empty keeps the dialog closed.</summary>
     [Parameter] public IReadOnlyList<SessionResult>? Rows { get; set; }
 
     [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>
+    /// A line shown at the top of the dialog while the first-run tutorial explains it; the speech
+    /// bubble stays away from this step because it would cover the dialog. Null shows nothing.
+    /// </summary>
+    [Parameter] public string? Note { get; set; }
 
     /// <summary>
     /// A bare seed is never encrypted, and a password typed for the backup format does not apply to it;
@@ -69,10 +82,13 @@ public partial class QrExportDialog : ComponentBase, IDisposable
 
         if (!_seedOnly && _password != _passwordConfirm)
         {
-            _error = "The passwords do not match.";
+            _error = UiText.Of(QrText.PasswordsDoNotMatch);
             return;
         }
 
+        // The clicked button is replaced by the build state and then by the code: focus has to be
+        // put back after each of those renders.
+        _refocusClose = true;
         if (_seedOnly)
         {
             SetCode(Rows[0].Seed);
@@ -91,19 +107,27 @@ public partial class QrExportDialog : ComponentBase, IDisposable
         }
         catch (ArgumentException)
         {
-            _error = "Nothing to encode.";
+            _error = UiText.Of(QrText.NothingToEncode);
         }
         finally
         {
             _building = false;
+            _refocusClose = true;
         }
+    }
+
+    private void ChangeCode()
+    {
+        // Change goes away with the code it was clicked to remove.
+        _refocusClose = true;
+        DropCode();
     }
 
     private void SetCode(string code)
     {
         if (!_seedOnly && code.Length > MaxCodeCharacters)
         {
-            _error = $"Too many wallets for one code. Select at most {Fitting()} of them.";
+            _error = UiText.Of(QrText.TooManyWallets, ("count", Fitting()));
             return;
         }
 
@@ -193,31 +217,47 @@ public partial class QrExportDialog : ComponentBase, IDisposable
         _folder = string.Empty;
         _seedOnly = false;
         _wasVisible = false;
+        _refocusClose = false;
     }
 
     private Task OnKeyDown(KeyboardEventArgs args)
         => args.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
 
-    /// <summary>Focus lands on Close, the way the confirmation dialog focuses Cancel.</summary>
+    /// <summary>
+    /// Focus lands on Close, the way the confirmation dialog focuses Cancel. It also returns there
+    /// after Show code and Change, because the button that was clicked goes away: focus on a removed
+    /// element falls to the page body, outside the dialog, and Escape typed there never reaches the
+    /// dialog's key handler. Nothing else moves it: a format change keeps its own button, and the
+    /// timed hide can fire while the user is typing in a field.
+    /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (Rows is { Count: > 0 } && !_wasVisible)
+        if (Rows is not { Count: > 0 })
         {
-            _wasVisible = true;
+            return;
+        }
+
+        bool refocus = _refocusClose;
+        _refocusClose = false;
+        if (_wasVisible && !refocus)
+        {
+            return;
+        }
+
+        _wasVisible = true;
+        try
+        {
+            await _close.FocusAsync();
+        }
+        catch (InvalidOperationException)
+        {
             try
             {
-                await _close.FocusAsync();
+                await _box.FocusAsync();
             }
             catch (InvalidOperationException)
             {
-                try
-                {
-                    await _box.FocusAsync();
-                }
-                catch (InvalidOperationException)
-                {
-                    // The dialog closed in the same batch; nothing to focus.
-                }
+                // The dialog closed in the same batch; nothing to focus.
             }
         }
     }
