@@ -1,0 +1,104 @@
+name: desktop-release
+
+# Publishes the portable ZIP of the desktop application as a GitHub release. It runs only for a tag
+# app-v<version> pushed by hand, and refuses unless the tag points at a commit on main whose
+# VanityVersion is <version>. A release is therefore always code that main holds, under the version
+# the application itself shows. The ZIP is built here rather than on a developer's machine, and the
+# build is attested, so anyone can check which commit and which run produced the file.
+
+on:
+  push:
+    tags: ['app-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: The tag is on main and matches VanityVersion
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#app-v}"
+          declared=$(sed -n 's:.*<VanityVersion>\(.*\)</VanityVersion>.*:\1:p' Directory.Build.props)
+          if [ "$version" != "$declared" ]; then
+            echo "::error::$GITHUB_REF_NAME does not match VanityVersion $declared in Directory.Build.props"
+            exit 1
+          fi
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet workload install maui-windows
+      - run: dotnet publish src/XrplVanity.App/XrplVanity.App.csproj -c Release -f net10.0-windows10.0.22621.0 -p:PublishProfile=Portable-win-x64
+        env:
+          # Scoped to the build for the reason given in dotnet.yml: DartSassBuilder ships a net8.0 tool.
+          DOTNET_ROLL_FORWARD: LatestMajor
+
+      # The archive holds one folder, so unpacking it never spills 700 files into Downloads.
+      - name: Zip the published folder
+        id: zip
+        shell: pwsh
+        run: |
+          $name = "XrplVanity-${{ steps.version.outputs.version }}-win-x64-portable.zip"
+          New-Item -ItemType Directory staging | Out-Null
+          Copy-Item src/XrplVanity.App/bin/publish-portable staging/XrplVanity -Recurse
+          Compress-Archive -Path staging/XrplVanity -DestinationPath $name -CompressionLevel Optimal
+          $hash = (Get-FileHash $name -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path "$name.sha256" -Value "$hash *$name" -Encoding ascii -NoNewline
+          "name=$name" >> $env:GITHUB_OUTPUT
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.zip.outputs.name }}
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          NAME: ${{ steps.zip.outputs.name }}
+          SHA256: ${{ steps.zip.outputs.sha256 }}
+        run: |
+          cat > notes.md <<EOF
+          The desktop application for Windows 10 (1809 or newer) and Windows 11, x64, as a ZIP that runs wherever it is unpacked. Nothing is installed.
+
+          1. Download \`$NAME\` and unpack it into any folder.
+          2. Run \`XrplVanity.App.exe\`.
+
+          The file is not code-signed yet, so Windows may stop the first start with *Windows protected your PC*. Click **More info**, then **Run anyway**.
+
+          **SHA-256:** \`$SHA256\`
+
+          The build is attested to this repository's workflow and commit. With the GitHub CLI:
+
+          \`\`\`
+          gh attestation verify $NAME -R $GITHUB_REPOSITORY
+          \`\`\`
+
+          Results and settings live in \`%LOCALAPPDATA%\\StaticBit\\io.staticbit.vanity\`, not in the application folder. Deleting the application folder leaves \`results.dat\` and its seeds in place. The ZIP version shows no Windows notifications.
+
+          More: https://xrpl-vanity.staticbit.io/desktop/
+          EOF
+          gh release create "$GITHUB_REF_NAME" "$NAME" "$NAME.sha256" --title "XRPL Vanity $VERSION for Windows" --notes-file notes.md --verify-tag

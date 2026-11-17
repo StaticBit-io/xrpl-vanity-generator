@@ -12,7 +12,10 @@
 <p class="lead">Busca una dirección personalizada, guarda los resultados cifrados y pasa un monedero a tu teléfono.</p>
 
 <h2 id="get-it">Cómo conseguirla</h2>
-<p>La aplicación llegará pronto a Microsoft Store. Mientras tanto, se puede <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">compilar desde el código</a>.</p>
+<p>Descarga el ZIP de la <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/releases/latest">última versión publicada</a>, descomprímelo en cualquier carpeta y ejecuta <code>XrplVanity.App.exe</code>. No se instala nada. La página de la versión indica el SHA-256 del archivo, para que compruebes tu copia antes de ejecutarla. También puedes <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md#portable-zip">compilarla desde el código</a>.</p>
+<p>El archivo aún no está firmado, así que Windows puede detener el primer inicio con <em>Windows protegió su PC</em>. Haz clic en <strong>Más información</strong> y luego en <strong>Ejecutar de todas formas</strong>. Cada versión nueva puede volver a preguntarlo.</p>
+<p>La versión ZIP no muestra notificaciones de Windows. La aplicación llegará a Microsoft Store, donde sí funcionan.</p>
+<p>Los resultados y la configuración no se guardan en la carpeta de la aplicación, sino en <code>%LOCALAPPDATA%\StaticBit\io.staticbit.vanity</code>. Para quitar la aplicación, borra las dos carpetas: si borras solo la de la aplicación, tus resultados y sus semillas quedan en el disco.</p>
 <ul>
 <li>Windows 10 versión 1809 (compilación 17763) o posterior, x64.</li>
 <li>El entorno de ejecución Microsoft Edge WebView2. Windows 11 y las actualizaciones recientes de Windows 10 ya lo incluyen.</li>
@@ -49,7 +52,7 @@
 <p>Una semilla controla su cuenta. Está oculta en todas partes hasta que la muestras, y se vuelve a ocultar a los 15 segundos o al salir de la página. Una semilla copiada se borra del portapapeles a los 30 segundos, salvo que hayas copiado otra cosa antes. Puedes cambiar los dos tiempos en Ajustes.</p>
 <p>Una semilla copiada no entra en el historial del portapapeles de Windows ni en su sincronización.</p>
 <p>Los resultados se guardan en un archivo, <code>results.dat</code>, cifrado con la API de protección de datos de Windows (DPAPI). Solo la cuenta de Windows que escribió el archivo puede leerlo, así que los resultados no pasan a otra cuenta ni a otro ordenador. Ninguna semilla aparece en un registro, una notificación o el menú de la bandeja.</p>
-<p><strong>Al desinstalar la aplicación se elimina <code>results.dat</code>, con todas sus semillas.</strong> Guarda antes las semillas que quieras conservar.</p>
+<p><strong>Al borrar los datos de la aplicación se elimina <code>results.dat</code>, con todas sus semillas.</strong> Guarda antes las semillas que quieras conservar.</p>
 
 <h2 id="qr">Pasa un monedero a tu teléfono</h2>
 <p>El botón QR de un resultado muestra ese monedero, y <strong>Mostrar QR</strong> muestra todas las filas seleccionadas. Escanea el código con el monedero móvil <a href="https://staticbit.io">StaticBit</a>, que restaura los monederos a partir de la copia de seguridad incluida en el código. Un código admite hasta 22 monederos, o 21 con contraseña.</p>
