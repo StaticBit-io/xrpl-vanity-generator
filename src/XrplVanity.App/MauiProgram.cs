@@ -24,6 +24,7 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
         string dataFolder = FileSystem.AppDataDirectory;
+        PinWebView2ProfileForUnpackagedBuild(dataFolder);
         builder.Services.AddSingleton<ISettingsStore>(new JsonSettingsStore(dataFolder));
         builder.Services.AddSingleton<IResultStore>(new DpapiResultStore(dataFolder));
         builder.Services.AddSingleton<WindowsNotificationService>();
@@ -64,5 +65,28 @@ public static class MauiProgram
         });
 
         return app;
+    }
+
+    /// <summary>
+    /// WebView2 keeps its profile next to the executable unless told otherwise. The ZIP build can be
+    /// unpacked anywhere, including Program Files, which a normal user cannot write to: WebView2 then
+    /// reports that it cannot create its data directory and the window stays empty. The profile goes
+    /// beside the data folder instead. BlazorWebViewInitializingEventArgs.UserDataFolder cannot do
+    /// this on Windows: MAUI 10.0.110 builds an environment from it and then calls
+    /// EnsureCoreWebView2Async() without that environment, so the setting is dropped. The WebView2
+    /// loader reads this variable when it creates the default environment. A packaged build already
+    /// keeps the profile in the package's local state, and a value set outside the process wins.
+    /// </summary>
+    private static void PinWebView2ProfileForUnpackagedBuild(string dataFolder)
+    {
+        const string variable = "WEBVIEW2_USER_DATA_FOLDER";
+        if (AppInfo.Current.PackagingModel != AppPackagingModel.Unpackaged
+            || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)))
+        {
+            return;
+        }
+
+        string appFolder = Path.GetDirectoryName(dataFolder)!;
+        Environment.SetEnvironmentVariable(variable, Path.Combine(appFolder, "WebView2"));
     }
 }

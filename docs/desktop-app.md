@@ -166,6 +166,14 @@ on disk, in a log, in a notification or in the tray menu ever carries one. A TSV
 written from the results list does contain seeds — it is a file you asked for, in a
 location you chose, and it is not protected.
 
+An unpackaged build — the [portable ZIP](#portable-zip) or a Debug build — has no package
+and therefore no `LocalState`. It keeps the same two files in
+`%LOCALAPPDATA%\StaticBit\io.staticbit.vanity\Data`, and WebView2's profile beside them in
+`%LOCALAPPDATA%\StaticBit\io.staticbit.vanity\WebView2`. Neither is inside the
+application folder, so deleting that folder leaves `results.dat` and its seeds in place.
+The packaged and unpackaged builds do not share their data: results from one are visible
+in the other only through a TSV export.
+
 ## Requirements
 
 - Windows 10 version 1809 (build 17763) or newer, x64.
@@ -174,7 +182,8 @@ location you chose, and it is not protected.
   [Troubleshooting](#troubleshooting)).
 - For GPU search, either an NVIDIA driver (CUDA) or any installed OpenCL platform. With
   neither, the application says so and searches on the CPU.
-- The MSIX package is self-contained: no .NET runtime has to be installed separately.
+- The MSIX package is self-contained: no .NET runtime has to be installed separately. So
+  is the portable ZIP, which also carries the Windows App SDK runtime.
 
 ## Build and run from source
 
@@ -314,6 +323,45 @@ publish layout contains `wwwroot`, and a package registered without it opens on 
 "can't reach this page" error. After changing `Package.appxmanifest`, remove the previous
 registration first (`Remove-AppxPackage -Package io.staticbit.vanity_1.0.0.0_x64__<hash> -PreserveApplicationData`)
 — Windows refuses to re-register the same version otherwise.
+
+## Portable ZIP
+
+The ZIP is the channel that needs no package, no certificate and no installer: a folder
+that runs wherever it is unpacked. It is built from the same project with its own publish
+profile:
+
+```powershell
+dotnet publish src/XrplVanity.App/XrplVanity.App.csproj -c Release -f net10.0-windows10.0.22621.0 -p:PublishProfile=Portable-win-x64
+```
+
+The folder lands in `src/XrplVanity.App/bin/publish-portable/` and is zipped as it is, about
+113 MB packed and 306 MB unpacked. `Portable-win-x64.pubxml` sets `WindowsPackageType=None`
+and `WindowsAppSDKSelfContained=true` besides `SelfContained=true`. An MSIX declares the
+Windows App SDK runtime as a dependency and the installer brings it in; an unpackaged build
+has nothing to bring it in, so the runtime ships inside the folder. On a clean machine the
+process loads .NET and the Windows App SDK from its own folder only, none of it from
+`Program Files\dotnet` or `WindowsApps`.
+
+What differs from the MSIX:
+
+- **No package identity.** Windows notifications are unavailable, and the Settings page says
+  so.
+- **Not signed.** Windows SmartScreen warns on the first start of a downloaded copy, and
+  again for every new version: an unsigned file earns reputation by its own hash, which a
+  new build resets.
+- **Data outside the folder.** Settings, results and the WebView2 profile live under
+  `%LOCALAPPDATA%\StaticBit\io.staticbit.vanity` (see [Where the data is](#where-the-data-is)).
+  Removing the application means deleting both the folder and that directory.
+- **No updates.** The application has no network code, so a new version is a new ZIP.
+
+The WebView2 profile is placed by `MauiProgram.PinWebView2ProfileForUnpackagedBuild`. Left to
+itself, WebView2 creates the profile next to the executable, so a copy unpacked into
+`Program Files` opens an empty window behind "We couldn't create the data directory". The
+documented route, `BlazorWebViewInitializingEventArgs.UserDataFolder`, does not work on
+Windows in MAUI 10.0.110: the handler builds an environment from it and then calls
+`EnsureCoreWebView2Async()` without that environment. The method sets
+`WEBVIEW2_USER_DATA_FOLDER` for the process instead, which the WebView2 loader reads; a value
+set outside the process wins.
 
 ## Fonts and third-party assets
 
