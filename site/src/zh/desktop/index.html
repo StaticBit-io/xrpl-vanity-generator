@@ -12,7 +12,10 @@
 <p class="lead">搜索靓号地址，加密保存结果，并把钱包转到手机上。</p>
 
 <h2 id="get-it">获取方式</h2>
-<p>应用即将上架 Microsoft Store。在此之前，可以<a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">从源代码编译</a>。</p>
+<p>从<a href="https://github.com/StaticBit-io/xrpl-vanity-generator/releases/latest">最新版本</a>下载 ZIP，解压到任意文件夹，然后运行 <code>XrplVanity.App.exe</code>。无需安装。版本页面列出了文件的 SHA-256，运行前可以用它核对你的副本。也可以<a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md#portable-zip">从源代码编译</a>。</p>
+<p>该文件尚未签名，因此首次启动时 Windows 可能显示<em>Windows 已保护你的电脑</em>。点击<strong>更多信息</strong>，然后点击<strong>仍要运行</strong>。每个新版本都可能再提示一次。</p>
+<p>ZIP 版本不显示 Windows 通知。应用即将上架 Microsoft Store，那里的版本支持通知。</p>
+<p>结果和设置不保存在应用文件夹中，而是在 <code>%LOCALAPPDATA%\StaticBit\io.staticbit.vanity</code>。要删除应用，请删除这两个文件夹：如果只删除应用文件夹，你的结果及其中的种子会留在磁盘上。</p>
 <ul>
 <li>Windows 10 1809（内部版本 17763）或更高版本，x64。</li>
 <li>Microsoft Edge WebView2 运行时。Windows 11 和较新的 Windows 10 更新已自带。</li>
@@ -49,7 +52,7 @@
 <p>种子控制着它对应的账户。种子在各处都是隐藏的，直到你点击显示；15 秒后或离开页面时会再次隐藏。复制的种子会在 30 秒后从剪贴板清除，除非你在此之前复制了别的内容。这两个时间都可以在“设置”中修改。</p>
 <p>复制的种子不会进入 Windows 剪贴板历史，也不会参与剪贴板同步。</p>
 <p>结果保存在一个文件 <code>results.dat</code> 中，并用 Windows 数据保护 API（DPAPI）加密。只有写入该文件的 Windows 账户才能读取它，因此结果不能转移到其他账户或其他电脑。种子不会出现在日志、通知或托盘菜单中。</p>
-<p><strong>卸载应用会删除 <code>results.dat</code> 及其中的所有种子。</strong>请先保存你想保留的种子。</p>
+<p><strong>删除应用数据会删除 <code>results.dat</code> 及其中的所有种子。</strong>请先保存你想保留的种子。</p>
 
 <h2 id="qr">把钱包转到手机上</h2>
 <p>结果上的二维码按钮会显示该钱包，<strong>显示二维码</strong>会显示所有选中的行。用 <a href="https://staticbit.io">StaticBit</a> 手机钱包扫描该码，它会根据码中的备份格式恢复钱包。一个码最多容纳 22 个钱包，设置密码时为 21 个。</p>

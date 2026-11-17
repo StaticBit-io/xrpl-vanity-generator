@@ -109,8 +109,8 @@ test('the desktop page warns that a TSV export is not protected', () => {
   assert.match(textOf(desktop), /TSV[\s\S]{0,200}plain text/);
 });
 
-test('the desktop page says uninstalling deletes the seeds', () => {
-  assert.match(textOf(desktop), /Uninstalling[^.]*results\.dat/);
+test('the desktop page says deleting the data deletes the seeds', () => {
+  assert.match(textOf(desktop), /Deleting the application's data deletes results\.dat/);
 });
 
 test('the desktop page says a bare-seed code is never encrypted', () => {
@@ -175,7 +175,8 @@ test('a reference box scrolls by itself', () => {
 test('every mention of StaticBit in a page links to its site', () => {
   for (const name of ['index.html', 'desktop/index.html', 'cli/index.html', 'privacy/index.html', 'support/index.html', '404.html']) {
     const body = read(`../src/${name}`).replace(/<head>[\s\S]*?<\/head>/, '');
-    const links = body.replace(/<a href="https:\/\/staticbit\.io">StaticBit<\/a>/g, '');
+    // A path such as %LOCALAPPDATA%\StaticBit\... is something to type, not a mention of the company.
+    const links = body.replace(/<a href="https:\/\/staticbit\.io">StaticBit<\/a>/g, '').replace(/<code>[^<]*<\/code>/g, '');
     const text = links.replace(/<[^>]+>/g, ' ');
     assert.doesNotMatch(text, /\bStaticBit\b(?!-io)/, name);
   }

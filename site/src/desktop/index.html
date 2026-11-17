@@ -12,7 +12,10 @@
 <p class="lead">Search for a vanity address, keep the results encrypted, and move a wallet to your phone.</p>
 
 <h2 id="get-it">Get it</h2>
-<p>The application is on its way to the Microsoft Store. Until it arrives, it can be <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">built from source</a>.</p>
+<p>Download the ZIP from the <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/releases/latest">latest release</a>, unpack it into any folder and run <code>XrplVanity.App.exe</code>. Nothing gets installed. The release page lists the file's SHA-256, so you can check your copy before you run it. You can also <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md#portable-zip">build it from source</a>.</p>
+<p>The file is not signed yet, so Windows may stop the first start with <em>Windows protected your PC</em>. Click <strong>More info</strong>, then <strong>Run anyway</strong>. Each new version may ask once more.</p>
+<p>The ZIP version shows no Windows notifications. The application is on its way to the Microsoft Store, where they work.</p>
+<p>Results and settings are kept outside the application folder, in <code>%LOCALAPPDATA%\StaticBit\io.staticbit.vanity</code>. To remove the application, delete both folders: with the application folder alone, your results and their seeds stay on the disk.</p>
 <ul>
 <li>Windows 10 version 1809 (build 17763) or newer, x64.</li>
 <li>The Microsoft Edge WebView2 runtime. Windows 11 and current Windows 10 updates include it.</li>
@@ -49,7 +52,7 @@
 <p>A seed controls its account. It is masked everywhere until you reveal it, and it hides again after 15 seconds or when you leave the page. A copied seed is cleared from the clipboard after 30 seconds, unless you have copied something else by then. Both delays are yours to change in Settings.</p>
 <p>A copied seed stays out of Windows clipboard history and clipboard sync.</p>
 <p>Results are stored in one file, <code>results.dat</code>, encrypted with the Windows Data Protection API (DPAPI). Only the Windows account that wrote the file can read it, so results do not move to another account or computer. No seed appears in a log, a notification or the tray menu.</p>
-<p><strong>Uninstalling the application deletes <code>results.dat</code>, and every seed in it.</strong> Save the seeds you want to keep first.</p>
+<p><strong>Deleting the application's data deletes <code>results.dat</code>, and every seed in it.</strong> Save the seeds you want to keep first.</p>
 
 <h2 id="qr">Move a wallet to your phone</h2>
 <p>The QR button on a result shows that wallet, and <strong>Show QR</strong> shows every selected row. Scan the code with the <a href="https://staticbit.io">StaticBit</a> mobile wallet, which restores it from the backup format the code carries. One code holds up to 22 wallets, or 21 with a password.</p>

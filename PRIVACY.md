@@ -2,7 +2,7 @@
 
 **XRPL Vanity** — desktop application for Windows, published by StaticBit.
 
-Last updated: 2026-11-05.
+Last updated: 2026-11-17.
 
 ## Summary
 
@@ -61,6 +61,10 @@ Uninstalling removes the application and its data folder, including `results.dat
 seed in it, and they cannot be recovered. Save the seeds you want to keep first. To delete
 the stored results without uninstalling, use **Open folder** on the Settings page and delete
 `results.dat` and `settings.json`.
+
+The ZIP version is not installed, and its data folder is not inside the application
+folder: deleting the application folder leaves `results.dat` in place. To remove its data,
+delete `%LOCALAPPDATA%\StaticBit\io.staticbit.vanity` as well.
 
 ## Contact
 
