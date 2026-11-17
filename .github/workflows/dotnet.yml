@@ -16,14 +16,20 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The repository is public, so a pull request from a fork runs code its author wrote. Such a run
+  # never goes to the self-hosted LINUX_RUNNER: only pushes and pull requests from branches of this
+  # repository do. Hosted runners are free for a public repository, so a fork loses nothing.
+
   # The same content otherwise runs twice: in its pull request and again on the push to dev or main.
   # A job that passed on commit tree T leaves an artifact ci-passed-<job>-<T>, and gate skips the job
   # when it finds one. The tree, not the commit: a pull request runs on the synthetic
   # refs/pull/N/merge commit, while the squash commit on dev is a different commit with the same
   # content. If dev moved on while the pull request waited, the trees differ and the job runs again.
   # An API error finds no marker, so the job runs rather than being skipped.
+  # Only markers left by runs of this repository count. A pull request from a fork runs its own copy
+  # of this workflow, so it could upload a marker without running a single test.
   gate:
-    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.LINUX_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       actions: read
@@ -42,7 +48,8 @@ jobs:
           for job in windows linux; do
             passed=false
             if [ -n "$tree" ] && n=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=ci-passed-$job-$tree" \
-                --jq '[.artifacts[] | select(.expired | not)] | length') && [ "$n" -gt 0 ]; then
+                --jq '[.artifacts[] | select((.expired | not)
+                  and .workflow_run.head_repository_id == .workflow_run.repository_id)] | length') && [ "$n" -gt 0 ]; then
               passed=true
             fi
             echo "$job: $passed (tree $tree)"
@@ -88,7 +95,7 @@ jobs:
   linux:
     needs: gate
     if: ${{ !cancelled() && needs.gate.outputs.linux != 'true' }}
-    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.LINUX_RUNNER || 'ubuntu-latest' }}
     # About 6 minutes for the suite on a 4-CPU container once the RealGpu tests are left out; the
     # margin covers a slower runner without letting a hang burn the budget.
     timeout-minutes: 20
@@ -120,7 +127,7 @@ jobs:
       ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
       && (needs.windows.result == 'success' || needs.gate.outputs.windows == 'true')
       && (needs.linux.result == 'success' || needs.gate.outputs.linux == 'true') }}
-    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.LINUX_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
       contents: write
