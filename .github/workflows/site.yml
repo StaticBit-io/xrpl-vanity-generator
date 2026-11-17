@@ -18,7 +18,8 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ vars.LINUX_RUNNER || 'ubuntu-latest' }}
+    # A pull request from a fork never reaches the self-hosted runner; see dotnet.yml.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
