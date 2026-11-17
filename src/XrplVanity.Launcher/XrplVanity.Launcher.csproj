@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The one executable at the top of the portable ZIP. The application itself is several hundred
+    files - the .NET runtime, the Windows App SDK, WebView2 - and they live in app\, so a reader who
+    unpacks the archive finds a single thing to run. Native AOT keeps this file small and free of any
+    runtime of its own. The repository's app\build-portable.ps1 publishes it and names it "XRPL Vanity.exe".
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <ApplicationIcon>XrplVanity.ico</ApplicationIcon>
+    <AssemblyTitle>XRPL Vanity</AssemblyTitle>
+    <Product>XRPL Vanity</Product>
+    <Company>StaticBit</Company>
+  </PropertyGroup>
+
+</Project>
