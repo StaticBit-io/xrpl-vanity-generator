@@ -12,7 +12,10 @@
 <p class="lead">Busque um endereço personalizado, guarde os resultados criptografados e leve uma carteira para o celular.</p>
 
 <h2 id="get-it">Como obter</h2>
-<p>O aplicativo está a caminho da Microsoft Store. Até lá, ele pode ser <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md">compilado a partir do código</a>.</p>
+<p>Baixe o ZIP da <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/releases/latest">versão mais recente</a>, descompacte em qualquer pasta e execute <code>XrplVanity.App.exe</code>. Nada é instalado. A página da versão mostra o SHA-256 do arquivo, para você conferir sua cópia antes de executá-la. Também é possível <a href="https://github.com/StaticBit-io/xrpl-vanity-generator/blob/main/docs/desktop-app.md#portable-zip">compilar a partir do código</a>.</p>
+<p>O arquivo ainda não é assinado, então o Windows pode interromper a primeira execução com <em>O Windows protegeu o computador</em>. Clique em <strong>Mais informações</strong> e depois em <strong>Executar assim mesmo</strong>. Cada nova versão pode perguntar de novo.</p>
+<p>A versão em ZIP não mostra notificações do Windows. O aplicativo está a caminho da Microsoft Store, onde elas funcionam.</p>
+<p>Resultados e configurações ficam fora da pasta do aplicativo, em <code>%LOCALAPPDATA%\StaticBit\io.staticbit.vanity</code>. Para remover o aplicativo, apague as duas pastas: se apagar só a pasta do aplicativo, seus resultados e as seeds deles continuam no disco.</p>
 <ul>
 <li>Windows 10 versão 1809 (build 17763) ou mais recente, x64.</li>
 <li>O runtime Microsoft Edge WebView2. O Windows 11 e as atualizações recentes do Windows 10 já o incluem.</li>
@@ -49,7 +52,7 @@
 <p>Uma seed controla a conta dela. Ela fica oculta em todo lugar até você mostrá-la, e se oculta de novo após 15 segundos ou quando você sai da página. Uma seed copiada é apagada da área de transferência após 30 segundos, a menos que você tenha copiado outra coisa antes. Os dois tempos podem ser mudados em Configurações.</p>
 <p>Uma seed copiada fica fora do histórico da área de transferência do Windows e da sincronização dela.</p>
 <p>Os resultados ficam em um arquivo, <code>results.dat</code>, criptografado com a API de proteção de dados do Windows (DPAPI). Só a conta do Windows que gravou o arquivo consegue lê-lo, então os resultados não passam para outra conta ou outro computador. Nenhuma seed aparece em um log, em uma notificação ou no menu da bandeja.</p>
-<p><strong>Desinstalar o aplicativo apaga o <code>results.dat</code> e todas as seeds dele.</strong> Guarde antes as seeds que quiser manter.</p>
+<p><strong>Apagar os dados do aplicativo apaga o <code>results.dat</code> e todas as seeds dele.</strong> Guarde antes as seeds que quiser manter.</p>
 
 <h2 id="qr">Leve uma carteira para o celular</h2>
 <p>O botão QR de um resultado mostra aquela carteira, e <strong>Mostrar QR</strong> mostra todas as linhas selecionadas. Escaneie o código com a carteira móvel <a href="https://staticbit.io">StaticBit</a>, que as restaura a partir do backup que o código carrega. Um código comporta até 22 carteiras, ou 21 com senha.</p>

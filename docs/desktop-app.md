@@ -342,6 +342,12 @@ has nothing to bring it in, so the runtime ships inside the folder. On a clean m
 process loads .NET and the Windows App SDK from its own folder only, none of it from
 `Program Files\dotnet` or `WindowsApps`.
 
+A release is published by `.github/workflows/desktop-release.yml`: push a tag `app-v<version>`
+on a commit of `main`, where `<version>` is `VanityVersion` from `Directory.Build.props`. The
+workflow refuses any other tag. It builds the ZIP on a GitHub runner, attests the build, and
+creates the release with the file and its SHA-256. The site's download link points at the
+latest release, so a release is what the site offers from then on.
+
 What differs from the MSIX:
 
 - **No package identity.** Windows notifications are unavailable, and the Settings page says
