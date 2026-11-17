@@ -55,6 +55,18 @@ jobs:
           # Scoped to the build for the reason given in dotnet.yml: DartSassBuilder ships a net8.0 tool.
           DOTNET_ROLL_FORWARD: LatestMajor
 
+      # Without the stylesheet the application starts and renders unstyled, and nothing else here
+      # would notice. The first release shipped that way: see _IncludeCompiledSass in
+      # XrplVanity.App.Core.csproj.
+      - name: The stylesheet is in the published folder
+        shell: bash
+        run: |
+          css=src/XrplVanity.App/bin/publish-portable/wwwroot/_content/XrplVanity.App.Core/scss/app.css
+          if [ ! -s "$css" ]; then
+            echo "::error::$css is missing from the published folder"
+            exit 1
+          fi
+
       # The archive holds one folder, so unpacking it never spills 700 files into Downloads.
       - name: Zip the published folder
         id: zip
