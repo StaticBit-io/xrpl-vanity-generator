@@ -77,6 +77,17 @@ jobs:
           # Scoped to the build for the reason given in linux/Dockerfile: DartSassBuilder ships a
           # net8.0 tool, and the test executables must not be rolled forward with it.
           DOTNET_ROLL_FORWARD: LatestMajor
+      # The application's stylesheet is compiled during the build, and a clean checkout once left it
+      # out of the static web assets: every build from CI rendered unstyled while a developer machine,
+      # with the file left over from its previous build, did not. See _IncludeCompiledSass.
+      - name: The stylesheet is a static web asset
+        shell: bash
+        run: |
+          manifest=$(find src/XrplVanity.App/bin/Release -name XrplVanity.App.staticwebassets.endpoints.json | head -1)
+          if [ -z "$manifest" ] || ! grep -q '_content/XrplVanity.App.Core/scss/app.css"' "$manifest"; then
+            echo "::error::_content/XrplVanity.App.Core/scss/app.css is not among the application's static web assets"
+            exit 1
+          fi
       # RealGpu tests need a real card, which hosted runners lack; they run on a developer machine.
       - run: dotnet run --project tests/XrplVanity.Tests -c Release --no-build -- -trait- "Category=RealGpu"
       - run: dotnet run --project tests/XrplVanity.App.Tests -c Release --no-build
