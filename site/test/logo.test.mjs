@@ -52,6 +52,16 @@ test('the tray icon carries the sizes Windows asks for', () => {
   for (const size of [16, 24, 32, 48]) assert.ok(widths.includes(size), `${size}: ${widths}`);
 });
 
+// The launcher is what a user of the portable ZIP sees first, at every size Explorer shows, up to the
+// 256-pixel large icons. It is rendered from appicon.svg; docs/desktop-app.md says how.
+test('the launcher icon carries the sizes Explorer shows', () => {
+  const ico = readFileSync(new URL('../../src/XrplVanity.Launcher/XrplVanity.ico', import.meta.url));
+  assert.equal(ico.readUInt16LE(2), 1);
+  const count = ico.readUInt16LE(4);
+  const widths = Array.from({ length: count }, (_, index) => ico[6 + 16 * index] || 256);
+  for (const size of [16, 24, 32, 48, 256]) assert.ok(widths.includes(size), `${size}: ${widths}`);
+});
+
 test('the mark in the application rail sits on the same black', () => {
   assert.match(read('../../src/XrplVanity.App.Core/Layout/NavRail.razor.css'), /\.mono-mark\s*{[^}]*background: #040805/);
 });
