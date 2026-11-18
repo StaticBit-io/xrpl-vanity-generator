@@ -50,22 +50,20 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet workload install maui-windows
-      - run: dotnet publish src/XrplVanity.App/XrplVanity.App.csproj -c Release -f net10.0-windows10.0.22621.0 -p:PublishProfile=Portable-win-x64
+      # app/build-portable.ps1 lays the archive out - the launcher on top, the application in app\ -
+      # leaves out what a user never needs, refuses a build without the stylesheet, and writes the
+      # SHA-256. A local run of the script produces the same archive.
+      - name: Build the portable ZIP
+        id: zip
+        shell: pwsh
         env:
           # Scoped to the build for the reason given in dotnet.yml: DartSassBuilder ships a net8.0 tool.
           DOTNET_ROLL_FORWARD: LatestMajor
-
-      # The archive holds one folder, so unpacking it never spills 700 files into Downloads.
-      - name: Zip the published folder
-        id: zip
-        shell: pwsh
         run: |
-          $name = "XrplVanity-${{ steps.version.outputs.version }}-win-x64-portable.zip"
-          New-Item -ItemType Directory staging | Out-Null
-          Copy-Item src/XrplVanity.App/bin/publish-portable staging/XrplVanity -Recurse
-          Compress-Archive -Path staging/XrplVanity -DestinationPath $name -CompressionLevel Optimal
-          $hash = (Get-FileHash $name -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -Path "$name.sha256" -Value "$hash *$name" -Encoding ascii -NoNewline
+          $zip = ./app/build-portable.ps1 -OutputDirectory artifacts
+          $name = Split-Path $zip -Leaf
+          $hash = (Get-Content "$zip.sha256" -Raw).Split(' ')[0]
+          Copy-Item $zip, "$zip.sha256" .
           "name=$name" >> $env:GITHUB_OUTPUT
           "sha256=$hash" >> $env:GITHUB_OUTPUT
 
@@ -85,7 +83,7 @@ jobs:
           The desktop application for Windows 10 (1809 or newer) and Windows 11, x64, as a ZIP that runs wherever it is unpacked. Nothing is installed.
 
           1. Download \`$NAME\` and unpack it into any folder.
-          2. Run \`XrplVanity.App.exe\`.
+          2. Run \`XRPL Vanity.exe\`. Keep the \`app\` folder next to it: the application lives there.
 
           The file is not code-signed yet, so Windows may stop the first start with *Windows protected your PC*. Click **More info**, then **Run anyway**.
 
@@ -97,7 +95,7 @@ jobs:
           gh attestation verify $NAME -R $GITHUB_REPOSITORY
           \`\`\`
 
-          Results and settings live in \`%LOCALAPPDATA%\\StaticBit\\io.staticbit.vanity\`, not in the application folder. Deleting the application folder leaves \`results.dat\` and its seeds in place. The ZIP version shows no Windows notifications.
+          Results and settings live in \`%LOCALAPPDATA%\\StaticBit\\io.staticbit.vanity\`, not in the application folder. Deleting the application folder leaves \`results.dat\` and its seeds in place.
 
           More: https://xrpl-vanity.staticbit.io/desktop/
           EOF

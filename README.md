@@ -444,13 +444,6 @@ it out of logs.
 See [docs/wallet-integration.md](docs/wallet-integration.md) for how to add the
 package to an application and run a search from its user interface.
 
-## Acknowledgements
-
-This tool is inspired by, and its CLI surface and matching semantics are
-modeled after, [`nhartner/xrp-vanity-address`](https://github.com/nhartner/xrp-vanity-address),
-a Java XRPL vanity address generator released under the Apache License 2.0.
-This is an independent C# reimplementation, not a fork.
-
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).

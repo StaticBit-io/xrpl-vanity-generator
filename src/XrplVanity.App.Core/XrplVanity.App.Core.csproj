@@ -24,4 +24,22 @@
   <ItemGroup>
     <SupportedPlatform Include="browser" />
   </ItemGroup>
+
+  <!--
+    DartSassBuilder writes wwwroot\scss\*.css during the build (DartSass_Build runs before
+    BeforeBuild), but MSBuild globbed wwwroot into Content when the project was evaluated. On a
+    clean checkout the stylesheet did not exist yet, so it never became a static web asset, and a
+    build published from a clean tree - the release ZIP built in CI, or a Store package built on a
+    fresh machine - shipped without it and rendered unstyled. A developer machine hides this, because
+    the file left over from the previous build is globbed. Add what the compiler wrote before the
+    static web assets are resolved; the Remove keeps an incremental build, where the glob already
+    found the file, from listing it twice.
+  -->
+  <Target Name="_IncludeCompiledSass" BeforeTargets="ResolveProjectStaticWebAssets">
+    <ItemGroup>
+      <Content Remove="wwwroot\scss\*.css" />
+      <Content Include="wwwroot\scss\*.css" />
+    </ItemGroup>
+  </Target>
+
 </Project>

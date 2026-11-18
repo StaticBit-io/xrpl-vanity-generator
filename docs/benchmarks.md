@@ -113,7 +113,6 @@ Windows, 12 worker threads (the default), commit 8b66560.
 
 | Implementation | Rate | Source |
 | --- | --- | --- |
-| `nhartner/xrp-vanity-address` (Java, GraalVM native image) | ~39,000/s | measured 2026-09-02, recorded in `2026-09-03-xrpl-vanity-design.md` |
 | .NET prototype (throwaway spike) | ~138,000/s | same document |
 | `xrpl-vanity --case-sensitive --starts abc --count 60` | superseded — the estimate assumed 58^3 per match; the measured rate is the `CPU:` row below | this page |
 | `xrpl-vanity --case-sensitive --starts abc --count 60` (CPU: line) | 118,885/s and 111,576/s (measured from the `CPU: searched … (R/s)` line, Plan F) | this page (Plan F) |

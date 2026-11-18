@@ -123,7 +123,7 @@ Settings page, which is disabled while a search or a speed measurement is runnin
 | --- | --- | --- |
 | Language | The language of every screen, the tutorial, the tray menu and notifications. It changes at once and is remembered in `settings.json`. | The system language if the application has it, else English |
 | Close button | What the × in the title bar does: ask every time, minimise to tray, or exit. | Ask every time |
-| Notifications | A toast on a match and when a search finishes. Disabled, with a note, when the platform refuses registration (an unpackaged build has no package identity). | On |
+| Notifications | A toast on a match and when a search finishes. Disabled, with a note, when the platform refuses registration. | On |
 | GPU duty (applies immediately) | Share of the time the GPU runs, 25–100 %. The same value as the Search page's slider and the tray menu; a change reaches a running search at once. | 100 |
 | Stop after N matches | The session ends by itself once it has found this many. Blank or 0 searches until you press Stop. | blank |
 | Clear clipboard after copying a seed | Seconds before a copied seed is wiped, and only if the clipboard still holds it. Copying anything else in the meantime keeps the newer content. | 30 |
@@ -200,8 +200,9 @@ Debug builds run unpackaged (`WindowsPackageType=None`), so they start straight 
 dotnet build src/XrplVanity.App/XrplVanity.App.csproj -c Debug -f net10.0-windows10.0.22621.0 -t:Run
 ```
 
-An unpackaged build has no package identity, so Windows notifications are unavailable and
-the Settings page marks the toggle accordingly. Everything else behaves the same.
+An unpackaged build has no package identity. Notifications work all the same, because the
+Windows App SDK registers an unpackaged process under an identity of its own (see
+[Portable ZIP](#portable-zip)), and everything else behaves the same.
 
 The unit tests for the UI layer run like every other suite in this repository — as an
 executable, never through `dotnet test`:
@@ -327,16 +328,49 @@ registration first (`Remove-AppxPackage -Package io.staticbit.vanity_1.0.0.0_x64
 ## Portable ZIP
 
 The ZIP is the channel that needs no package, no certificate and no installer: a folder
-that runs wherever it is unpacked. It is built from the same project with its own publish
-profile:
+that runs wherever it is unpacked. One script builds it, locally and in the release workflow
+alike:
 
 ```powershell
-dotnet publish src/XrplVanity.App/XrplVanity.App.csproj -c Release -f net10.0-windows10.0.22621.0 -p:PublishProfile=Portable-win-x64
+./app/build-portable.ps1
 ```
 
-The folder lands in `src/XrplVanity.App/bin/publish-portable/` and is zipped as it is, about
-113 MB packed and 306 MB unpacked. `Portable-win-x64.pubxml` sets `WindowsPackageType=None`
-and `WindowsAppSDKSelfContained=true` besides `SelfContained=true`. An MSIX declares the
+The archive and its `.sha256` land in `artifacts/portable/`. Native AOT compiles the
+launcher, so the machine needs the Visual Studio C++ build tools (the "Desktop development
+with C++" workload); the script puts the Visual Studio installer folder on `PATH` itself,
+because Visual Studio 18's `vcvarsall.bat` calls `vswhere.exe` by name.
+
+What the user unpacks:
+
+```text
+XrplVanity\
+  XRPL Vanity.exe   the launcher, the one file to run
+  README.txt        how to start it, the SmartScreen prompt, where the data is
+  app\              the application, the .NET runtime and the Windows App SDK
+```
+
+The launcher, `src/XrplVanity.Launcher`, is a 1.5 MB Native AOT executable with no runtime of
+its own. It starts `app\XrplVanity.App.exe` and exits; if `app\` is missing it says to unpack
+the whole archive. The application is several hundred files, and without the launcher a user
+who opens the folder has to find one `.exe` among them. Its icon, `XrplVanity.ico`, is
+rendered from `src/XrplVanity.App/Resources/AppIcon/appicon.svg` at 16, 24, 32, 48, 64, 128
+and 256 pixels; re-render it when the logo changes, a site test checks the sizes.
+
+The script publishes `XrplVanity.App` with `-p:PublishProfile=Portable-win-x64`, refuses a
+build without the compiled stylesheet, and then leaves out what a user never needs:
+
+- debug symbols (`*.pdb`);
+- the Windows App SDK's AI and machine-learning runtime: ONNX Runtime, DirectML, Windows AI,
+  the NPU probe, about 43 MB the application never calls. The publish profile sets
+  `DisableWindowsAppSDKMLAutoInitialize`, so nothing loads it at start either;
+- WinUI's `.mui` string folders for languages the interface does not speak; for the rest
+  Windows falls back to `en-us`. `SatelliteResourceLanguages` in the profile does the same for
+  .NET's satellite assemblies;
+- the `.scss` sources next to the compiled `app.css`.
+
+The result is about 95 MB packed and 260 MB unpacked, some 470 files. `Portable-win-x64.pubxml` sets
+`WindowsPackageType=None` and `WindowsAppSDKSelfContained=true` besides `SelfContained=true`.
+An MSIX declares the
 Windows App SDK runtime as a dependency and the installer brings it in; an unpackaged build
 has nothing to bring it in, so the runtime ships inside the folder. On a clean machine the
 process loads .NET and the Windows App SDK from its own folder only, none of it from
@@ -350,8 +384,12 @@ latest release, so a release is what the site offers from then on.
 
 What differs from the MSIX:
 
-- **No package identity.** Windows notifications are unavailable, and the Settings page says
-  so.
+- **No package identity.** Notifications still work: for an unpackaged process the Windows
+  App SDK registers an identity of its own, keyed by the executable's path, under
+  `HKCU\Software\Classes\AppUserModelId` with an icon copy in
+  `%LOCALAPPDATA%\Microsoft\WindowsAppSDK`. Windows lists the sender as "XrplVanity", and a
+  copy moved to another folder registers again. Deleting the folder leaves these entries
+  behind; they point at nothing and do no harm.
 - **Not signed.** Windows SmartScreen warns on the first start of a downloaded copy, and
   again for every new version: an unsigned file earns reputation by its own hash, which a
   new build resets.
@@ -574,10 +612,10 @@ then press the refresh button on the DEVICES card — it re-runs the enumeration
 restart.
 
 **Notifications never appear.** The Settings page says whether the platform accepted the
-registration at all: "unavailable on this system" means the process has no package
-identity (an unpackaged Debug build) or the registration failed. If the toggle is
+registration at all: "unavailable on this system" means the registration failed, for
+instance in an MSIX whose manifest declares no toast activator. If the toggle is
 available and toasts still do not show, check that Windows notifications are on for
-"XRPL Vanity" in *Settings → System → Notifications*, and that focus assist / do not
+"XRPL Vanity" (or "XrplVanity" for the ZIP and other unpackaged builds) in *Settings → System → Notifications*, and that focus assist / do not
 disturb is off. A long run with a short pattern can also queue hundreds of toasts, and
 Windows shows them one at a time.
 
