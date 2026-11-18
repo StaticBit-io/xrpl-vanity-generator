@@ -5,10 +5,16 @@ name: desktop-release
 # VanityVersion is <version>. A release is therefore always code that main holds, under the version
 # the application itself shows. The ZIP is built here rather than on a developer's machine, and the
 # build is attested, so anyone can check which commit and which run produced the file.
+#
+# Run by hand on any branch (gh workflow run desktop-release.yml --ref <branch>), it builds the same
+# ZIP on the same runner and uploads it as a run artifact, with no tag, attestation or release. That
+# is the way to try a change to the build before tagging: a local run uses whatever PowerShell the
+# machine has, and Windows PowerShell 5.1 passed a script that PowerShell 7 here rejected.
 
 on:
   push:
     tags: ['app-v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -33,8 +39,12 @@ jobs:
         id: version
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#app-v}"
           declared=$(sed -n 's:.*<VanityVersion>\(.*\)</VanityVersion>.*:\1:p' Directory.Build.props)
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            echo "version=$declared" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#app-v}"
           if [ "$version" != "$declared" ]; then
             echo "::error::$GITHUB_REF_NAME does not match VanityVersion $declared in Directory.Build.props"
             exit 1
@@ -67,11 +77,24 @@ jobs:
           "name=$name" >> $env:GITHUB_OUTPUT
           "sha256=$hash" >> $env:GITHUB_OUTPUT
 
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'push'
+        with:
+          name: ${{ steps.zip.outputs.name }}
+          path: |
+            ${{ steps.zip.outputs.name }}
+            ${{ steps.zip.outputs.name }}.sha256
+          retention-days: 7
+          # The ZIP is compressed already.
+          compression-level: 0
+
       - uses: actions/attest-build-provenance@v2
+        if: github.event_name == 'push'
         with:
           subject-path: ${{ steps.zip.outputs.name }}
 
       - name: Publish the release
+        if: github.event_name == 'push'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
