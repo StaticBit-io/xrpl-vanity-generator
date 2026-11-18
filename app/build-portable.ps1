@@ -34,16 +34,19 @@ foreach ($path in @($staging, $launcherOut, $zipPath, "$zipPath.sha256")) {
 }
 New-Item -ItemType Directory -Path $appFolder -Force | Out-Null
 
-# dotnet's output goes to the console, so the script's own output stays the ZIP path alone.
-function Invoke-Dotnet {
-    & dotnet @args | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "dotnet $($args[0]) failed with exit code $LASTEXITCODE." }
+# dotnet's output goes to the console, so the script's own output stays the ZIP path alone. The
+# arguments travel as an array of strings: unquoted tokens passed through a function's $args are
+# parsed as parameters first, and PowerShell 7 splits -p:Name=Value at the colon, which hands dotnet
+# "Name=Value" as a second project (MSB1008). Windows PowerShell 5.1 does not, so a local run passed.
+function Invoke-Dotnet([string[]] $Arguments) {
+    & dotnet @Arguments | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "dotnet $($Arguments[0]) failed with exit code $LASTEXITCODE." }
 }
 
-Invoke-Dotnet publish (Join-Path $root 'src\XrplVanity.App\XrplVanity.App.csproj') -c Release `
-    -f net10.0-windows10.0.22621.0 -p:PublishProfile=Portable-win-x64 -o $appFolder --nologo
-Invoke-Dotnet publish (Join-Path $root 'src\XrplVanity.Launcher\XrplVanity.Launcher.csproj') -c Release `
-    -r win-x64 -o $launcherOut --nologo
+Invoke-Dotnet @('publish', (Join-Path $root 'src\XrplVanity.App\XrplVanity.App.csproj'), '-c', 'Release',
+    '-f', 'net10.0-windows10.0.22621.0', '-p:PublishProfile=Portable-win-x64', '-o', $appFolder, '--nologo')
+Invoke-Dotnet @('publish', (Join-Path $root 'src\XrplVanity.Launcher\XrplVanity.Launcher.csproj'), '-c', 'Release',
+    '-r', 'win-x64', '-o', $launcherOut, '--nologo')
 
 # Without the stylesheet the application starts and renders unstyled, and nothing else would notice.
 # The first release shipped that way; see _IncludeCompiledSass in XrplVanity.App.Core.csproj.
