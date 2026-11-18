@@ -63,9 +63,20 @@ rem Resizetizer can keep the images of an earlier logo while refreshing their da
 rem package then shows the old icon. Its stamps go too, or it would skip the empty folder.
 if exist "%INTERMEDIATE%\resizetizer" rmdir /s /q "%INTERMEDIATE%\resizetizer"
 del /q "%INTERMEDIATE%\maui*.stamp" 2>nul
+rem Developer mode refuses to register a package again under the version it already has once
+rem the manifest differs (0x80073CFB, for instance after a Windows App SDK update), and the only
+rem other way out, removing the package, deletes results.dat. So every run registers a higher
+rem version: VanityVersion plus a revision of whole hours since 2026, which an update accepts and
+rem which keeps the package's data. The revision field holds up to 65535, that is until 2033.
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$v = ([xml](Get-Content 'Directory.Build.props')).Project.PropertyGroup.VanityVersion | Where-Object { $_ } | Select-Object -First 1; $r = [int][math]::Floor(([DateTimeOffset]::UtcNow - [DateTimeOffset]'2026-01-01T00:00:00Z').TotalHours); '{0}.{1}' -f $v, $r"`) do set "PKGVER=%%i"
+if "!PKGVER!"=="" (
+  echo ERROR: could not read VanityVersion from Directory.Build.props.
+  goto :fail
+)
+
 echo.
-echo Building... this takes a few minutes the first time.
-dotnet publish "%PROJECT%" -c Release -f %TFM% -p:PublishProfile=MSIX-win-x64 -p:PackageCertificateThumbprint=!THUMB! --nologo -v quiet
+echo Building version !PKGVER!... this takes a few minutes the first time.
+dotnet publish "%PROJECT%" -c Release -f %TFM% -p:PublishProfile=MSIX-win-x64 -p:PackageCertificateThumbprint=!THUMB! -p:VanityPackageVersion=!PKGVER! --nologo -v quiet
 if errorlevel 1 (
   echo.
   echo ERROR: the build failed. Scroll up for the first error line.
