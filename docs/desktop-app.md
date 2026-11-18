@@ -557,9 +557,9 @@ session's own dispose cap is 30 s, so a session that refuses to settle costs 10 
 ### One click: run-desktop-app.bat
 
 `run-desktop-app.bat` in the repository root does everything below in one step:
-it finds or creates the signing certificate, closes a running instance, publishes,
-copies the manifest into the publish layout, registers the package for the current
-user and starts the application. Double-click it, or run it from any directory — it
+it finds or creates the signing certificate, closes a running instance, publishes
+under a version whose revision grows by one every hour, copies the manifest into the
+publish layout, registers the package for the current user and starts the application. Double-click it, or run it from any directory — it
 changes to its own folder first. It needs the .NET 10 SDK and Developer Mode, and it
 stops with a plain-language message when either is missing. No administrator rights
 are required. The rest of this section is what the script does, step by step.
@@ -577,7 +577,16 @@ Add-AppxPackage -Register src\XrplVanity.App\bin\publish\AppxManifest.xml
 ```
 
 "XRPL Vanity" then appears in the Start menu and runs with package identity, so
-notifications and the tray behave as they do after a real install. Remove it again with
+notifications and the tray behave as they do after a real install.
+
+Registering again under the same version fails with `0x80073CFB` ("the package is
+already installed") once the manifest has changed, for instance after a Windows App SDK
+update. Raise the version instead of removing the package: a higher version is an update
+and keeps `LocalState`. Publish with `-p:VanityPackageVersion=1.0.0.<n>`, where `<n>` is
+larger than the installed revision. `run-desktop-app.bat` does this on every run, with
+the hours since the start of 2026 as the revision.
+
+Remove it again with
 `Remove-AppxPackage (Get-AppxPackage io.staticbit.vanity).PackageFullName` — that also
 deletes the package's `LocalState`, including `results.dat`, so export anything you want
 to keep first.
